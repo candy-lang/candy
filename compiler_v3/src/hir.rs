@@ -84,9 +84,12 @@ pub enum Body {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Expression {
-    Symbol(Box<str>),
     Int(i64),
     Text(Box<str>),
+    Tag {
+        symbol: Box<str>,
+        value: Option<Box<Expression>>,
+    },
     Struct(Box<[(Box<str>, Expression)]>),
     StructAccess {
         struct_: Box<Expression>,
@@ -126,7 +129,10 @@ impl BuiltinFunction {
 pub enum Type {
     #[allow(clippy::enum_variant_names)]
     Type,
-    Symbol, // TODO: specific symbol as separate type
+    Tag {
+        symbol: Box<str>,
+        value_type: Option<Box<Type>>,
+    },
     Int,
     Text,
     Struct(Box<[(Box<str>, Type)]>),

@@ -12,6 +12,7 @@ use crate::{
 use itertools::{Itertools, Position};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
+    borrow::Cow,
     collections::{hash_map::Entry, BTreeSet},
     mem,
     ops::Range,
@@ -22,7 +23,6 @@ use strum::VariantArray;
 pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError>) {
     let mut context = Context::new(path);
     context.add_builtin_value("type", Expression::Type(Type::Type), Type::Type);
-    context.add_builtin_value("symbol", Expression::Type(Type::Symbol), Type::Type);
     context.add_builtin_value("int", Expression::Type(Type::Int), Type::Type);
     context.add_builtin_value("text", Expression::Type(Type::Text), Type::Type);
     context.add_builtin_functions();
@@ -450,7 +450,6 @@ impl<'c> Context<'c> {
 
     fn evaluate_expression_to_type(&mut self, expression: &Expression) -> Type {
         match expression {
-            Expression::Symbol(_) => todo!(),
             Expression::Int(_) => {
                 // TODO: report actual error location
                 self.add_error(Offset(0)..Offset(0), "Expected a type, not an int");
@@ -461,6 +460,12 @@ impl<'c> Context<'c> {
                 self.add_error(Offset(0)..Offset(0), "Expected a type, not a text");
                 Type::Error
             }
+            Expression::Tag { symbol, value } => Type::Tag {
+                symbol: symbol.clone(),
+                value_type: value
+                    .as_ref()
+                    .map(|it| Box::new(self.evaluate_expression_to_type(it))),
+            },
             Expression::Struct(_) => todo!(),
             Expression::StructAccess { struct_, field } => todo!(),
             Expression::ValueWithTypeAnnotation { value, type_ } => todo!(),
@@ -674,10 +679,19 @@ impl<'c> Context<'c> {
                     return None;
                 }
             }
-            AstExpression::Symbol(symbol) => (
-                Expression::Symbol(symbol.symbol.value()?.string.clone()),
-                Type::Symbol,
-            ),
+            AstExpression::Symbol(symbol) => {
+                let symbol_string = &symbol.symbol.value()?.string;
+                (
+                    Expression::Tag {
+                        symbol: symbol_string.clone(),
+                        value: None,
+                    },
+                    Type::Tag {
+                        symbol: symbol_string.clone(),
+                        value_type: None,
+                    },
+                )
+            }
             AstExpression::Int(int) => (Expression::Int(*int.value.value()?), Type::Int),
             AstExpression::Text(text) => {
                 let text = text
@@ -717,10 +731,14 @@ impl<'c> Context<'c> {
             }
             AstExpression::Call(call) => {
                 let (receiver, receiver_type) = self.lower_expression(&call.receiver, None)?;
-                let parameter_context_types = match &receiver_type {
+                let parameter_context_types: Option<Cow<Box<[Type]>>> = match &receiver_type {
+                    Type::Tag {
+                        value_type: Some(box type_),
+                        ..
+                    } => Some(Cow::Owned([type_.clone()].into())),
                     Type::Function {
                         parameter_types, ..
-                    } => Some(parameter_types),
+                    } => Some(Cow::Borrowed(parameter_types)),
                     _ => None,
                 };
 
@@ -731,15 +749,47 @@ impl<'c> Context<'c> {
                     .map(|(index, argument)| {
                         self.lower_expression(
                             &argument.value,
-                            parameter_context_types.and_then(|it| it.get(index)),
+                            parameter_context_types
+                                .as_deref()
+                                .and_then(|it| it.get(index)),
                         )
                     })
                     .collect::<Option<Box<[_]>>>()?;
                 match receiver_type {
-                    Type::Type | Type::Symbol | Type::Int | Type::Text | Type::Struct(_) => {
+                    Type::Type | Type::Int | Type::Text | Type::Struct(_) => {
                         // TODO: report actual error location
                         self.add_error(Offset(0)..Offset(0), "Cannot call this type");
                         return None;
+                    }
+                    Type::Tag { symbol, value_type } => {
+                        if let Some(_) = value_type {
+                            // TODO: report actual error location
+                            self.add_error(
+                                Offset(0)..Offset(0),
+                                "You called a tag that already has a value.",
+                            );
+                            return None;
+                        } else if arguments.len() > 1 {
+                            // TODO: report actual error location
+                            self.add_error(
+                                Offset(0)..Offset(0),
+                                "Tags can only be created with one value.",
+                            );
+                            return None;
+                        }
+
+                        assert!(!arguments.is_empty());
+                        let (value, value_type) = arguments[0].clone();
+                        (
+                            Expression::Tag {
+                                symbol: symbol.clone(),
+                                value: Some(Box::new(value)),
+                            },
+                            Type::Tag {
+                                symbol,
+                                value_type: Some(Box::new(value_type)),
+                            },
+                        )
                     }
                     Type::Function {
                         parameter_types,
@@ -838,7 +888,11 @@ impl<'c> Context<'c> {
                     .string
                     .clone();
                 let type_ = match struct_type {
-                    Type::Type | Type::Symbol | Type::Int | Type::Text | Type::Function { .. } => {
+                    Type::Type
+                    | Type::Tag { .. }
+                    | Type::Int
+                    | Type::Text
+                    | Type::Function { .. } => {
                         // TODO: report actual error location
                         self.add_error(Offset(0)..Offset(0), "Receiver is not a struct");
                         Type::Error
@@ -893,7 +947,27 @@ impl<'c> Context<'c> {
         match (from, to) {
             (Type::Error, _) | (_, Type::Error) => true,
             (Type::Type, Type::Type) => true,
-            (Type::Symbol, Type::Symbol) => true,
+            (
+                Type::Tag {
+                    symbol: symbol_a,
+                    value_type: value_type_a,
+                },
+                Type::Tag {
+                    symbol: symbol_b,
+                    value_type: value_type_b,
+                },
+            ) => {
+                if symbol_a != symbol_b || value_type_a.is_some() != value_type_b.is_some() {
+                    return false;
+                }
+                if let Some(value_type_a) = value_type_a
+                    && let Some(value_type_b) = value_type_b
+                {
+                    Self::is_assignable_to(value_type_a, value_type_b)
+                } else {
+                    true
+                }
+            }
             (Type::Int, Type::Int) => true,
             (Type::Text, Type::Text) => true,
             (Type::Struct(from), Type::Struct(to)) => {

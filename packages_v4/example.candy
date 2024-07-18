@@ -51,6 +51,11 @@ let valueWithExplicitType: int = 42
 # }
 # aDate.add([days: 1]) # is equivalent to `add(aDate, [days: 1])`
 
+let nothing = Nothing
+
+let true = True
+let false = False
+
 let main() -> int = {
   let helloWorld = "Hello, World!"
   print(helloWorld)

@@ -155,10 +155,17 @@ impl<'h> Context<'h> {
     }
     fn lower_expression(&mut self, expression: &Expression) {
         match expression {
-            Expression::Symbol(_) => todo!(),
             Expression::Int(int) => self.push(format!("{int}")),
             // TODO: escape text
             Expression::Text(text) => self.push(format!("\"{text}\"")),
+            Expression::Tag { symbol: _, value } => {
+                self.push("{ ");
+                if let Some(value) = value {
+                    self.push(".value = ");
+                    self.lower_expression(value);
+                }
+                self.push("}");
+            }
             Expression::Struct(fields) => {
                 self.push("{ ");
                 for (name, value) in fields.iter() {
@@ -214,18 +221,22 @@ impl<'h> Context<'h> {
                         self.lower_type_definition(&mut definitions, &parameter.type_);
                     }
                     self.lower_type_definition(&mut definitions, return_type);
-                    match body {
-                        Body::Builtin(_) => {}
-                        Body::Written { expressions } => {
-                            for (_, _, expression, type_) in expressions {
-                                self.lower_type_definition(&mut definitions, type_);
-                                self.lower_type_definitions_in_expression(
-                                    &mut definitions,
-                                    expression,
-                                );
-                            }
-                        }
-                    }
+                    self.lower_type_definitions_in_body(&mut definitions, body);
+                }
+            }
+        }
+    }
+    fn lower_type_definitions_in_body(
+        &mut self,
+        definitions: &mut FxHashSet<&'h Type>,
+        body: &'h Body,
+    ) {
+        match body {
+            Body::Builtin(_) => {}
+            Body::Written { expressions } => {
+                for (_, _, expression, type_) in expressions {
+                    self.lower_type_definition(definitions, type_);
+                    self.lower_type_definitions_in_expression(definitions, expression);
                 }
             }
         }
@@ -236,15 +247,19 @@ impl<'h> Context<'h> {
         expression: &'h Expression,
     ) {
         match expression {
-            Expression::Symbol(_)
-            | Expression::Int(_)
+            Expression::Int(_)
             | Expression::Text(_)
+            | Expression::Tag { .. }
             | Expression::Struct(_)
             | Expression::StructAccess { .. }
-            | Expression::ValueWithTypeAnnotation { .. }
-            | Expression::Lambda { .. }
-            | Expression::Reference(_)
-            | Expression::Call { .. } => {}
+            | Expression::ValueWithTypeAnnotation { .. } => {}
+            Expression::Lambda { parameters, body } => {
+                for parameter in parameters.iter() {
+                    self.lower_type_definition(definitions, &parameter.type_);
+                }
+                self.lower_type_definitions_in_body(definitions, body);
+            }
+            Expression::Reference(_) | Expression::Call { .. } => {}
             Expression::Type(type_) => self.lower_type_definition(definitions, type_),
             Expression::Error => {}
         }
@@ -256,7 +271,26 @@ impl<'h> Context<'h> {
 
         match type_ {
             Type::Type => panic!("Type type found."),
-            Type::Symbol => eprintln!("Symbol type found: {type_:?}"),
+            Type::Tag { symbol, value_type } => {
+                if let Some(value_type) = value_type {
+                    self.lower_type_definition(definitions, value_type);
+                }
+
+                self.push("struct ");
+                self.lower_type(type_);
+                self.push("{");
+                if let Some(value_type) = value_type {
+                    self.lower_type(value_type);
+                    self.push(" value; ");
+                }
+                self.push("};\n");
+
+                self.push("typedef struct ");
+                self.lower_type(type_);
+                self.push(" ");
+                self.lower_type(type_);
+                self.push(";\n");
+            }
             Type::Int => {
                 self.push("typedef int64_t ");
                 self.lower_type(type_);
@@ -316,7 +350,14 @@ impl<'h> Context<'h> {
     fn lower_type(&mut self, type_: &Type) {
         match type_ {
             Type::Type => panic!("Type type found."),
-            Type::Symbol => todo!(),
+            Type::Tag { symbol, value_type } => {
+                self.push("tag_");
+                self.push(symbol);
+                if let Some(value_type) = value_type {
+                    self.push("_of_");
+                    self.lower_type(value_type);
+                }
+            }
             Type::Int => self.push("candyInt"),
             Type::Text => self.push("candyText"),
             Type::Struct(struct_) => {
