@@ -833,7 +833,7 @@ impl<'c> Context<'c> {
                         return None;
                     }
                     Type::Tag(TagType { symbol, value_type }) => {
-                        if let Some(_) = value_type {
+                        if value_type.is_some() {
                             // TODO: report actual error location
                             self.add_error(
                                 Offset(0)..Offset(0),
@@ -1023,7 +1023,7 @@ impl<'c> Context<'c> {
             if let (Type::Tag(from), Type::Or(OrType(to))) = (&type_, context_type)
                 && to
                     .iter()
-                    .any(|to| Self::tag_type_is_assignable_to(&from, to))
+                    .any(|to| Self::tag_type_is_assignable_to(from, to))
             {
                 Some((
                     Expression::CreateOrVariant {
