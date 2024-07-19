@@ -1,11 +1,12 @@
 use crate::{
     ast::{
         AstAssignment, AstAssignmentFunction, AstAssignmentKind, AstAssignmentValue, AstExpression,
-        AstStatement, AstTextPart,
+        AstParameter, AstStatement, AstTextPart,
     },
     error::CompilerError,
     hir::{
-        Body, BuiltinFunction, Definition, Expression, Hir, Id, OrType, Parameter, TagType, Type,
+        Body, BodyOrBuiltin, BuiltinFunction, Definition, Expression, Hir, Id, Lambda, OrType,
+        Parameter, TagType, Type,
     },
     id::IdGenerator,
     position::Offset,
@@ -137,7 +138,7 @@ struct ValueDefinition<'a> {
 #[derive(Debug)]
 struct FunctionDefinition<'a> {
     ast: Option<&'a AstAssignmentFunction>,
-    signature_and_body: Option<(Box<[Parameter]>, Type, Option<Body>)>,
+    signature_and_body: Option<(Box<[Parameter]>, Type, Option<BodyOrBuiltin>)>,
 }
 impl<'c> Context<'c> {
     fn new(path: &'c Path) -> Self {
@@ -240,7 +241,7 @@ impl<'c> Context<'c> {
                 signature_and_body: Some((
                     parameters,
                     return_type,
-                    Some(Body::Builtin(builtin_function)),
+                    Some(BodyOrBuiltin::Builtin(builtin_function)),
                 )),
             }),
         );
@@ -383,43 +384,7 @@ impl<'c> Context<'c> {
             TempDefinition::Function(FunctionDefinition { ast, .. }) => {
                 let ast = ast.unwrap();
                 self.with_scope(|context| {
-                    let mut parameter_names = FxHashSet::default();
-                    let parameters = ast
-                        .parameters
-                        .iter()
-                        .filter_map(|parameter| try {
-                            let name = parameter.name.identifier.value()?.clone();
-                            if !parameter_names.insert(name.clone()) {
-                                context.add_error(
-                                    name.span.clone(),
-                                    format!("Duplicate parameter name: {}", *name),
-                                );
-                                return None;
-                            }
-
-                            let type_ = parameter
-                                .type_
-                                .as_ref()
-                                .and_then(|it| it.value())
-                                .map_or(Expression::Error, |it| {
-                                    context.lower_expression(it, Some(&Type::Type)).0
-                                });
-                            let type_ = context.evaluate_expression_to_type(&type_);
-
-                            let id = context.id_generator.generate();
-                            context.local_identifiers.push((
-                                name.string.clone(),
-                                id,
-                                None,
-                                type_.clone(),
-                            ));
-                            Parameter {
-                                id,
-                                name: name.string,
-                                type_,
-                            }
-                        })
-                        .collect();
+                    let parameters = context.lower_parameters(&ast.parameters, None);
 
                     let return_type = ast.return_type.as_ref().map_or_else(Type::nothing, |it| {
                         it.value().map_or(Type::Error, |it| {
@@ -436,14 +401,14 @@ impl<'c> Context<'c> {
                         }
                     }
 
-                    let body = context.lower_body(&ast.body, &return_type);
+                    let (body, _) = context.lower_body(&ast.body, Some(&return_type));
                     match context.definitions.get_mut(&id).unwrap() {
                         TempDefinition::Value(_) => unreachable!(),
                         TempDefinition::Function(FunctionDefinition {
                             signature_and_body, ..
                         }) => {
                             let (_, _, definition_body) = signature_and_body.as_mut().unwrap();
-                            *definition_body = Some(body);
+                            *definition_body = Some(BodyOrBuiltin::Body(body));
                         }
                     };
                 });
@@ -475,7 +440,7 @@ impl<'c> Context<'c> {
             Expression::Struct(_) => todo!(),
             Expression::StructAccess { struct_, field } => todo!(),
             Expression::ValueWithTypeAnnotation { value, type_ } => todo!(),
-            Expression::Lambda { parameters, body } => todo!(),
+            Expression::Lambda(lambda) => todo!(),
             Expression::Reference(id) => {
                 if let Some(assignment) = self
                     .local_identifiers
@@ -588,12 +553,56 @@ impl<'c> Context<'c> {
             Expression::Error => Type::Error,
         }
     }
+    fn lower_parameters(
+        &mut self,
+        parameters: &[AstParameter],
+        context_types: Option<&[Type]>,
+    ) -> Box<[Parameter]> {
+        let mut parameter_names = FxHashSet::default();
+        parameters
+            .iter()
+            .enumerate()
+            .filter_map(|(index, parameter)| try {
+                let name = parameter.name.identifier.value()?.clone();
+                if !parameter_names.insert(name.clone()) {
+                    self.add_error(
+                        name.span.clone(),
+                        format!("Duplicate parameter name: {}", *name),
+                    );
+                    return None;
+                }
 
-    fn lower_body(&mut self, body: &[AstStatement], context_type: &Type) -> Body {
+                let type_ = parameter.type_.as_ref().map_or_else(
+                    || {
+                        context_types
+                            .and_then(|it| it.get(index).cloned())
+                            .unwrap_or(Type::Error)
+                    },
+                    |it| {
+                        it.value().map_or(Type::Error, |it| {
+                            let (type_, _) = self.lower_expression(it, Some(&Type::Type));
+                            self.evaluate_expression_to_type(&type_)
+                        })
+                    },
+                );
+
+                let id = self.id_generator.generate();
+                self.local_identifiers
+                    .push((name.string.clone(), id, None, type_.clone()));
+                Parameter {
+                    id,
+                    name: name.string,
+                    type_,
+                }
+            })
+            .collect()
+    }
+
+    fn lower_body(&mut self, body: &[AstStatement], context_type: Option<&Type>) -> (Body, Type) {
         let mut expressions = vec![];
         for (position, statement) in body.iter().with_position() {
             let statement_context_type = if matches!(position, Position::Last | Position::Only) {
-                Some(context_type)
+                context_type
             } else {
                 None
             };
@@ -657,7 +666,11 @@ impl<'c> Context<'c> {
             // TODO: report actual error location
             self.add_error(Offset(0)..Offset(0), "Body must not be empty");
         }
-        Body::Written { expressions }
+        let return_type = context_type
+            .cloned()
+            .or_else(|| expressions.last().map(|(_, _, _, type_)| type_.clone()))
+            .unwrap_or(Type::Error);
+        (Body { expressions }, return_type)
     }
 
     fn lower_expression(
@@ -1011,7 +1024,30 @@ impl<'c> Context<'c> {
                     type_,
                 )
             }
-            AstExpression::Lambda(_) => todo!(),
+            AstExpression::Lambda(lambda) => {
+                let function_context_type = if let Some(Type::Function {
+                    box parameter_types,
+                    box return_type,
+                }) = context_type
+                {
+                    Some((parameter_types, return_type))
+                } else {
+                    None
+                };
+                let parameters = self
+                    .lower_parameters(&lambda.parameters, function_context_type.map(|(it, _)| it));
+                let parameter_types = parameters.iter().map(|it| it.type_.clone()).collect();
+
+                let (body, return_type) =
+                    self.lower_body(&lambda.body, function_context_type.map(|(_, it)| it));
+                (
+                    Expression::Lambda(Lambda { parameters, body }),
+                    Type::Function {
+                        parameter_types,
+                        return_type: Box::new(return_type),
+                    },
+                )
+            }
             AstExpression::Or(or) => {
                 let (left, _) = self.lower_expression(&or.left, Some(&Type::Type));
                 let right = or.right.value().map_or(Expression::Error, |it| {

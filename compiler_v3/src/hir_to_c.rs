@@ -1,11 +1,14 @@
 use crate::{
-    hir::{Body, BuiltinFunction, Definition, Expression, Hir, OrType, Parameter, TagType, Type},
+    hir::{
+        Body, BodyOrBuiltin, BuiltinFunction, Definition, Expression, Hir, Id, OrType, Parameter,
+        TagType, Type,
+    },
+    id::CountableId,
     utils::HashSetExtension,
 };
 use core::panic;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
-use std::borrow::Cow;
 
 pub fn hir_to_c(hir: &Hir) -> String {
     let mut context = Context::new(hir);
@@ -38,6 +41,24 @@ impl<'h> Context<'h> {
         self.push("\n");
 
         self.push("/// Declarations\n\n");
+        self.lower_declarations();
+        self.push("\n");
+
+        self.push("/// Definitions\n\n");
+        self.lower_definitions();
+
+        let (main_function_id, _, _) = self
+            .hir
+            .assignments
+            .iter()
+            .find(|(_, box name, _)| name == "main")
+            .unwrap();
+        self.push(format!(
+            "int main() {{ return {main_function_id}_function(NULL); }}\n",
+        ));
+    }
+
+    fn lower_declarations(&mut self) {
         for (id, name, assignment) in &self.hir.assignments {
             self.push(format!("/* {name} */ "));
             match assignment {
@@ -57,22 +78,29 @@ impl<'h> Context<'h> {
                     ..
                 } => {
                     self.lower_type(return_type);
-                    self.push(format!(" {id}("));
-                    for (i, parameter) in parameters.iter().enumerate() {
-                        if i != 0 {
-                            self.push(", ");
-                        }
+                    self.push(format!(" {id}_function(void* closure"));
+                    for parameter in parameters.iter() {
+                        self.push(", ");
                         self.lower_type(&parameter.type_);
                         self.push(format!(" {}", parameter.id));
                     }
                     self.push(");");
+
+                    self.push("const ");
+                    self.lower_type(&Type::Function {
+                        parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
+                        return_type: Box::new(return_type.clone()),
+                    });
+                    self.push(format!(
+                        " {id} = {{ .closure = NULL, .function = {id}_function }};",
+                    ));
                 }
             }
             self.push("\n");
         }
-        self.push("\n");
+    }
 
-        self.push("/// Definitions\n\n");
+    fn lower_definitions(&mut self) {
         for (id, name, assignment) in &self.hir.assignments {
             self.push(format!("// {name}\n"));
             match assignment {
@@ -85,7 +113,7 @@ impl<'h> Context<'h> {
                     self.push("const ");
                     self.lower_type(type_);
                     self.push(format!(" {id} = "));
-                    self.lower_expression(value);
+                    self.lower_expression(*id, value, type_);
                     self.push(";");
                 }
                 Definition::Function {
@@ -93,34 +121,76 @@ impl<'h> Context<'h> {
                     return_type,
                     body,
                 } => {
+                    if let BodyOrBuiltin::Body(body) = body {
+                        self.lower_lambdas_inside_body(body);
+                    }
+
                     self.lower_type(return_type);
-                    self.push(format!(" {id}("));
-                    for (i, parameter) in parameters.iter().enumerate() {
-                        if i != 0 {
-                            self.push(", ");
-                        }
+                    self.push(format!(" {id}_function(void* closure"));
+                    for parameter in parameters {
+                        self.push(", ");
                         self.lower_type(&parameter.type_);
                         self.push(format!(" {}", parameter.id));
                     }
                     self.push(") {\n");
-                    self.lower_body(parameters, body);
+                    self.lower_body_or_builtin(parameters, body);
                     self.push("}");
                 }
             }
             self.push("\n\n");
         }
-
-        let (main_function_id, _, _) = self
-            .hir
-            .assignments
-            .iter()
-            .find(|(_, box name, _)| name == "main")
-            .unwrap();
-        self.push(format!("int main() {{ return {main_function_id}(); }}\n"));
     }
-    fn lower_body(&mut self, parameters: &[Parameter], body: &Body) {
+    fn lower_lambdas_inside_body(&mut self, body: &Body) {
+        for (id, _, expression, type_) in &body.expressions {
+            match expression {
+                Expression::Int(_)
+                | Expression::Text(_)
+                | Expression::Tag { .. }
+                | Expression::Struct(_)
+                | Expression::StructAccess { .. }
+                | Expression::ValueWithTypeAnnotation { .. }
+                | Expression::Reference(_)
+                | Expression::Call { .. }
+                | Expression::CreateOrVariant { .. } => {}
+                Expression::Or { .. } => panic!("Or expression found."),
+                Expression::Type(_) => panic!("Should have been resolved to a value."),
+                Expression::Error => panic!("Error expression found."),
+                Expression::Lambda(lambda) => {
+                    self.lower_lambdas_inside_body(&lambda.body);
+
+                    let Type::Function {
+                        parameter_types,
+                        return_type,
+                    } = type_
+                    else {
+                        panic!("Lambda's type should be a function type.");
+                    };
+
+                    self.push(format!("struct {id}_closure {{"));
+                    for id in lambda.closure().iter().sorted() {
+                        self.lower_type(self.hir.type_of(*id).as_ref());
+                        self.push(format!(" {id}; "));
+                    }
+                    self.push("};\n");
+                    self.push(format!("typedef struct {id}_closure {id}_closure;\n"));
+
+                    self.lower_type(return_type);
+                    self.push(format!(" {id}_function(void* closure"));
+                    for parameter in lambda.parameters.iter() {
+                        self.push(", ");
+                        self.lower_type(&parameter.type_);
+                        self.push(format!(" {}", parameter.id));
+                    }
+                    self.push(") {\n");
+                    self.lower_body(&lambda.body);
+                    self.push("}");
+                }
+            }
+        }
+    }
+    fn lower_body_or_builtin(&mut self, parameters: &[Parameter], body: &BodyOrBuiltin) {
         match body {
-            Body::Builtin(builtin_function) => {
+            BodyOrBuiltin::Builtin(builtin_function) => {
                 self.push("// builtin function\n");
                 match builtin_function {
                     BuiltinFunction::IntAdd => self.push(format!(
@@ -132,7 +202,11 @@ impl<'h> Context<'h> {
                         self.push(format!("puts({}); const ", parameters[0].id));
                         self.lower_type(&Type::nothing());
                         self.push(" _1 = ");
-                        self.lower_expression(&Expression::nothing());
+                        self.lower_expression(
+                            Id::from_usize(1),
+                            &Expression::nothing(),
+                            &Type::nothing(),
+                        );
                         self.push("; return _1;");
                     }
                     BuiltinFunction::TextConcat => self.push(format!(
@@ -148,23 +222,24 @@ impl<'h> Context<'h> {
                     )),
                 }
             }
-            Body::Written { expressions } => {
-                for (id, name, expression, type_) in expressions {
-                    if let Some(name) = name {
-                        self.push(format!("// {name}\n"));
-                    }
-
-                    self.push("const ");
-                    self.lower_type(type_);
-                    self.push(format!(" {id} = "));
-                    self.lower_expression(expression);
-                    self.push(";\n");
-                }
-                self.push(format!("return {};", expressions.last().unwrap().0));
-            }
+            BodyOrBuiltin::Body(body) => self.lower_body(body),
         }
     }
-    fn lower_expression(&mut self, expression: &Expression) {
+    fn lower_body(&mut self, body: &Body) {
+        for (id, name, expression, type_) in &body.expressions {
+            if let Some(name) = name {
+                self.push(format!("// {name}\n"));
+            }
+
+            self.push("const ");
+            self.lower_type(type_);
+            self.push(format!(" {id} = "));
+            self.lower_expression(*id, expression, type_);
+            self.push(";\n");
+        }
+        self.push(format!("return {};", body.expressions.last().unwrap().0));
+    }
+    fn lower_expression(&mut self, id: Id, expression: &Expression, type_: &Type) {
         match expression {
             Expression::Int(int) => self.push(format!("{int}")),
             // TODO: escape text
@@ -173,7 +248,7 @@ impl<'h> Context<'h> {
                 self.push("{ ");
                 if let Some(value) = value {
                     self.push(".value = ");
-                    self.lower_expression(value);
+                    self.lower_expression(id, value, &Type::Error); // TODO: proper ID, type
                 }
                 self.push("}");
             }
@@ -181,31 +256,44 @@ impl<'h> Context<'h> {
                 self.push("{ ");
                 for (name, value) in fields.iter() {
                     self.push(format!(".{name} = "));
-                    self.lower_expression(value);
+                    self.lower_expression(id, value, &Type::Error); // TODO: proper ID, type
                     self.push(", ");
                 }
                 self.push("}");
             }
             Expression::StructAccess { struct_, field } => {
-                self.lower_expression(struct_);
+                self.lower_expression(id, struct_, &Type::Error); // TODO: proper ID, type
                 self.push(format!(".{field}"));
             }
             Expression::ValueWithTypeAnnotation { value, type_ } => {
-                self.lower_expression(value);
+                self.lower_expression(id, value, &Type::Error); // TODO: proper ID, type
             }
-            Expression::Lambda { .. } => todo!(),
-            Expression::Reference(id) => self.push(id.to_string()),
+            Expression::Lambda(lambda) => {
+                self.push("{ .closure = {");
+                for id in lambda.closure().iter().sorted() {
+                    self.push(format!(".{id} = {id}; "));
+                }
+                self.push(format!("}}, .function = {id}_function }};"));
+            }
+            Expression::Reference(id) => {
+                // if let Some((_, _, Definition::Function { .. })) = self.hir.assignments.iter().find(|(item_id, _, _)| item_id == id) {
+                //     self.push();
+                // } else {
+                self.push(id.to_string());
+                // }
+            }
             Expression::Call {
                 receiver,
                 arguments,
             } => {
-                self.lower_expression(receiver);
-                self.push("(");
-                for (i, argument) in arguments.iter().enumerate() {
-                    if i != 0 {
-                        self.push(", ");
-                    }
-                    self.lower_expression(argument);
+                // TODO: lower receiver only once
+                self.lower_expression(id, receiver, &Type::Error); // TODO: proper ID, type
+                self.push(".function(");
+                self.lower_expression(id, receiver, &Type::Error); // TODO: proper ID, type
+                self.push(".closure");
+                for argument in arguments.iter() {
+                    self.push(", ");
+                    self.lower_expression(id, argument, &Type::Error); // TODO: proper ID, type
                 }
                 self.push(")");
             }
@@ -219,7 +307,7 @@ impl<'h> Context<'h> {
                 self.push(".symbol = ");
                 self.push(symbol);
                 self.push(", .tag = ");
-                self.lower_expression(value);
+                self.lower_expression(id, value, &Type::Error); // TODO: proper ID, type
                 self.push("}");
             }
             Expression::Type(_) => panic!("Should have been resolved to a value."),
@@ -241,11 +329,20 @@ impl<'h> Context<'h> {
                     return_type,
                     body,
                 } => {
-                    for parameter in parameters {
-                        self.lower_type_definition(&mut definitions, &parameter.type_);
+                    self.lower_type_definition(
+                        &mut definitions,
+                        &Type::Function {
+                            parameter_types: parameters.iter().map(|it| it.type_.clone()).collect(),
+                            return_type: Box::new(return_type.clone()),
+                        },
+                    );
+
+                    match body {
+                        BodyOrBuiltin::Builtin(_) => {}
+                        BodyOrBuiltin::Body(body) => {
+                            self.lower_type_definitions_in_body(&mut definitions, body);
+                        }
                     }
-                    self.lower_type_definition(&mut definitions, return_type);
-                    self.lower_type_definitions_in_body(&mut definitions, body);
                 }
             }
         }
@@ -255,14 +352,9 @@ impl<'h> Context<'h> {
         definitions: &mut FxHashSet<Type>,
         body: &'h Body,
     ) {
-        match body {
-            Body::Builtin(_) => {}
-            Body::Written { expressions } => {
-                for (_, _, expression, type_) in expressions {
-                    self.lower_type_definition(definitions, type_);
-                    self.lower_type_definitions_in_expression(definitions, expression);
-                }
-            }
+        for (_, _, expression, type_) in &body.expressions {
+            self.lower_type_definition(definitions, type_);
+            self.lower_type_definitions_in_expression(definitions, expression);
         }
     }
     fn lower_type_definitions_in_expression(
@@ -277,11 +369,11 @@ impl<'h> Context<'h> {
             | Expression::Struct(_)
             | Expression::StructAccess { .. }
             | Expression::ValueWithTypeAnnotation { .. } => {}
-            Expression::Lambda { parameters, body } => {
-                for parameter in parameters.iter() {
+            Expression::Lambda(lambda) => {
+                for parameter in lambda.parameters.iter() {
                     self.lower_type_definition(definitions, &parameter.type_);
                 }
-                self.lower_type_definitions_in_body(definitions, body);
+                self.lower_type_definitions_in_body(definitions, &lambda.body);
             }
             Expression::Reference(_)
             | Expression::Call { .. }
@@ -393,16 +485,21 @@ impl<'h> Context<'h> {
                 }
                 self.lower_type_definition(definitions, return_type);
 
-                self.push("typedef ");
+                self.push("struct ");
+                self.lower_type(type_);
+                self.push("{ void* closure; ");
                 self.lower_type(return_type);
-                self.push(" (*)(");
+                self.push(" (*function)(void*");
                 for (i, parameter_type) in parameter_types.iter().enumerate() {
-                    if i != 0 {
-                        self.push(", ");
-                    }
+                    self.push(", ");
                     self.lower_type(parameter_type);
                 }
-                self.push(") ");
+                self.push(");");
+                self.push("};\n");
+
+                self.push("typedef struct ");
+                self.lower_type(type_);
+                self.push(" ");
                 self.lower_type(type_);
                 self.push(";\n");
             }
@@ -443,7 +540,7 @@ impl<'h> Context<'h> {
             } => {
                 self.push("function_");
                 if !parameter_types.is_empty() {
-                    self.push("taking");
+                    self.push("taking_");
                     for (index, parameter_type) in parameter_types.iter().enumerate() {
                         if index != 0 {
                             self.push("_and_");
