@@ -1,0 +1,86 @@
+# Types
+pub struct Nothing {}
+pub enum Never {}
+
+struct MyStruct {
+  name: Text,
+  color: Int,
+}
+# struct UInt {
+#   value: Int,
+# } where value.isNonNegative()
+# struct Date {
+#   year: Int,
+#   month: Int,
+#   day: Int,
+# } where {
+#   needs(month.isBetween(1, 12))
+#   needs(day.isBetween(1, 31))
+# }
+
+enum Bool { true, false }
+let true = Bool.true
+let false = Bool.false
+
+enum MyEnum {
+  foo: Int,
+  bar,
+}
+
+# array type: `Array[Int]`
+# function type: `Fun[Int, Text, Int]`, later `Fun (Int, Text) Int`
+
+# Expressions
+let intExpression: Int = 42
+let textExpression = "Hello, World!"
+# let textExpressionWithInterpolation = "The answer is {intExpression}!"
+let identifierExpression = intExpression
+# let parenthesizedExpression = (intExpression)
+let structExpression = MyStruct("Banana", 12345)
+# let lambdaExpression = (x: Int) { x }
+
+# Assignments
+let valueWithExplicitType: Int = 42
+# let someFunction(x: Int) -> Int = { x }
+
+# Uniform Function Call Syntax
+# Functions can also be overloaded
+# fun add(aDate: Date, duration: Duration) Self {
+#   needs(days.isNonNegative())
+#   Date(
+#     aDate.year,
+#     aDate.month,
+#     aDate.day.add(duration.days),
+#   )
+# }
+# aDate.add(Duration(days: 1)) # is equivalent to `add(aDate, Duration(days: 1))`
+
+fun fibonacci(n: int) int = {
+  switch n.isLessThan(2) {
+    true => n,
+    false => fibonacci(n.subtract(1).add(fibonacci(n.subtract(2))))
+  }
+}
+
+fun printHello(name: Text) = {
+  print("Hello, {name}!")
+}
+
+fun main() Int = {
+  (x: Int) { x }
+
+  let helloWorld = "Hello, World!"
+  printHello("World")
+
+  let theAnswer = 40.add(2)
+  let theAnswerText = "42"
+  print("The answer is {theAnswerText}!")
+
+  theAnswer
+}
+
+# fibonacci
+# symbols, or types
+# calculator
+# 2048
+# sudoku

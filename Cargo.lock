@@ -166,7 +166,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "candy_compiler_v3"
+name = "candy_compiler_v4"
 version = "0.1.0"
 dependencies = [
  "clap",

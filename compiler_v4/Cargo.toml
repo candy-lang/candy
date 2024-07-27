@@ -1,11 +1,11 @@
 [package]
-name = "candy_compiler_v3"
+name = "candy_compiler_v4"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "candy_v3"
+name = "candy_v4"
 path = "src/main.rs"
 
 [dependencies]

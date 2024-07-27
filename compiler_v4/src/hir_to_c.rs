@@ -79,7 +79,7 @@ impl<'h> Context<'h> {
                 } => {
                     self.lower_type(return_type);
                     self.push(format!(" {id}_function(void* closure"));
-                    for parameter in parameters.iter() {
+                    for parameter in parameters {
                         self.push(", ");
                         self.lower_type(&parameter.type_);
                         self.push(format!(" {}", parameter.id));
