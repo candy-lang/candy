@@ -10,7 +10,7 @@ members = [
     "compiler/language_server",
     "compiler/vm",
     "compiler/vm/fuzz",
-    "compiler_v3",
+    "compiler_v4",
 ]
 
 [workspace.package]

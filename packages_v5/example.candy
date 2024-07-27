@@ -1,6 +1,6 @@
 # Types
-pub struct Nothing {}
-pub enum Never {}
+struct Nothing {}
+enum Never {}
 
 struct MyStruct {
   name: Text,

@@ -1,20 +1,23 @@
 use super::{
-    lambda::lambda,
+    declarations::assignment,
     literal::{
-        bar, closing_bracket, closing_parenthesis, colon, comma, dot, opening_bracket,
+        closing_curly_brace, closing_parenthesis, comma, dot, opening_curly_brace,
         opening_parenthesis,
     },
-    parser::{Parser, ParserUnwrapOrAstError, ParserWithValueUnwrapOrAstError},
+    parser::{
+        Parser, ParserUnwrapOrAstError, ParserWithResultUnwrapOrAstError,
+        ParserWithValueUnwrapOrAstError,
+    },
     text::text,
     whitespace::{
-        whitespace, AndTrailingWhitespace, OptionAndTrailingWhitespace,
-        OptionWithValueAndTrailingWhitespace, ValueAndTrailingWhitespace,
+        whitespace, AndTrailingWhitespace, OptionWithValueAndTrailingWhitespace,
+        ValueAndTrailingWhitespace,
     },
-    word::{identifier, int, symbol},
+    word::{raw_identifier, word},
 };
 use crate::ast::{
-    AstCall, AstCallArgument, AstExpression, AstOr, AstParenthesized, AstStruct, AstStructAccess,
-    AstStructField,
+    AstArgument, AstBody, AstCall, AstError, AstExpression, AstIdentifier, AstInt, AstNavigation,
+    AstParenthesized, AstResult, AstStatement,
 };
 use replace_with::replace_with_or_abort;
 use tracing::instrument;
@@ -24,15 +27,20 @@ pub fn expression(parser: Parser) -> Option<(Parser, AstExpression)> {
     // If we start the call list with `if … else …`, the formatting looks weird.
     // Hence, we start with a single `None`.
     let (mut parser, mut result) = None
+        .or_else(|| {
+            raw_identifier(parser).map(|(parser, identifier)| {
+                (
+                    parser,
+                    AstExpression::Identifier(AstIdentifier { identifier }),
+                )
+            })
+        })
         .or_else(|| int(parser).map(|(parser, it)| (parser, AstExpression::Int(it))))
         .or_else(|| text(parser).map(|(parser, it)| (parser, AstExpression::Text(it))))
-        .or_else(|| identifier(parser).map(|(parser, it)| (parser, AstExpression::Identifier(it))))
-        .or_else(|| symbol(parser).map(|(parser, it)| (parser, AstExpression::Symbol(it))))
         .or_else(|| {
             parenthesized(parser).map(|(parser, it)| (parser, AstExpression::Parenthesized(it)))
         })
-        .or_else(|| struct_(parser).map(|(parser, it)| (parser, AstExpression::Struct(it))))
-        .or_else(|| lambda(parser).map(|(parser, it)| (parser, AstExpression::Lambda(it))))?;
+        .or_else(|| body(parser).map(|(parser, it)| (parser, AstExpression::Body(it))))?;
 
     loop {
         fn parse_suffix<'a>(
@@ -47,15 +55,34 @@ pub fn expression(parser: Parser) -> Option<(Parser, AstExpression)> {
         }
 
         let mut did_make_progress = false;
-        did_make_progress |=
-            parse_suffix(&mut parser, &mut result, expression_suffix_struct_access);
+        did_make_progress |= parse_suffix(&mut parser, &mut result, expression_suffix_navigation);
         did_make_progress |= parse_suffix(&mut parser, &mut result, expression_suffix_call);
-        did_make_progress |= parse_suffix(&mut parser, &mut result, expression_suffix_or);
         if !did_make_progress {
             break;
         }
     }
     Some((parser, result))
+}
+
+#[instrument(level = "trace")]
+pub fn int(parser: Parser) -> Option<(Parser, AstInt)> {
+    let (parser, string) = word(parser)?;
+    if !string.string.chars().next().unwrap().is_ascii_digit() {
+        return None;
+    }
+
+    let value = if string.string.chars().all(|c| c.is_ascii_digit()) {
+        AstResult::ok(str::parse(&string.string).expect("Couldn't parse int."))
+    } else {
+        AstResult::error(
+            None,
+            AstError {
+                unparsable_input: string.clone(),
+                error: "This integer contains characters that are not digits.".to_string(),
+            },
+        )
+    };
+    Some((parser, AstInt { value, string }))
 }
 
 #[instrument(level = "trace")]
@@ -79,66 +106,55 @@ fn parenthesized<'a>(parser: Parser) -> Option<(Parser, AstParenthesized)> {
         },
     ))
 }
-
 #[instrument(level = "trace")]
-fn struct_<'a>(parser: Parser) -> Option<(Parser, AstStruct)> {
-    let mut parser = opening_bracket(parser)?.and_trailing_whitespace();
+fn body<'a>(parser: Parser) -> Option<(Parser, AstBody)> {
+    let parser = opening_curly_brace(parser)?.and_trailing_whitespace();
 
-    let mut fields: Vec<AstStructField> = vec![];
-    let mut parser_for_missing_comma_error: Option<Parser> = None;
-    while let Some((new_parser, field, new_parser_for_missing_comma_error)) = struct_field(parser) {
-        if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
-            fields.last_mut().unwrap().comma_error = Some(
-                parser_for_missing_comma_error
-                    .error_at_current_offset("This parameter is missing a comma."),
-            );
+    let (parser, statements) = statements(parser);
+
+    let (parser, closing_curly_brace_error) = closing_curly_brace(parser)
+        .unwrap_or_ast_error(parser, "This body is missing a closing curly brace.");
+
+    Some((
+        parser,
+        AstBody {
+            statements,
+            closing_curly_brace_error,
+        },
+    ))
+}
+#[instrument(level = "trace")]
+pub fn statements(mut parser: Parser) -> (Parser, Vec<AstStatement>) {
+    let mut statements = vec![];
+    while !parser.is_at_end() {
+        let mut made_progress = false;
+
+        if let Some((new_parser, statement)) = statement(parser) {
+            parser = new_parser;
+            statements.push(statement);
+            made_progress = true;
         }
 
-        parser = new_parser.and_trailing_whitespace();
-        fields.push(field);
-        parser_for_missing_comma_error = new_parser_for_missing_comma_error;
+        if let Some(new_parser) = whitespace(parser) {
+            parser = new_parser;
+            made_progress = true;
+        }
+
+        if !made_progress {
+            break;
+        }
     }
-
-    let (parser, closing_bracket_error) = closing_bracket(parser)
-        .unwrap_or_ast_error(parser, "This struct is missing a closing bracket.");
-
-    Some((
-        parser,
-        AstStruct {
-            fields,
-            closing_bracket_error,
-        },
-    ))
+    (parser, statements)
 }
 #[instrument(level = "trace")]
-fn struct_field<'a>(parser: Parser) -> Option<(Parser, AstStructField, Option<Parser>)> {
-    let (parser, key) = identifier(parser)?.and_trailing_whitespace();
-
-    let (parser, colon_error) = colon(parser)
-        .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This struct field is missing a colon.");
-
-    let (parser, value) = expression(parser)
-        .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This struct field is missing a value.");
-
-    let (parser, parser_for_missing_comma_error) =
-        comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));
-
-    Some((
-        parser,
-        AstStructField {
-            key,
-            colon_error,
-            value: value.map(Box::new),
-            comma_error: None,
-        },
-        parser_for_missing_comma_error,
-    ))
+pub fn statement(parser: Parser) -> Option<(Parser, AstStatement)> {
+    assignment(parser)
+        .map(|(parser, it)| (parser, AstStatement::Assignment(it)))
+        .or_else(|| expression(parser).map(|(parser, it)| (parser, AstStatement::Expression(it))))
 }
 
 #[instrument(level = "trace")]
-fn expression_suffix_struct_access<'s>(
+fn expression_suffix_navigation<'s>(
     parser: Parser<'s>,
     current: &mut AstExpression,
 ) -> Option<Parser<'s>> {
@@ -146,12 +162,12 @@ fn expression_suffix_struct_access<'s>(
 
     let parser = dot(parser)?.and_trailing_whitespace();
 
-    let (parser, key) =
-        identifier(parser).unwrap_or_ast_error(parser, "This struct access is missing a key.");
+    let (parser, key) = raw_identifier(parser)
+        .unwrap_or_ast_error_result(parser, "This struct access is missing a key.");
 
     replace_with_or_abort(current, |current| {
-        AstExpression::StructAccess(AstStructAccess {
-            struct_: Box::new(current),
+        AstExpression::Navigation(AstNavigation {
+            receiver: Box::new(current),
             key,
         })
     });
@@ -168,7 +184,7 @@ fn expression_suffix_call<'s>(
 
     let mut parser = opening_parenthesis(parser)?.and_trailing_whitespace();
 
-    let mut arguments: Vec<AstCallArgument> = vec![];
+    let mut arguments: Vec<AstArgument> = vec![];
     let mut parser_for_missing_comma_error: Option<Parser> = None;
     while let Some((new_parser, argument, new_parser_for_missing_comma_error)) =
         argument(parser.and_trailing_whitespace())
@@ -199,27 +215,8 @@ fn expression_suffix_call<'s>(
 
     Some(parser)
 }
-
 #[instrument(level = "trace")]
-fn expression_suffix_or<'s>(parser: Parser<'s>, current: &mut AstExpression) -> Option<Parser<'s>> {
-    let parser = whitespace(parser).unwrap_or(parser);
-
-    let parser = bar(parser)?.and_trailing_whitespace();
-
-    let (parser, right) =
-        expression(parser).unwrap_or_ast_error(parser, "This or is missing a right side.");
-
-    replace_with_or_abort(current, |current| {
-        AstExpression::Or(AstOr {
-            left: Box::new(current),
-            right: right.map(Box::new),
-        })
-    });
-
-    Some(parser)
-}
-#[instrument(level = "trace")]
-fn argument<'a>(parser: Parser) -> Option<(Parser, AstCallArgument, Option<Parser>)> {
+fn argument<'a>(parser: Parser) -> Option<(Parser, AstArgument, Option<Parser>)> {
     let (parser, value) = expression(parser)?.and_trailing_whitespace();
 
     let (parser, parser_for_missing_comma_error) =
@@ -227,7 +224,7 @@ fn argument<'a>(parser: Parser) -> Option<(Parser, AstCallArgument, Option<Parse
 
     Some((
         parser,
-        AstCallArgument {
+        AstArgument {
             value,
             comma_error: None,
         },

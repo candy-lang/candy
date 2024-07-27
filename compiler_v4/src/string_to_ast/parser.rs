@@ -152,7 +152,7 @@ pub impl<T, 's> ParserWithValueUnwrapOrAstError<T, 's> for Option<(Parser<'s>, T
 #[extension_trait]
 pub impl<T, 's> ParserWithResultUnwrapOrAstError<T, 's> for Option<(Parser<'s>, AstResult<T>)> {
     #[must_use]
-    fn unwrap_or_ast_error(
+    fn unwrap_or_ast_error_result(
         self,
         original_parser: Parser<'s>,
         error_message: impl Into<String>,

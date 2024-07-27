@@ -25,3 +25,9 @@ define_literal!(bar, "|");
 define_literal!(arrow, "->");
 define_literal!(double_quote, "\"");
 define_literal!(octothorpe, "#");
+
+pub const KEYWORDS: &[&str] = &["struct", "enum", "fun", "let"];
+define_literal!(struct_keyword, "struct");
+define_literal!(enum_keyword, "enum");
+define_literal!(fun_keyword, "fun");
+define_literal!(let_keyword, "let");
