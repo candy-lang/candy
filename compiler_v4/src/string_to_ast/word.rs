@@ -10,7 +10,7 @@ pub fn raw_identifier(parser: Parser) -> Option<(Parser, AstResult<AstString>)> 
     }
 
     let next_character = w.string.chars().next().unwrap();
-    if !next_character.is_lowercase() && next_character != '_' {
+    if next_character.is_ascii_digit() {
         return None;
     }
 

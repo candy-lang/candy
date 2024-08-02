@@ -19,8 +19,8 @@ struct MyStruct {
 # }
 
 enum Bool { true, false }
-let true = Bool.true
-let false = Bool.false
+let true: Bool = Bool.true
+let false: Bool = Bool.false
 
 enum MyEnum {
   foo: Int,
@@ -32,11 +32,11 @@ enum MyEnum {
 
 # Expressions
 let intExpression: Int = 42
-let textExpression = "Hello, World!"
+let textExpression: Text = "Hello, World!"
 # let textExpressionWithInterpolation = "The answer is {intExpression}!"
-let identifierExpression = intExpression
+let identifierExpression: Int = intExpression
 # let parenthesizedExpression = (intExpression)
-let structExpression = MyStruct("Banana", 12345)
+let structExpression: MyStruct = MyStruct("Banana", 12345)
 # let lambdaExpression = (x: Int) { x }
 
 # Assignments
@@ -55,24 +55,26 @@ let valueWithExplicitType: Int = 42
 # }
 # aDate.add(Duration(days: 1)) # is equivalent to `add(aDate, Duration(days: 1))`
 
-fun fibonacci(n: int) int = {
-  switch n.isLessThan(2) {
-    true => n,
-    false => fibonacci(n.subtract(1).add(fibonacci(n.subtract(2))))
-  }
+fun fibonacci(n: Int) Int {
+  n
+  # switch n.isLessThan(2) {
+  #   true => n,
+  #   false => fibonacci(n.subtract(1).add(fibonacci(n.subtract(2))))
+  # }
 }
 
-fun printHello(name: Text) = {
+fun printHello(name: Text) {
   print("Hello, {name}!")
 }
 
-fun main() Int = {
-  (x: Int) { x }
+fun main() Int {
+  # (x: Int) { x }
 
   let helloWorld = "Hello, World!"
   printHello("World")
 
-  let theAnswer = 40.add(2)
+  # let theAnswer = 40.add(2)
+  let theAnswer = 42
   let theAnswerText = "42"
   print("The answer is {theAnswerText}!")
 

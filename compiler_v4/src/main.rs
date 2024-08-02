@@ -152,6 +152,8 @@ fn compile_hir(path: &Path, source: &str) -> (Hir, Vec<CompilerError>) {
     let (hir, mut hir_errors) = ast_to_hir(path, &asts);
     errors.append(&mut hir_errors);
 
+    dbg!(&hir);
+
     (hir, errors)
 }
 
@@ -177,7 +179,7 @@ fn init_logger() {
                     .starts_with("candy")
         }))
         .with_filter(filter::filter_fn(level_for(
-            "candy_v3::string_to_ast",
+            "candy_v4::string_to_ast",
             Level::DEBUG,
         )));
     tracing_subscriber::registry().with(console_log).init();
