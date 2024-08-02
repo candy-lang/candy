@@ -1,6 +1,9 @@
-use crate::hir::{
-    Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Hir, Parameter, Type,
-    TypeDeclaration,
+use crate::{
+    hir::{
+        Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Hir, Id, Parameter, Type,
+        TypeDeclaration,
+    },
+    id::CountableId,
 };
 use core::panic;
 use itertools::Itertools;
@@ -32,17 +35,18 @@ impl<'h> Context<'h> {
         self.push("#include <string.h>\n\n");
 
         self.push("/// Type Declarations\n\n");
-        self.push("typedef int64_t Int;\n\n");
-        self.push("typedef char* Text;\n\n");
         self.lower_type_declarations();
         self.push("\n");
 
-        self.push("/// Declarations\n\n");
+        self.push("/// Assignment Declarations\n\n");
         self.lower_assignment_declarations();
+        self.push("\n");
+
+        self.push("/// Function Declarations\n\n");
         self.lower_function_declarations();
         self.push("\n");
 
-        self.push("/// Definitions\n\n");
+        self.push("/// Function Definitions\n\n");
         self.lower_function_definitions();
         // TODO: init assignments in main in correct order
 
@@ -52,10 +56,27 @@ impl<'h> Context<'h> {
             .iter()
             .find(|(_, box name, _)| name == "main")
             .unwrap();
-        self.push(format!("int main() {{ return {main_function_id}(); }}\n",));
+        self.push(format!(
+            "int main() {{ return {main_function_id}()->value; }}\n",
+        ));
     }
 
     fn lower_type_declarations(&mut self) {
+        self.push(
+            "\
+            struct Int {
+                uint64_t value;
+            };
+            typedef struct Int Int;",
+        );
+        self.push(
+            "\
+            struct Text {
+                char* value;
+            };
+            typedef struct Text Text;",
+        );
+
         for (name, declaration) in &self.hir.type_declarations {
             match declaration {
                 TypeDeclaration::Struct { fields } => {
@@ -108,7 +129,7 @@ impl<'h> Context<'h> {
 
     fn lower_assignment_declarations(&mut self) {
         for (id, name, assignment) in self.hir.assignments.iter() {
-            self.push(format!("/* {name} */ const "));
+            self.push(format!("/* {name} */ "));
             self.lower_type(&assignment.type_);
             self.push(format!(" {id};\n"));
         }
@@ -128,7 +149,6 @@ impl<'h> Context<'h> {
             }
             self.push(");\n");
 
-            // self.push("const ");
             // self.lower_type(&Type::Function {
             //     parameter_types: function
             //         .parameters
@@ -167,25 +187,29 @@ impl<'h> Context<'h> {
                 self.push("// builtin function\n");
                 match builtin_function {
                     BuiltinFunction::IntAdd => self.push(format!(
-                        "return {a} + {b};",
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {a}->value + {b}->value;
+                        return result_pointer;",
                         a = parameters[0].id,
                         b = parameters[1].id,
                     )),
                     BuiltinFunction::Print => {
-                        self.push(format!("puts({}); const ", parameters[0].id));
-                        self.lower_type(&Type::nothing());
-                        self.push(" _1 = ");
-                        self.lower_expression(&Expression::nothing());
-                        self.push("; return _1;");
+                        self.push(format!("puts({}->value);\n", parameters[0].id));
+                        let nothing_id = Id::from_usize(1);
+                        self.lower_expression(nothing_id, &Expression::nothing());
+                        self.push(format!("return {nothing_id};"));
                     }
                     BuiltinFunction::TextConcat => self.push(format!(
                         "\
-                        const size_t lengthA = strlen({a});\n\
-                        const size_t lengthB = strlen({b});\n\
-                        char *result = malloc(lengthA + lengthB + 1);\n\
-                        memcpy(result, {a}, lengthA);\n\
-                        memcpy(result + lengthA, {b}, lengthB + 1);\n\
-                        return result;",
+                        size_t lengthA = strlen({a}->value);\n\
+                        size_t lengthB = strlen({b}->value);\n\
+                        char* result = malloc(lengthA + lengthB + 1);\n\
+                        memcpy(result, {a}->value, lengthA);\n\
+                        memcpy(result + lengthA, {b}->value, lengthB + 1);\n\
+                        Text* result_pointer = malloc(sizeof(Text));
+                        result_pointer->value = result;
+                        return result_pointer;",
                         a = parameters[0].id,
                         b = parameters[1].id,
                     )),
@@ -200,19 +224,30 @@ impl<'h> Context<'h> {
                 self.push(format!("// {name}\n"));
             }
 
-            self.push("const ");
-            self.lower_type(&expression.type_);
-            self.push(format!(" {id} = "));
-            self.lower_expression(expression);
-            self.push(";\n");
+            self.lower_expression(*id, expression);
+            self.push("\n");
         }
         self.push(format!("return {};", body.expressions.last().unwrap().0));
     }
-    fn lower_expression(&mut self, expression: &Expression) {
+    fn lower_expression(&mut self, id: Id, expression: &Expression) {
         match &expression.kind {
-            ExpressionKind::Int(int) => self.push(format!("{int}")),
-            // TODO: escape text
-            ExpressionKind::Text(text) => self.push(format!("\"{text}\"")),
+            ExpressionKind::Int(int) => {
+                self.lower_type(&expression.type_);
+                self.push(format!(" {id} = malloc(sizeof("));
+                self.lower_type_without_pointer(&expression.type_);
+                self.push("));");
+
+                self.push(format!("{id}->value = {int};"));
+            }
+            ExpressionKind::Text(text) => {
+                self.lower_type(&expression.type_);
+                self.push(format!(" {id} = malloc(sizeof("));
+                self.lower_type_without_pointer(&expression.type_);
+                self.push("));");
+
+                // TODO: escape text
+                self.push(format!("{id}->value = \"{text}\";"));
+            }
             ExpressionKind::CreateStruct { struct_, fields } => {
                 let Type::Named(name) = struct_ else {
                     unreachable!();
@@ -224,14 +259,18 @@ impl<'h> Context<'h> {
                     unreachable!();
                 };
 
-                self.push("{ ");
+                self.lower_type(&expression.type_);
+                self.push(format!(" {id} = malloc(sizeof("));
+                self.lower_type_without_pointer(&expression.type_);
+                self.push("));");
+
                 for ((name, _), value) in type_fields.iter().zip_eq(fields.iter()) {
-                    self.push(format!(".{name} = {value},"));
+                    self.push(format!("\n{id}->{name} = {value};"));
                 }
-                self.push("}");
             }
             ExpressionKind::StructAccess { struct_, field } => {
-                self.push(format!("{struct_}.{field}"));
+                self.lower_type(&expression.type_);
+                self.push(format!(" {id} = {struct_}->{field};"));
             }
             ExpressionKind::CreateEnum {
                 enum_,
@@ -242,12 +281,15 @@ impl<'h> Context<'h> {
                     unreachable!();
                 };
 
-                self.push("{ ");
-                self.push(format!(".symbol = {name}_{variant},"));
+                self.lower_type(&expression.type_);
+                self.push(format!(" {id} = malloc(sizeof("));
+                self.lower_type_without_pointer(&expression.type_);
+                self.push("));\n");
+
+                self.push(format!("{id}->symbol = {name}_{variant},"));
                 if let Some(value) = value {
-                    self.push(format!(".value = {value}"));
+                    self.push(format!("\n{id}->value = {value}"));
                 }
-                self.push("}");
             }
             // ExpressionKind::Lambda(lambda) => {
             //     self.push("{ .closure = {");
@@ -256,27 +298,33 @@ impl<'h> Context<'h> {
             //     }
             //     self.push(format!("}}, .function = {id}_function }};"));
             // }
-            ExpressionKind::Reference(id) => {
-                self.push(id.to_string());
+            ExpressionKind::Reference(referenced_id) => {
+                self.lower_type(&expression.type_);
+                self.push(format!(" {id} = {referenced_id};"));
             }
             ExpressionKind::Call {
                 receiver,
                 arguments,
             } => {
-                self.push(format!("{receiver}("));
+                self.lower_type(&expression.type_);
+                self.push(format!(" {id} = {receiver}("));
                 for (index, argument) in arguments.iter().enumerate() {
                     if index > 0 {
                         self.push(", ");
                     }
                     self.push(format!("{argument}"));
                 }
-                self.push(")");
+                self.push(");");
             }
             ExpressionKind::Error => panic!("Error expression found."),
         }
     }
 
     fn lower_type(&mut self, type_: &Type) {
+        self.lower_type_without_pointer(type_);
+        self.push("*");
+    }
+    fn lower_type_without_pointer(&mut self, type_: &Type) {
         match type_ {
             Type::Named(name) => self.push(name),
             Type::Error => panic!("Error type found."),
