@@ -1,4 +1,4 @@
-use crate::ast::AstDeclaration;
+use crate::ast::Ast;
 
 use parser::Parser;
 use std::path::Path;
@@ -14,7 +14,7 @@ mod whitespace;
 mod word;
 
 #[must_use]
-pub fn string_to_ast(path: &Path, source: &str) -> Vec<AstDeclaration> {
+pub fn string_to_ast(path: &Path, source: &str) -> Ast {
     let (parser, declarations) = declarations::declarations(Parser::new(path, source));
 
     let rest = parser.rest().trim_end();

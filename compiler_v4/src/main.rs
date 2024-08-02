@@ -1,4 +1,10 @@
-#![feature(box_patterns, let_chains, option_take_if, try_blocks)]
+#![feature(
+    anonymous_lifetime_in_impl_trait,
+    box_patterns,
+    let_chains,
+    option_take_if,
+    try_blocks
+)]
 #![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(
     clippy::cognitive_complexity,

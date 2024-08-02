@@ -54,14 +54,16 @@ pub struct AstError {
     pub error: String,
 }
 
+pub type Ast = Vec<AstDeclaration>;
+
 // Declarations
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AstDeclaration {
     Struct(AstStruct),
     Enum(AstEnum),
-    Function(AstFunction),
     Assignment(AstAssignment),
+    Function(AstFunction),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -94,6 +96,14 @@ pub struct AstEnumVariant {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstAssignment {
+    pub name: AstResult<AstString>,
+    pub type_: Option<AstResult<AstType>>,
+    pub equals_sign_error: Option<AstError>,
+    pub value: AstResult<AstExpression>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstFunction {
     pub name: AstResult<AstString>,
     pub opening_parenthesis_error: Option<AstError>,
@@ -110,14 +120,6 @@ pub struct AstParameter {
     pub colon_error: Option<AstError>,
     pub type_: AstResult<AstType>,
     pub comma_error: Option<AstError>,
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct AstAssignment {
-    pub name: AstResult<AstString>,
-    pub type_: Option<AstResult<AstType>>,
-    pub equals_sign_error: Option<AstError>,
-    pub value: AstResult<AstExpression>,
 }
 
 // Types
@@ -273,8 +275,8 @@ impl CollectAstErrors for AstDeclaration {
         match &self {
             Self::Struct(struct_) => struct_.collect_errors_to(errors),
             Self::Enum(enum_) => enum_.collect_errors_to(errors),
-            Self::Function(function_) => function_.collect_errors_to(errors),
             Self::Assignment(assignment_) => assignment_.collect_errors_to(errors),
+            Self::Function(function_) => function_.collect_errors_to(errors),
         }
     }
 }
@@ -309,6 +311,14 @@ impl CollectAstErrors for AstEnumVariant {
         self.comma_error.collect_errors_to(errors);
     }
 }
+impl CollectAstErrors for AstAssignment {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.name.collect_errors_to(errors);
+        self.type_.collect_errors_to(errors);
+        self.equals_sign_error.collect_errors_to(errors);
+        self.value.collect_errors_to(errors);
+    }
+}
 impl CollectAstErrors for AstFunction {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.name.collect_errors_to(errors);
@@ -327,14 +337,6 @@ impl CollectAstErrors for AstParameter {
         self.colon_error.collect_errors_to(errors);
         self.type_.collect_errors_to(errors);
         self.comma_error.collect_errors_to(errors);
-    }
-}
-impl CollectAstErrors for AstAssignment {
-    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
-        self.name.collect_errors_to(errors);
-        self.type_.collect_errors_to(errors);
-        self.equals_sign_error.collect_errors_to(errors);
-        self.value.collect_errors_to(errors);
     }
 }
 

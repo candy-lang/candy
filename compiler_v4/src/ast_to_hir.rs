@@ -1,12 +1,12 @@
 use crate::{
     ast::{
-        AstAssignment, AstAssignmentFunction, AstAssignmentKind, AstAssignmentValue, AstExpression,
-        AstParameter, AstStatement, AstTextPart,
+        Ast, AstArgument, AstAssignment, AstBody, AstDeclaration, AstEnum, AstExpression,
+        AstFunction, AstNamedType, AstParameter, AstStatement, AstStruct, AstTextPart, AstType,
     },
     error::CompilerError,
     hir::{
-        Body, BodyOrBuiltin, BuiltinFunction, Definition, Expression, Hir, Id, Lambda, OrType,
-        Parameter, TagType, Type,
+        Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
+        Hir, Id, Parameter, Type, TypeDeclaration,
     },
     id::IdGenerator,
     position::Offset,
@@ -14,163 +14,148 @@ use crate::{
 };
 use itertools::{Itertools, Position};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{
-    borrow::Cow,
-    collections::{hash_map::Entry, BTreeSet},
-    mem,
-    ops::Range,
-    path::Path,
-};
+use std::{collections::hash_map::Entry, ops::Range, path::Path};
 use strum::VariantArray;
 
-pub fn ast_to_hir(path: &Path, ast: &[AstAssignment]) -> (Hir, Vec<CompilerError>) {
-    let mut context = Context::new(path);
-    context.add_builtin_value("type", Expression::Type(Type::Type), Type::Type);
-    context.add_builtin_value("int", Expression::Type(Type::Int), Type::Type);
-    context.add_builtin_value("text", Expression::Type(Type::Text), Type::Type);
+pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
+    let mut context = Context::new(path, ast);
     context.add_builtin_functions();
+    context.lower_declarations();
 
-    context.catalog_assignments(ast);
-    context.lower_assignments();
-
-    let mut identifiers: FxHashMap<_, _> = context
-        .global_identifiers
-        .iter()
-        .flat_map(|(name, named)| match named {
-            Named::Value(id) => vec![(*id, name.clone())],
-            Named::Functions(functions) => {
-                functions.iter().map(|id| (*id, name.clone())).collect_vec()
-            }
-        })
-        .collect();
-
-    let mut hir = Hir::default();
-    for (id, definition) in mem::take(&mut context.definitions) {
-        let identifier = identifiers.remove(&id).unwrap();
-        match definition {
-            TempDefinition::Value(ValueDefinition { definition, .. }) => {
-                let (type_, value) = definition.expect("Missing definition");
-                hir.assignments.push((
-                    id,
-                    identifier,
-                    Definition::Value {
-                        type_,
-                        value: value.unwrap(),
-                    },
-                ));
-            }
-            TempDefinition::Function(FunctionDefinition {
-                signature_and_body, ..
-            }) => {
-                let (parameters, return_type, body) =
-                    signature_and_body.expect("Missing signature and body");
-                hir.assignments.push((
-                    id,
-                    identifier.clone(),
-                    Definition::Function {
-                        parameters,
-                        return_type,
-                        body: body.expect("Missing body"),
-                    },
-                ));
-            }
-        }
-    }
-
-    let main_function = hir.assignments.iter().find(|(_, box n, _)| n == "main");
-    if let Some((_, _, assignment)) = main_function {
-        match assignment.clone() {
-            Definition::Function {
-                parameters,
-                return_type,
-                ..
-            } => {
-                if !parameters.is_empty() {
-                    // TODO: report actual error location
-                    context.add_error(
-                        Offset(0)..Offset(0),
-                        "Main function must not have parameters",
-                    );
-                }
-                if !matches!(return_type, Type::Int | Type::Error) {
-                    // TODO: report actual error location
-                    context.add_error(Offset(0)..Offset(0), "Main function must return an int");
-                }
-            }
-            Definition::Value { value, type_ } => {
+    if let Some(named) = context.global_identifiers.get("main") {
+        match named.clone() {
+            Named::Assignment(_) => {
                 // TODO: report actual error location
-                context.add_error(Offset(0)..Offset(0), "`main` function must be a function");
+                context.add_error(Offset(0)..Offset(0), "`main` must be a function");
+            }
+            Named::Functions(ids) => {
+                assert!(!ids.is_empty());
+
+                let ValueDeclaration::Function(function) = context
+                    .value_declarations
+                    .get(ids.first().unwrap())
+                    .unwrap()
+                else {
+                    unreachable!();
+                };
+
+                let parameters_are_empty = function.parameters.is_empty();
+                let return_type = function.return_type.clone();
+                if ids.len() > 1 {
+                    // TODO: report actual error location
+                    context.add_error(Offset(0)..Offset(0), "Main function may not be overloaded");
+                } else {
+                    if !parameters_are_empty {
+                        // TODO: report actual error location
+                        context.add_error(
+                            Offset(0)..Offset(0),
+                            "Main function must not have parameters",
+                        );
+                    }
+                    if return_type != Type::Error && return_type != Type::int() {
+                        // TODO: report actual error location
+                        context.add_error(Offset(0)..Offset(0), "Main function must return an Int");
+                    }
+                }
             }
         }
     } else {
         context.add_error(Offset(0)..Offset(0), "Program is missing a main function");
     }
 
-    (hir, context.errors)
+    context.into_hir()
 }
 
 #[derive(Debug)]
 struct Context<'c> {
     path: &'c Path,
+    ast: &'c Ast,
     id_generator: IdGenerator<Id>,
-    definitions: FxHashMap<Id, TempDefinition<'c>>,
-    definitions_to_lower: BTreeSet<Id>,
+    value_declarations: FxHashMap<Id, ValueDeclaration<'c>>,
     global_identifiers: FxHashMap<Box<str>, Named>,
-    local_identifiers: Vec<(Box<str>, Id, Option<Definition>, Type)>,
-    current_lowering_chain: Vec<Id>,
     errors: Vec<CompilerError>,
+    hir: Hir,
 }
 #[derive(Debug)]
 enum Named {
-    Value(Id),
+    Assignment(Id),
     Functions(Vec<Id>),
 }
 #[derive(Debug)]
-enum TempDefinition<'a> {
-    Value(ValueDefinition<'a>),
-    Function(FunctionDefinition<'a>),
+enum ValueDeclaration<'a> {
+    Assignment(AssignmentDeclaration<'a>),
+    Function(FunctionDeclaration<'a>),
 }
 #[derive(Debug)]
-struct ValueDefinition<'a> {
-    ast: Option<&'a AstAssignmentValue>,
-    definition: Option<(Type, Option<Expression>)>,
+struct AssignmentDeclaration<'a> {
+    ast: &'a AstAssignment,
+    type_: Type,
+    body: Option<Body>,
 }
 #[derive(Debug)]
-struct FunctionDefinition<'a> {
-    ast: Option<&'a AstAssignmentFunction>,
-    signature_and_body: Option<(Box<[Parameter]>, Type, Option<BodyOrBuiltin>)>,
+struct FunctionDeclaration<'a> {
+    ast: Option<&'a AstFunction>,
+    parameters: Box<[Parameter]>,
+    return_type: Type,
+    body: Option<BodyOrBuiltin>,
 }
+
 impl<'c> Context<'c> {
-    fn new(path: &'c Path) -> Self {
+    fn new(path: &'c Path, ast: &'c Ast) -> Self {
         Self {
             path,
+            ast,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
-            definitions: FxHashMap::default(),
-            definitions_to_lower: BTreeSet::default(),
+            value_declarations: FxHashMap::default(),
             global_identifiers: FxHashMap::default(),
-            local_identifiers: vec![],
-            current_lowering_chain: vec![],
             errors: vec![],
+            hir: Hir::default(),
         }
     }
 
-    fn add_builtin_value(
-        &mut self,
-        name: impl Into<Box<str>>,
-        expression: Expression,
-        type_: Type,
-    ) {
-        let id = self.id_generator.generate();
-        self.definitions.force_insert(
-            id,
-            TempDefinition::Value(ValueDefinition {
-                ast: None,
-                definition: Some((type_, Some(expression))),
-            }),
-        );
-        self.global_identifiers
-            .force_insert(name.into(), Named::Value(id));
+    fn into_hir(mut self) -> (Hir, Vec<CompilerError>) {
+        let mut assignments = vec![];
+        let mut functions = vec![];
+        for (name, named) in self.global_identifiers {
+            let ids = match named {
+                Named::Assignment(id) => vec![id],
+                Named::Functions(ids) => ids,
+            };
+            for id in ids {
+                let declaration = self.value_declarations.remove(&id).unwrap();
+                match declaration {
+                    ValueDeclaration::Assignment(AssignmentDeclaration { type_, body, .. }) => {
+                        assignments.push((
+                            id,
+                            name.clone(),
+                            Assignment {
+                                type_,
+                                body: body.unwrap(),
+                            },
+                        ))
+                    }
+                    ValueDeclaration::Function(FunctionDeclaration {
+                        parameters,
+                        return_type,
+                        body,
+                        ..
+                    }) => functions.push((
+                        id,
+                        name.clone(),
+                        Function {
+                            parameters,
+                            return_type,
+                            body: body.unwrap(),
+                        },
+                    )),
+                }
+            }
+        }
+        self.hir.assignments = assignments.into();
+        self.hir.functions = functions.into();
+        (self.hir, self.errors)
     }
+
     fn add_builtin_functions(&mut self) {
         {
             let a_id = self.id_generator.generate();
@@ -181,15 +166,15 @@ impl<'c> Context<'c> {
                     Parameter {
                         id: a_id,
                         name: "a".into(),
-                        type_: Type::Int,
+                        type_: Type::int(),
                     },
                     Parameter {
                         id: b_id,
                         name: "b".into(),
-                        type_: Type::Int,
+                        type_: Type::int(),
                     },
                 ],
-                Type::Int,
+                Type::int(),
             );
         }
         {
@@ -199,7 +184,7 @@ impl<'c> Context<'c> {
                 [Parameter {
                     id: message_id,
                     name: "message".into(),
-                    type_: Type::Text,
+                    type_: Type::text(),
                 }],
                 Type::nothing(),
             );
@@ -213,15 +198,15 @@ impl<'c> Context<'c> {
                     Parameter {
                         id: a_id,
                         name: "a".into(),
-                        type_: Type::Text,
+                        type_: Type::text(),
                     },
                     Parameter {
                         id: b_id,
                         name: "b".into(),
-                        type_: Type::Text,
+                        type_: Type::text(),
                     },
                 ],
-                Type::Text,
+                Type::text(),
             );
         }
     }
@@ -234,336 +219,241 @@ impl<'c> Context<'c> {
         let name = builtin_function.as_ref();
         let parameters = parameters.into();
         let id = builtin_function.id();
-        self.definitions.force_insert(
+        self.value_declarations.force_insert(
             id,
-            TempDefinition::Function(FunctionDefinition {
+            ValueDeclaration::Function(FunctionDeclaration {
                 ast: None,
-                signature_and_body: Some((
-                    parameters,
-                    return_type,
-                    Some(BodyOrBuiltin::Builtin(builtin_function)),
-                )),
+                parameters,
+                return_type,
+                body: Some(BodyOrBuiltin::Builtin(builtin_function)),
             }),
         );
         self.global_identifiers
             .force_insert(name.into(), Named::Functions(vec![id]));
     }
 
-    fn catalog_assignments(&mut self, assignments: &'c [AstAssignment]) {
-        for assignment in assignments {
-            self.catalog_assignment(assignment);
+    fn lower_declarations(&mut self) {
+        let mut assignments_to_lower = vec![];
+        let mut functions_to_lower = vec![];
+        for declaration in self.ast {
+            match declaration {
+                AstDeclaration::Struct(struct_) => self.lower_struct(struct_),
+                AstDeclaration::Enum(enum_) => self.lower_enum(enum_),
+                AstDeclaration::Assignment(assignment) => {
+                    if let Some(id) = self.lower_assignment_signature(assignment) {
+                        assignments_to_lower.push(id);
+                    }
+                }
+                AstDeclaration::Function(function) => {
+                    if let Some(id) = self.lower_function_signature(function) {
+                        functions_to_lower.push(id);
+                    }
+                }
+            }
+        }
+        for id in assignments_to_lower {
+            self.lower_assignment(id);
+        }
+        for id in functions_to_lower {
+            self.lower_function(id);
         }
     }
-    fn catalog_assignment(&mut self, assignment: &'c AstAssignment) {
-        let Some(name) = assignment.name.value().and_then(|it| it.identifier.value()) else {
+
+    fn lower_struct(&mut self, struct_type: &'c AstStruct) {
+        let Some(name) = struct_type.name.value() else {
             return;
+        };
+
+        let fields = struct_type
+            .fields
+            .iter()
+            .filter_map(|field| {
+                let Some(name) = field.name.value() else {
+                    return None;
+                };
+
+                let type_ = self.lower_type(field.type_.value());
+                Some((name.string.clone(), type_))
+            })
+            .collect();
+
+        match self.hir.type_declarations.entry(name.string.clone()) {
+            Entry::Occupied(_) => {
+                self.add_error(name.span.clone(), "Duplicate type name");
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(TypeDeclaration::Struct { fields });
+            }
+        };
+    }
+    fn lower_enum(&mut self, enum_type: &'c AstEnum) {
+        let Some(name) = enum_type.name.value() else {
+            return;
+        };
+
+        let variants = enum_type
+            .variants
+            .iter()
+            .filter_map(|variant| {
+                let Some(name) = variant.name.value() else {
+                    return None;
+                };
+
+                let type_ = variant.type_.as_ref().map(|it| self.lower_type(it.value()));
+                Some((name.string.clone(), type_))
+            })
+            .collect();
+
+        match self.hir.type_declarations.entry(name.string.clone()) {
+            Entry::Occupied(_) => {
+                self.add_error(name.span.clone(), "Duplicate type name");
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(TypeDeclaration::Enum { variants });
+            }
+        };
+    }
+
+    fn lower_type(&mut self, type_: impl Into<Option<&AstType>>) -> Type {
+        match type_.into() {
+            Some(AstType::Named(AstNamedType { name })) => {
+                let Some(name) = name.value() else {
+                    return Type::Error;
+                };
+
+                if &*name.string == "Int" {
+                    return Type::int();
+                }
+                if &*name.string == "Text" {
+                    return Type::text();
+                }
+
+                if self.ast.iter().any(|it| {
+                    matches!(
+                        it,
+                        AstDeclaration::Struct(AstStruct { name:it_name, .. })
+                            | AstDeclaration::Enum(AstEnum { name:it_name, .. })
+                        if it_name.value().map(|it| &it.string) == Some(&name.string)
+                    )
+                }) {
+                    Type::Named(name.string.clone())
+                } else {
+                    self.add_error(name.span.clone(), format!("Unknown type: `{}`", **name));
+                    Type::Error
+                }
+            }
+            None => Type::Error,
+        }
+    }
+
+    fn lower_assignment_signature(&mut self, assignment: &'c AstAssignment) -> Option<Id> {
+        let Some(name) = assignment.name.value() else {
+            return None;
         };
 
         let id = self.id_generator.generate();
-        let definition = match &assignment.kind {
-            AstAssignmentKind::Value(ast) => {
-                match self.global_identifiers.entry(name.string.clone()) {
-                    Entry::Occupied(entry) => match entry.get() {
-                        Named::Functions(_) => {
-                            self.add_error(name.span.clone(), "A top-level value can't have the same name as a top-level function.");
-                            return;
-                        }
-                        Named::Value { .. } => {
-                            self.add_error(
-                                name.span.clone(),
-                                "Two top-level values can't have the same name.",
-                            );
-                            return;
-                        }
+        let type_ = assignment
+            .type_
+            .as_ref()
+            .map_or(Type::Error, |it| self.lower_type(it.value()));
+
+        match self.global_identifiers.entry(name.string.clone()) {
+            Entry::Occupied(mut entry) => {
+                self.errors.push(CompilerError {
+                    path: self.path.to_path_buf(),
+                    span:
+                    name.span.clone(),
+                    message: match entry.get_mut() {
+                Named::Functions(_) => "A top-level assignment can't have the same name as a top-level function.".to_string(),
+                Named::Assignment(_) => "Top-level assignments can't have the same name.".to_string(),
                     },
-                    Entry::Vacant(entry) => {
-                        entry.insert(Named::Value(id));
-                    }
-                }
-                TempDefinition::Value(ValueDefinition {
-                    ast: Some(ast),
-                    definition: None,
-                })
+                });
+                return None;
             }
-            AstAssignmentKind::Function(ast) => {
-                let function = FunctionDefinition {
-                    ast: Some(ast),
-                    signature_and_body: None,
-                };
-                match self.global_identifiers.entry(name.string.clone()) {
-                    Entry::Occupied(mut entry) => match entry.get_mut() {
-                        Named::Functions(functions) => {
-                            functions.push(id);
-                        }
-                        Named::Value { .. } => {
-                            self.add_error(name.span.clone(), "A top-level function can't have the same name as a top-level value.");
-                            return;
-                        }
-                    },
-                    Entry::Vacant(entry) => {
-                        entry.insert(Named::Functions(vec![id]));
-                    }
-                }
-                TempDefinition::Function(function)
-            }
-        };
-        self.definitions.force_insert(id, definition);
-        self.definitions_to_lower.insert(id);
-    }
-    fn lower_assignments(&mut self) {
-        while let Some(id) = self.definitions_to_lower.first() {
-            self.current_lowering_chain.clear();
-
-            self.lower_assignment(*id);
-
-            assert!(self.current_lowering_chain.is_empty());
-        }
-    }
-    fn lower_assignments_with_name(&mut self, name: &str) {
-        let Some(named) = self.global_identifiers.get(name) else {
-            return;
-        };
-
-        match named {
-            Named::Value(id) => self.lower_assignment(*id),
-            Named::Functions(ids) => {
-                for id in ids.clone() {
-                    self.lower_assignment(id);
-                }
+            Entry::Vacant(entry) => {
+                entry.insert(Named::Assignment(id));
             }
         }
+        self.value_declarations.force_insert(
+            id,
+            ValueDeclaration::Assignment(AssignmentDeclaration {
+                ast: assignment,
+                type_,
+                body: None,
+            }),
+        );
+        Some(id)
     }
     fn lower_assignment(&mut self, id: Id) {
-        if self.current_lowering_chain.contains(&id) {
-            // TODO: Is this even necessary with `definitions_to_lower`?
-            return;
-        }
-        if !self.definitions_to_lower.remove(&id) {
-            return;
-        }
+        let declaration = self.value_declarations.get(&id).unwrap();
+        let ValueDeclaration::Assignment(declaration) = declaration else {
+            unreachable!();
+        };
+        let value = declaration.ast.value.clone();
+        let type_ = declaration.type_.clone();
 
-        let old_local_assignments = mem::take(&mut self.local_identifiers);
-        self.current_lowering_chain.push(id);
-
-        let definition = self.definitions.get(&id).unwrap();
-        match definition {
-            TempDefinition::Value(ValueDefinition { ast, .. }) => {
-                let ast = ast.unwrap();
-
-                let explicit_type =
-                    ast.type_
-                        .as_ref()
-                        .and_then(|type_| type_.value())
-                        .map(|type_| {
-                            let (type_value, _) = self.lower_expression(type_, Some(&Type::Type));
-                            self.evaluate_expression_to_type(&type_value)
-                        });
-                if let Some(explicit_type) = explicit_type.as_ref() {
-                    match self.definitions.get_mut(&id).unwrap() {
-                        TempDefinition::Value(ValueDefinition { definition, .. }) => {
-                            *definition = Some((explicit_type.clone(), None));
-                        }
-                        TempDefinition::Function(_) => unreachable!(),
-                    }
-                }
-
-                let (value, value_type) = ast
-                    .value
-                    .value()
-                    .map_or((Expression::Error, Type::Error), |it| {
-                        self.lower_expression(it, explicit_type.as_ref())
-                    });
-                // TODO: check `value_type` is assignable to `explicit_type`
-                match self.definitions.get_mut(&id).unwrap() {
-                    TempDefinition::Value(ValueDefinition { definition, .. }) => {
-                        *definition = Some((explicit_type.unwrap_or(value_type), Some(value)));
-                    }
-                    TempDefinition::Function(_) => unreachable!(),
-                }
+        let hir_body = self.build_body(|builder| {
+            if let Some(value) = value.value() {
+                builder.lower_expression(value, Some(&type_));
+            } else {
+                builder.push_error();
             }
-            TempDefinition::Function(FunctionDefinition { ast, .. }) => {
-                let ast = ast.unwrap();
-                self.with_scope(|context| {
-                    let parameters = context.lower_parameters(&ast.parameters, None);
+        });
 
-                    let return_type = ast.return_type.as_ref().map_or_else(Type::nothing, |it| {
-                        it.value().map_or(Type::Error, |it| {
-                            let (value, _) = context.lower_expression(it, Some(&Type::Type));
-                            context.evaluate_expression_to_type(&value)
-                        })
-                    });
-                    match context.definitions.get_mut(&id).unwrap() {
-                        TempDefinition::Value(_) => unreachable!(),
-                        TempDefinition::Function(FunctionDefinition {
-                            signature_and_body, ..
-                        }) => {
-                            *signature_and_body = Some((parameters, return_type.clone(), None));
-                        }
-                    }
-
-                    let (body, _) = context.lower_body(&ast.body, Some(&return_type));
-                    match context.definitions.get_mut(&id).unwrap() {
-                        TempDefinition::Value(_) => unreachable!(),
-                        TempDefinition::Function(FunctionDefinition {
-                            signature_and_body, ..
-                        }) => {
-                            let (_, _, definition_body) = signature_and_body.as_mut().unwrap();
-                            *definition_body = Some(BodyOrBuiltin::Body(body));
-                        }
-                    };
-                });
+        match self.value_declarations.get_mut(&id).unwrap() {
+            ValueDeclaration::Assignment(AssignmentDeclaration { body, .. }) => {
+                *body = Some(hir_body);
             }
+            ValueDeclaration::Function(_) => unreachable!(),
         }
-
-        assert_eq!(self.current_lowering_chain.pop().unwrap(), id);
-        self.local_identifiers = old_local_assignments;
     }
 
-    fn evaluate_expression_to_type(&mut self, expression: &Expression) -> Type {
-        match expression {
-            Expression::Int(_) => {
-                // TODO: report actual error location
-                self.add_error(Offset(0)..Offset(0), "Expected a type, not an int");
-                Type::Error
+    fn lower_function_signature(&mut self, function: &'c AstFunction) -> Option<Id> {
+        let Some(name) = function.name.value() else {
+            return None;
+        };
+
+        let id = self.id_generator.generate();
+        let parameters = self.lower_parameters(&function.parameters);
+        let return_type = function
+            .return_type
+            .as_ref()
+            .map_or_else(|| Type::nothing(), |it| self.lower_type(it));
+        match self.global_identifiers.entry(name.string.clone()) {
+            Entry::Occupied(mut entry) => match entry.get_mut() {
+                Named::Functions(functions) => {
+                    // TODO: check for invalid overloads
+                    functions.push(id);
+                }
+                Named::Assignment(_) => {
+                    self.add_error(
+                        name.span.clone(),
+                        "A top-level function can't have the same name as a top-level assignment.",
+                    );
+                    return None;
+                }
+            },
+            Entry::Vacant(entry) => {
+                entry.insert(Named::Functions(vec![id]));
             }
-            Expression::Text(_) => {
-                // TODO: report actual error location
-                self.add_error(Offset(0)..Offset(0), "Expected a type, not a text");
-                Type::Error
-            }
-            Expression::Tag { symbol, value } => Type::Tag(TagType {
-                symbol: symbol.clone(),
-                value_type: value
-                    .as_ref()
-                    .map(|it| Box::new(self.evaluate_expression_to_type(it))),
+        }
+        self.value_declarations.force_insert(
+            id,
+            ValueDeclaration::Function(FunctionDeclaration {
+                ast: Some(function),
+                parameters,
+                return_type,
+                body: None,
             }),
-            Expression::Struct(_) => todo!(),
-            Expression::StructAccess { struct_, field } => todo!(),
-            Expression::ValueWithTypeAnnotation { value, type_ } => todo!(),
-            Expression::Lambda(lambda) => todo!(),
-            Expression::Reference(id) => {
-                if let Some(assignment) = self
-                    .local_identifiers
-                    .iter()
-                    .find(|(_, i, _, _)| i == id)
-                    .map(|(_, _, assignment, _)| {
-                        assignment.clone().expect("TODO: ID belongs to a parameter")
-                    })
-                {
-                    match assignment {
-                        Definition::Value { value, .. } => self.evaluate_expression_to_type(&value),
-                        Definition::Function {
-                            parameters,
-                            return_type,
-                            body,
-                        } => todo!(),
-                    }
-                } else if let Some(definition) = self.definitions.get(id) {
-                    match definition {
-                        TempDefinition::Value(ValueDefinition { definition, .. }) => {
-                            let Some(value) =
-                                definition.as_ref().and_then(|(_, value)| value.as_ref())
-                            else {
-                                // TODO: report actual error location
-                                self.add_error(
-                                    Offset(0)..Offset(0),
-                                    "Recursion while resolving type",
-                                );
-                                return Type::Error;
-                            };
-                            self.evaluate_expression_to_type(&value.clone())
-                        }
-                        TempDefinition::Function(_) => {
-                            // TODO: report actual error location
-                            self.add_error(
-                                Offset(0)..Offset(0),
-                                "Function reference is not a valid type",
-                            );
-                            return Type::Error;
-                        }
-                    }
-                } else {
-                    unreachable!("ID not found");
-                }
-            }
-            Expression::Call {
-                receiver,
-                arguments,
-            } => todo!(),
-            Expression::Or { left, right } => {
-                fn add_tag_type(
-                    context: &mut Context,
-                    tags: &mut Vec<TagType>,
-                    has_error: &mut bool,
-                    tag: TagType,
-                ) {
-                    if tags.iter().any(|it| it.symbol == tag.symbol) {
-                        // TODO: report actual error location
-                        context.add_error(
-                            Offset(0)..Offset(0),
-                            format!("Or type contains tag `{}` multiple times.", tag.symbol),
-                        );
-                        *has_error = true;
-                    } else {
-                        tags.push(tag);
-                    }
-                }
-                fn add(
-                    context: &mut Context,
-                    tags: &mut Vec<TagType>,
-                    has_error: &mut bool,
-                    type_: Type,
-                ) {
-                    match type_ {
-                        Type::Type => todo!(),
-                        Type::Tag(tag) => add_tag_type(context, tags, has_error, tag),
-                        Type::Or(OrType(or_tags)) => {
-                            for tag in or_tags.iter() {
-                                add_tag_type(context, tags, has_error, tag.clone());
-                            }
-                        }
-                        Type::Int | Type::Text | Type::Struct(_) | Type::Function { .. } => {
-                            // TODO: report actual error location
-                            context.add_error(
-                                Offset(0)..Offset(0),
-                                format!("Or type can only contain tags types, found `{type_:?}`."),
-                            );
-                            *has_error = true;
-                        }
-                        Type::Error => *has_error = true,
-                    };
-                }
-
-                let mut tags = vec![];
-                let mut has_error = false;
-
-                let left = self.evaluate_expression_to_type(left);
-                let right = self.evaluate_expression_to_type(right);
-                add(self, &mut tags, &mut has_error, left);
-                add(self, &mut tags, &mut has_error, right);
-
-                if has_error {
-                    Type::Error
-                } else {
-                    Type::Or(OrType(tags.into()))
-                }
-            }
-            Expression::CreateOrVariant { or_type, .. } => Type::Or(or_type.clone()),
-            Expression::Type(type_) => type_.clone(),
-            Expression::Error => Type::Error,
-        }
+        );
+        Some(id)
     }
-    fn lower_parameters(
-        &mut self,
-        parameters: &[AstParameter],
-        context_types: Option<&[Type]>,
-    ) -> Box<[Parameter]> {
+    fn lower_parameters(&mut self, parameters: &'c [AstParameter]) -> Box<[Parameter]> {
         let mut parameter_names = FxHashSet::default();
         parameters
             .iter()
-            .enumerate()
-            .filter_map(|(index, parameter)| try {
-                let name = parameter.name.identifier.value()?.clone();
+            .filter_map(|parameter| try {
+                let name = parameter.name.value()?.clone();
                 if !parameter_names.insert(name.clone()) {
                     self.add_error(
                         name.span.clone(),
@@ -572,23 +462,9 @@ impl<'c> Context<'c> {
                     return None;
                 }
 
-                let type_ = parameter.type_.as_ref().map_or_else(
-                    || {
-                        context_types
-                            .and_then(|it| it.get(index).cloned())
-                            .unwrap_or(Type::Error)
-                    },
-                    |it| {
-                        it.value().map_or(Type::Error, |it| {
-                            let (type_, _) = self.lower_expression(it, Some(&Type::Type));
-                            self.evaluate_expression_to_type(&type_)
-                        })
-                    },
-                );
+                let type_ = self.lower_type(parameter.type_.value());
 
                 let id = self.id_generator.generate();
-                self.local_identifiers
-                    .push((name.string.clone(), id, None, type_.clone()));
                 Parameter {
                     id,
                     name: name.string,
@@ -597,561 +473,542 @@ impl<'c> Context<'c> {
             })
             .collect()
     }
+    fn lower_function(&mut self, id: Id) {
+        let declaration = self.value_declarations.get(&id).unwrap();
+        let ValueDeclaration::Function(declaration) = declaration else {
+            unreachable!();
+        };
+        let body = declaration.ast.unwrap().body.clone();
+        let parameters = declaration.parameters.clone();
+        let return_type = declaration.return_type.clone();
 
-    fn lower_body(&mut self, body: &[AstStatement], context_type: Option<&Type>) -> (Body, Type) {
-        let mut expressions = vec![];
-        for (position, statement) in body.iter().with_position() {
+        let hir_body = self.build_body(|builder| {
+            for parameter in parameters.iter() {
+                builder.push_parameter(parameter.name.clone(), parameter.type_.clone());
+            }
+
+            builder.lower_statements(&body, Some(&return_type));
+        });
+
+        match self.value_declarations.get_mut(&id).unwrap() {
+            ValueDeclaration::Assignment(_) => unreachable!(),
+            ValueDeclaration::Function(FunctionDeclaration { body, .. }) => {
+                *body = Some(BodyOrBuiltin::Body(hir_body));
+            }
+        };
+    }
+
+    fn is_assignable_to(from: &Type, to: &Type) -> bool {
+        match (from, to) {
+            (Type::Error, _) | (_, Type::Error) => true,
+            (Type::Named(from_name), Type::Named(to_name)) => from_name == to_name,
+        }
+    }
+
+    fn build_body(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
+        let mut builder = BodyBuilder::new(self);
+        fun(&mut builder);
+        builder.body
+    }
+
+    fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {
+        self.errors.push(CompilerError {
+            path: self.path.to_path_buf(),
+            span,
+            message: message.into(),
+        });
+    }
+}
+
+struct BodyBuilder<'c0, 'c1> {
+    context: &'c0 mut Context<'c1>,
+    local_identifiers: Vec<(Box<str>, Id, Type)>,
+    body: Body,
+}
+impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
+    #[must_use]
+    fn new(context: &'c0 mut Context<'c1>) -> Self {
+        Self {
+            context,
+            local_identifiers: vec![],
+            body: Body::default(),
+        }
+    }
+
+    fn lower_statements(
+        &mut self,
+        statements: &[AstStatement],
+        context_type: Option<&Type>,
+    ) -> (Id, Type) {
+        let mut last_expression = None;
+        for (position, statement) in statements.iter().with_position() {
             let statement_context_type = if matches!(position, Position::Last | Position::Only) {
                 context_type
             } else {
                 None
             };
 
-            let (name, expression, type_) = match statement {
+            match statement {
                 AstStatement::Assignment(assignment) => {
-                    let Some(name) = assignment
-                        .name
-                        .value()
-                        .and_then(|it| it.identifier.value())
-                        .cloned()
-                    else {
+                    let Some(name) = assignment.name.value().cloned() else {
                         continue;
                     };
 
-                    let (expression, type_) = match &assignment.kind {
-                        AstAssignmentKind::Value(AstAssignmentValue { value, type_: _ }) => {
-                            // TODO: lower written type
-                            if let Some((value, type_)) =
-                                value.value().map(|it| self.lower_expression(it, None))
-                            {
-                                (
-                                    Expression::ValueWithTypeAnnotation {
-                                        value: Box::new(value),
-                                        type_: type_.clone(),
-                                    },
-                                    type_,
-                                )
-                            } else {
-                                (Expression::Error, Type::Error)
-                            }
-                        }
-                        AstAssignmentKind::Function { .. } => todo!(),
+                    let type_ = assignment
+                        .type_
+                        .as_ref()
+                        .map(|it| self.context.lower_type(it.value()));
+
+                    let (id, type_) = if let Some(value) = assignment.value.value() {
+                        self.lower_expression(value, type_.as_ref())
+                    } else {
+                        (self.push_error(), Type::Error)
                     };
-                    // TODO: return `Nothing` instead
-                    (Some(name.string), expression, type_)
+                    self.push(name.string.clone(), ExpressionKind::Reference(id), type_);
+                    last_expression = None;
                 }
                 AstStatement::Expression(expression) => {
-                    let (expression, type_) =
-                        self.lower_expression(expression, statement_context_type);
-                    (None, expression, type_)
+                    last_expression =
+                        Some(self.lower_expression(expression, statement_context_type));
                 }
-            };
-
-            let id = self.id_generator.generate();
-            if let Some(name) = &name {
-                self.local_identifiers.push((
-                    name.clone(),
-                    id,
-                    Some(Definition::Value {
-                        value: expression.clone(),
-                        type_: type_.clone(),
-                    }),
-                    type_.clone(),
-                ));
             }
-            expressions.push((id, name, expression, type_));
         }
 
-        if expressions.is_empty() {
-            // TODO: report actual error location
-            self.add_error(Offset(0)..Offset(0), "Body must not be empty");
-        }
-        let return_type = context_type
-            .cloned()
-            .or_else(|| expressions.last().map(|(_, _, _, type_)| type_.clone()))
-            .unwrap_or(Type::Error);
-        (Body { expressions }, return_type)
+        let last_expression = last_expression.unwrap_or_else(|| {
+            // TODO: check return type
+            let id = self.push_nothing();
+            (id, Type::nothing())
+        });
+        let return_type = context_type.cloned().unwrap_or(last_expression.1);
+        (last_expression.0, return_type)
     }
 
     fn lower_expression(
         &mut self,
         expression: &AstExpression,
         context_type: Option<&Type>,
-    ) -> (Expression, Type) {
-        let (expression, type_) = match expression {
+    ) -> (Id, Type) {
+        match self.lower_expression_raw(expression, context_type) {
+            LoweredExpression::Expression { id, type_ } => {
+                if let Some(context_type) = context_type
+                    && !Context::is_assignable_to(&type_, context_type)
+                {
+                    // TODO: report actual error location
+                    self.context.add_error(
+                        Offset(0)..Offset(0),
+                        format!("Expected type `{context_type:?}`, got `{type_:?}`."),
+                    );
+                    (self.push_error(), Type::Error)
+                } else {
+                    (id, type_)
+                }
+            }
+            LoweredExpression::FunctionReference(_) => {
+                // TODO: report actual error location
+                self.context
+                    .add_error(Offset(0)..Offset(0), "Function must be called.");
+                (self.push_error(), Type::Error)
+            }
+            LoweredExpression::TypeReference(_) => {
+                // TODO: report actual error location
+                self.context
+                    .add_error(Offset(0)..Offset(0), "Type must be instantiated.");
+                (self.push_error(), Type::Error)
+            }
+            LoweredExpression::EnumVariantReference { .. } => {
+                // TODO: report actual error location
+                self.context
+                    .add_error(Offset(0)..Offset(0), "Enum variant must be instantiated.");
+                (self.push_error(), Type::Error)
+            }
+            LoweredExpression::Error => (self.push_error(), Type::Error),
+        }
+    }
+    fn lower_expression_raw(
+        &mut self,
+        expression: &AstExpression,
+        context_type: Option<&Type>,
+    ) -> LoweredExpression {
+        match expression {
             AstExpression::Identifier(identifier) => {
                 let Some(identifier) = identifier.identifier.value() else {
-                    return (Expression::Error, Type::Error);
+                    return LoweredExpression::Error;
                 };
+
                 let name = &identifier.string;
                 if let Some((id, type_)) = self.lookup_local_identifier(identifier) {
-                    (Expression::Reference(id), type_.clone())
-                } else if let Some(named) = self.global_identifiers.get(name) {
+                    self.push_lowered(None, ExpressionKind::Reference(id), type_.clone())
+                } else if let Some(named) = self.context.global_identifiers.get(name) {
                     match named {
-                        Named::Value(id) => {
+                        Named::Assignment(id) => {
                             let id = *id;
-                            self.lower_assignments_with_name(name);
-                            let definition = match self.definitions.get(&id).unwrap() {
-                                TempDefinition::Value(ValueDefinition { definition, .. }) => {
-                                    definition
-                                }
-                                TempDefinition::Function(_) => unreachable!(),
+                            let type_ = match self.context.value_declarations.get(&id).unwrap() {
+                                ValueDeclaration::Assignment(AssignmentDeclaration {
+                                    type_,
+                                    ..
+                                }) => type_.clone(),
+                                ValueDeclaration::Function(_) => unreachable!(),
                             };
-
-                            let type_ = if let Some((type_, _)) = definition {
-                                type_.clone()
-                            } else {
-                                self.add_error(
-                                    identifier.span.clone(),
-                                    "Missing type in recursion",
-                                );
-                                Type::Error
-                            };
-                            (Expression::Reference(id), type_)
+                            self.push_lowered(None, ExpressionKind::Reference(id), type_.clone())
                         }
                         Named::Functions(functions) => {
                             assert!(!functions.is_empty());
                             if functions.len() > 1 {
-                                self.add_error(
+                                self.context.add_error(
                                     identifier.span.clone(),
                                     "Function overloads are not yet supported",
                                 );
-                                (Expression::Error, Type::Error)
+                                LoweredExpression::Error
                             } else {
-                                let id = functions[0];
-                                self.lower_assignments_with_name(name);
-                                let signature_and_body = match self.definitions.get(&id).unwrap() {
-                                    TempDefinition::Value(_) => unreachable!(),
-                                    TempDefinition::Function(FunctionDefinition {
-                                        signature_and_body,
-                                        ..
-                                    }) => signature_and_body,
-                                };
-
-                                if let Some((parameter_types, return_type, _)) = signature_and_body
-                                {
-                                    (
-                                        Expression::Reference(id),
-                                        Type::Function {
-                                            parameter_types: parameter_types
-                                                .iter()
-                                                .map(|it| it.type_.clone())
-                                                .collect(),
-                                            return_type: Box::new(return_type.clone()),
-                                        },
-                                    )
-                                } else {
-                                    self.add_error(
-                                        identifier.span.clone(),
-                                        "Missing function signature in recursion",
-                                    );
-                                    (Expression::Error, Type::Error)
-                                }
+                                LoweredExpression::FunctionReference(functions[0])
                             }
                         }
                     }
+                } else if self.context.hir.type_declarations.get(name).is_some() {
+                    LoweredExpression::TypeReference(Type::Named(name.clone()))
                 } else {
-                    self.add_error(identifier.span.clone(), format!("Unknown variable: {name}"));
-                    (Expression::Error, Type::Error)
+                    self.context.add_error(
+                        identifier.span.clone(),
+                        format!("Unknown reference: {name}"),
+                    );
+                    LoweredExpression::Error
                 }
             }
-            AstExpression::Symbol(symbol) => {
-                let symbol_string = &symbol.symbol.value().unwrap().string;
-                if context_type == Some(&Type::Type) {
-                    (
-                        Expression::Type(Type::Tag(TagType {
-                            symbol: symbol_string.clone(),
-                            value_type: None,
-                        })),
-                        Type::Type,
-                    )
-                } else {
-                    (
-                        Expression::Tag {
-                            symbol: symbol_string.clone(),
-                            value: None,
-                        },
-                        Type::Tag(TagType {
-                            symbol: symbol_string.clone(),
-                            value_type: None,
-                        }),
-                    )
-                }
-            }
-            AstExpression::Int(int) => (
+            AstExpression::Int(int) => self.push_lowered(
+                None,
                 int.value
                     .value()
-                    .map_or(Expression::Error, |it| Expression::Int(*it)),
-                Type::Int,
+                    .map_or(ExpressionKind::Error, |it| ExpressionKind::Int(*it)),
+                Type::int(),
             ),
             AstExpression::Text(text) => {
                 let text = text
                     .parts
                     .iter()
-                    .map::<Expression, _>(|it| match it {
-                        AstTextPart::Text(text) => Expression::Text(text.clone()),
+                    .map::<Id, _>(|it| match it {
+                        AstTextPart::Text(text) => {
+                            self.push(None, ExpressionKind::Text(text.clone()), Type::text())
+                        }
                         AstTextPart::Interpolation { expression, .. } => {
-                            let (value, type_) = expression
-                                .value()
-                                .map_or((Expression::Error, Type::Error), |it| {
-                                    self.lower_expression(it, Some(&Type::Text))
-                                });
-                            if type_ != Type::Text {
-                                // TODO: report actual error location
-                                self.add_error(
-                                    Offset(0)..Offset(0),
-                                    "Interpolated expression must be text",
-                                );
-                                return Expression::Error;
+                            if let Some(expression) = expression.value() {
+                                self.lower_expression(expression, Some(&Type::text())).0
+                            } else {
+                                self.push_error()
                             }
-                            value
                         }
                     })
-                    .reduce(|lhs, rhs| Expression::Call {
-                        receiver: Box::new(Expression::Reference(BuiltinFunction::TextConcat.id())),
-                        arguments: [lhs, rhs].into(),
+                    .collect_vec()
+                    .into_iter()
+                    .reduce(|lhs, rhs| {
+                        self.push(
+                            None,
+                            ExpressionKind::Call {
+                                receiver: BuiltinFunction::TextConcat.id(),
+                                arguments: [lhs, rhs].into(),
+                            },
+                            Type::text(),
+                        )
                     })
-                    .unwrap_or_else(|| Expression::Text("".into()));
-                (text, Type::Text)
+                    .unwrap_or_else(|| {
+                        self.push(None, ExpressionKind::Text("".into()), Type::text())
+                    });
+                LoweredExpression::Expression {
+                    id: text,
+                    type_: Type::text(),
+                }
             }
             AstExpression::Parenthesized(parenthesized) => {
                 return parenthesized
                     .inner
                     .value()
-                    .map_or((Expression::Error, Type::Error), |it| {
-                        self.lower_expression(it, context_type)
+                    .map_or(LoweredExpression::Error, |it| {
+                        self.lower_expression_raw(it, context_type)
                     });
             }
             AstExpression::Call(call) => {
-                let (receiver, receiver_type) = self.lower_expression(&call.receiver, None);
-                let parameter_context_types: Option<Cow<Box<[Type]>>> = match &receiver_type {
-                    Type::Tag(TagType {
-                        value_type: Some(box type_),
-                        ..
-                    }) => Some(Cow::Owned([type_.clone()].into())),
-                    Type::Function {
-                        parameter_types, ..
-                    } => Some(Cow::Borrowed(parameter_types)),
-                    _ => None,
-                };
+                let receiver = self.lower_expression_raw(&call.receiver, None);
 
-                let arguments = call
-                    .arguments
-                    .iter()
-                    .enumerate()
-                    .map(|(index, argument)| {
-                        self.lower_expression(
-                            &argument.value,
-                            parameter_context_types
-                                .as_deref()
-                                .and_then(|it| it.get(index)),
-                        )
-                    })
-                    .collect::<Box<[_]>>();
-                match receiver_type {
-                    Type::Type | Type::Int | Type::Text | Type::Struct(_) | Type::Or { .. } => {
+                fn lower_arguments(
+                    builder: &mut BodyBuilder,
+                    arguments: &[AstArgument],
+                    parameter_types: &[Type],
+                ) -> Option<Box<[Id]>> {
+                    let arguments = arguments
+                        .iter()
+                        .enumerate()
+                        .map(|(index, argument)| {
+                            builder
+                                .lower_expression(&argument.value, parameter_types.get(index))
+                                .0
+                        })
+                        .collect::<Box<_>>();
+                    if arguments.len() == parameter_types.len() {
+                        Some(arguments)
+                    } else {
                         // TODO: report actual error location
-                        self.add_error(Offset(0)..Offset(0), "Cannot call this type");
-                        return (Expression::Error, Type::Error);
+                        builder.context.add_error(
+                            Offset(0)..Offset(0),
+                            format!(
+                                "Expected {} argument(s), got {}.",
+                                parameter_types.len(),
+                                arguments.len(),
+                            ),
+                        );
+                        None
                     }
-                    Type::Tag(TagType { symbol, value_type }) => {
-                        if value_type.is_some() {
-                            // TODO: report actual error location
-                            self.add_error(
-                                Offset(0)..Offset(0),
-                                "You called a tag that already has a value.",
-                            );
-                            return (Expression::Error, Type::Error);
-                        } else if arguments.len() > 1 {
-                            // TODO: report actual error location
-                            self.add_error(
-                                Offset(0)..Offset(0),
-                                "Tags can only be created with one value.",
-                            );
-                            return (Expression::Error, Type::Error);
-                        }
+                }
 
-                        assert!(!arguments.is_empty());
-                        let (value, value_type) = arguments[0].clone();
-                        (
-                            Expression::Tag {
-                                symbol: symbol.clone(),
-                                value: Some(Box::new(value)),
-                            },
-                            Type::Tag(TagType {
-                                symbol,
-                                value_type: Some(Box::new(value_type)),
-                            }),
-                        )
+                match receiver {
+                    LoweredExpression::Expression { .. } => {
+                        // TODO: report actual error location
+                        self.context
+                            .add_error(Offset(0)..Offset(0), "Cannot call this type");
+                        LoweredExpression::Error
                     }
-                    Type::Function {
-                        parameter_types,
-                        box return_type,
-                        ..
-                    } => {
-                        if parameter_types.len() == arguments.len() {
-                            (
-                                Expression::Call {
-                                    receiver: Box::new(receiver),
-                                    arguments: arguments
-                                        .iter()
-                                        .map(|(value, _)| value.clone())
-                                        .collect(),
-                                },
+                    LoweredExpression::FunctionReference(function_id) => {
+                        match self.context.value_declarations.get(&function_id).unwrap() {
+                            ValueDeclaration::Assignment(_) => unreachable!(),
+                            ValueDeclaration::Function(FunctionDeclaration {
+                                parameters,
                                 return_type,
+                                ..
+                            }) => {
+                                let parameter_types =
+                                    parameters.iter().map(|it| it.type_.clone()).collect_vec();
+                                let return_type = return_type.clone();
+
+                                let arguments =
+                                    lower_arguments(self, &call.arguments, &parameter_types);
+                                if let Some(arguments) = arguments {
+                                    self.push_lowered(
+                                        None,
+                                        ExpressionKind::Call {
+                                            receiver: function_id,
+                                            arguments,
+                                        },
+                                        return_type,
+                                    )
+                                } else {
+                                    LoweredExpression::Error
+                                }
+                            }
+                        }
+                    }
+                    LoweredExpression::TypeReference(type_) => match &type_ {
+                        Type::Named(type_name) => {
+                            match self.context.hir.type_declarations.get(type_name).unwrap() {
+                                TypeDeclaration::Struct { fields } => {
+                                    let fields = lower_arguments(
+                                        self,
+                                        &call.arguments,
+                                        &fields
+                                            .iter()
+                                            .map(|(_, type_)| type_.clone())
+                                            .collect_vec(),
+                                    );
+                                    if let Some(fields) = fields {
+                                        self.push_lowered(
+                                            None,
+                                            ExpressionKind::CreateStruct {
+                                                struct_: type_.clone(),
+                                                fields,
+                                            },
+                                            type_,
+                                        )
+                                    } else {
+                                        LoweredExpression::Error
+                                    }
+                                }
+                                TypeDeclaration::Enum { .. } => {
+                                    // TODO: report actual error location
+                                    self.context.add_error(
+                                        Offset(0)..Offset(0),
+                                        "Enum variant is missing.",
+                                    );
+                                    LoweredExpression::Error
+                                }
+                            }
+                        }
+                        Type::Error => todo!(),
+                    },
+                    LoweredExpression::EnumVariantReference { enum_, variant } => {
+                        let enum_name = match &enum_ {
+                            Type::Named(name) => name,
+                            Type::Error => unreachable!(),
+                        };
+                        let variant_type =
+                            match self.context.hir.type_declarations.get(enum_name).unwrap() {
+                                TypeDeclaration::Struct { .. } => unreachable!(),
+                                TypeDeclaration::Enum { variants } => variants
+                                    .iter()
+                                    .find(|(name, _)| name == &variant)
+                                    .unwrap()
+                                    .1
+                                    .clone(),
+                            };
+                        let parameter_types = if let Some(variant_type) = variant_type {
+                            vec![variant_type]
+                        } else {
+                            vec![]
+                        };
+                        let arguments = lower_arguments(self, &call.arguments, &parameter_types);
+                        if let Some(arguments) = arguments {
+                            self.push_lowered(
+                                None,
+                                ExpressionKind::CreateEnum {
+                                    enum_: enum_.clone(),
+                                    variant,
+                                    value: arguments.first().copied(),
+                                },
+                                enum_,
                             )
                         } else {
-                            // TODO: report actual error location
-                            self.add_error(
-                                Offset(0)..Offset(0),
-                                format!(
-                                    "Expected {} {}, got {}.",
-                                    parameter_types.len(),
-                                    if parameter_types.len() == 1 {
-                                        "argument"
+                            LoweredExpression::Error
+                        }
+                    }
+                    LoweredExpression::Error => LoweredExpression::Error,
+                }
+            }
+            AstExpression::Navigation(navigation) => {
+                let receiver = self.lower_expression_raw(&navigation.receiver, None);
+
+                let Some(key) = navigation.key.value() else {
+                    return LoweredExpression::Error;
+                };
+
+                match receiver {
+                    LoweredExpression::Expression { id, type_ } => match &type_ {
+                        Type::Named(type_name) => {
+                            match self.context.hir.type_declarations.get(type_name).unwrap() {
+                                TypeDeclaration::Struct { fields } => {
+                                    if let Some((_, field_type)) =
+                                        fields.iter().find(|(name, _)| name == &key.string)
+                                    {
+                                        self.push_lowered(
+                                            None,
+                                            ExpressionKind::StructAccess {
+                                                struct_: id,
+                                                field: key.string.clone(),
+                                            },
+                                            field_type.clone(),
+                                        )
                                     } else {
-                                        "arguments"
-                                    },
-                                    arguments.len(),
-                                ),
-                            );
-                            (Expression::Error, Type::Error)
-                        }
-                    }
-                    Type::Error => (Expression::Error, Type::Error),
-                }
-            }
-            AstExpression::Struct(struct_) => {
-                let struct_context_type =
-                    context_type.and_then(|context_type| match context_type {
-                        Type::Struct(context_type) => Some(context_type),
-                        _ => None,
-                    });
-
-                let mut keys = FxHashSet::default();
-                let Some(fields) = struct_
-                    .fields
-                    .iter()
-                    .map(|field| try {
-                        let name = field.key.identifier.value()?;
-                        if !keys.insert(name.clone()) {
-                            self.add_error(
-                                name.span.clone(),
-                                format!("Duplicate struct field: {}", **name),
-                            );
-                            return None;
-                        }
-
-                        let (value, type_) = self.lower_expression(
-                            field.value.value()?.as_ref(),
-                            struct_context_type.and_then(|it| {
-                                it.iter()
-                                    .find(|(type_name, _)| type_name == &**name)
-                                    .map(|(_, type_)| type_)
-                            }),
-                        );
-                        (name.string.clone(), value, type_)
-                    })
-                    .collect::<Option<Vec<(Box<str>, Expression, Type)>>>()
-                else {
-                    return (Expression::Error, Type::Error);
-                };
-                let type_ = if fields.iter().any(|(_, _, type_)| type_ == &Type::Type) {
-                    Type::Type
-                } else {
-                    Type::Struct(
-                        fields
-                            .iter()
-                            .map(|(name, _, type_)| (name.clone(), type_.clone()))
-                            .collect(),
-                    )
-                };
-                let fields = fields
-                    .into_iter()
-                    .map(|(name, value, _)| (name, value))
-                    .collect();
-                (Expression::Struct(fields), type_)
-            }
-            AstExpression::StructAccess(struct_access) => {
-                // TODO: If we support implicit struct type conversion, pass a context type here
-                let (struct_, struct_type) =
-                    self.lower_expression(struct_access.struct_.as_ref(), None);
-                let Some(field) = struct_access
-                    .key
-                    .value()
-                    .and_then(|it| it.identifier.value())
-                    .map(|it| it.string.clone())
-                else {
-                    return (Expression::Error, Type::Error);
-                };
-                let type_ = match struct_type {
-                    Type::Type
-                    | Type::Tag { .. }
-                    | Type::Int
-                    | Type::Text
-                    | Type::Function { .. }
-                    | Type::Or { .. } => {
-                        // TODO: report actual error location
-                        self.add_error(Offset(0)..Offset(0), "Receiver is not a struct");
-                        Type::Error
-                    }
-                    Type::Struct(struct_type) => {
-                        struct_type
-                            .iter()
-                            .find_map(|(name, type_)| {
-                                if name == &field {
-                                    Some(type_.clone())
-                                } else {
-                                    None
+                                        self.context.add_error(
+                                            key.span.clone(),
+                                            format!(
+                                                "Struct `{type_:?}` doesn't have a field `{}`",
+                                                key.string
+                                            ),
+                                        );
+                                        LoweredExpression::Error
+                                    }
                                 }
-                            })
-                            .unwrap_or_else(|| {
-                                // TODO: report actual error location
-                                self.add_error(
-                                    Offset(0)..Offset(0),
-                                    format!("Struct does not have field `{field}`"),
-                                );
-                                Type::Error
-                            })
+                                TypeDeclaration::Enum { .. } => {
+                                    self.context.add_error(
+                                        key.span.clone(),
+                                        format!(
+                                            "Enum `{type_:?}` doesn't have a field `{}`",
+                                            key.string
+                                        ),
+                                    );
+                                    LoweredExpression::Error
+                                }
+                            }
+                        }
+                        Type::Error => todo!(),
+                    },
+                    LoweredExpression::FunctionReference(_) => {
+                        self.context.add_error(
+                            key.span.clone(),
+                            format!("Function doesn't have a field `{}`", key.string),
+                        );
+                        LoweredExpression::Error
                     }
-                    Type::Error => todo!(),
-                };
-                (
-                    Expression::StructAccess {
-                        struct_: Box::new(struct_),
-                        field,
+                    LoweredExpression::TypeReference(type_) => match &type_ {
+                        Type::Named(type_name) => {
+                            match self.context.hir.type_declarations.get(type_name).unwrap() {
+                                TypeDeclaration::Struct { .. } => {
+                                    self.context.add_error(
+                                        key.span.clone(),
+                                        format!(
+                                            "Struct type `{type_:?}` doesn't have a field `{}`",
+                                            key.string,
+                                        ),
+                                    );
+                                    LoweredExpression::Error
+                                }
+                                TypeDeclaration::Enum { variants } => {
+                                    if variants.iter().any(|(name, _)| name == &key.string) {
+                                        LoweredExpression::EnumVariantReference {
+                                            enum_: type_,
+                                            variant: key.string.clone(),
+                                        }
+                                    } else {
+                                        self.context.add_error(
+                                            key.span.clone(),
+                                            format!(
+                                                "Enum `{type_:?}` doesn't have a variant `{}`",
+                                                key.string,
+                                            ),
+                                        );
+                                        LoweredExpression::Error
+                                    }
+                                }
+                            }
+                        }
+                        Type::Error => todo!(),
                     },
-                    type_,
-                )
+                    LoweredExpression::EnumVariantReference { .. } => todo!(),
+                    LoweredExpression::Error => LoweredExpression::Error,
+                }
             }
-            AstExpression::Lambda(lambda) => {
-                let function_context_type = if let Some(Type::Function {
-                    box parameter_types,
-                    box return_type,
-                }) = context_type
-                {
-                    Some((parameter_types, return_type))
-                } else {
-                    None
-                };
-                let parameters = self
-                    .lower_parameters(&lambda.parameters, function_context_type.map(|(it, _)| it));
-                let parameter_types = parameters.iter().map(|it| it.type_.clone()).collect();
-
-                let (body, return_type) =
-                    self.lower_body(&lambda.body, function_context_type.map(|(_, it)| it));
-                (
-                    Expression::Lambda(Lambda { parameters, body }),
-                    Type::Function {
-                        parameter_types,
-                        return_type: Box::new(return_type),
-                    },
-                )
+            AstExpression::Body(AstBody { statements, .. }) => {
+                let (id, type_) = self.lower_statements(statements, context_type);
+                LoweredExpression::Expression { id, type_ }
             }
-            AstExpression::Or(or) => {
-                let (left, _) = self.lower_expression(&or.left, Some(&Type::Type));
-                let right = or.right.value().map_or(Expression::Error, |it| {
-                    self.lower_expression(it, Some(&Type::Type)).0
-                });
-                (
-                    Expression::Or {
-                        left: Box::new(left),
-                        right: Box::new(right),
-                    },
-                    Type::Type,
-                )
-            }
-        };
-
-        if let Some(context_type) = context_type {
-            if let (Type::Tag(from), Type::Or(OrType(to))) = (&type_, context_type)
-                && to
-                    .iter()
-                    .any(|to| Self::tag_type_is_assignable_to(from, to))
-            {
-                (
-                    Expression::CreateOrVariant {
-                        or_type: OrType(to.clone()),
-                        symbol: from.symbol.clone(),
-                        value: Box::new(expression),
-                    },
-                    context_type.clone(),
-                )
-            } else if Self::is_assignable_to(&type_, context_type) {
-                (expression, context_type.clone())
-            } else {
-                // TODO: report actual error location
-                self.add_error(
-                    Offset(0)..Offset(0),
-                    format!("Expected type `{context_type:?}`, got `{type_:?}`."),
-                );
-                (Expression::Error, Type::Error)
-            }
-        } else {
-            (expression, type_)
         }
     }
 
-    fn is_assignable_to(from: &Type, to: &Type) -> bool {
-        match (from, to) {
-            (Type::Error, _)
-            | (_, Type::Error)
-            | (Type::Type, Type::Type)
-            | (Type::Int, Type::Int)
-            | (Type::Text, Type::Text) => true,
-            (Type::Tag(from), Type::Tag(to)) => Self::tag_type_is_assignable_to(from, to),
-            (Type::Or(OrType(from)), Type::Or(OrType(to))) => {
-                // TODO: support subsets
-                if from.len() == to.len() {
-                    return false;
-                }
-                from.iter().all(|from| {
-                    to.iter()
-                        .any(|to| Self::tag_type_is_assignable_to(from, to))
-                })
-            }
-            (Type::Struct(from), Type::Struct(to)) => {
-                if from.len() != to.len() {
-                    return false;
-                }
-                from.iter().all(|(name, field_from)| {
-                    let Some((_, field_to)) = to.iter().find(|(to_name, _)| name == to_name) else {
-                        return false;
-                    };
-                    Self::is_assignable_to(field_from, field_to)
-                })
-            }
-            (
-                Type::Function {
-                    parameter_types,
-                    return_type,
-                },
-                Type::Function {
-                    parameter_types: to_parameter_types,
-                    return_type: to_return_type,
-                },
-            ) => {
-                parameter_types.len() == to_parameter_types.len()
-                    && parameter_types
-                        .iter()
-                        .zip(to_parameter_types.iter())
-                        .all(|(from, to)| Self::is_assignable_to(from, to))
-                    && Self::is_assignable_to(return_type, to_return_type)
-            }
-            _ => false,
+    fn push_lowered(
+        &mut self,
+        name: impl Into<Option<Box<str>>>,
+        kind: ExpressionKind,
+        type_: Type,
+    ) -> LoweredExpression {
+        let id = self.push(name, kind, type_.clone());
+        LoweredExpression::Expression { id, type_ }
+    }
+    fn push_nothing(&mut self) -> Id {
+        self.push(
+            None,
+            ExpressionKind::CreateStruct {
+                struct_: Type::nothing(),
+                fields: [].into(),
+            },
+            Type::nothing(),
+        )
+    }
+    fn push_parameter(&mut self, name: Box<str>, type_: Type) -> Id {
+        let id = self.context.id_generator.generate();
+        self.local_identifiers.push((name, id, type_.clone()));
+        id
+    }
+    fn push_error(&mut self) -> Id {
+        self.push(None, ExpressionKind::Error, Type::Error)
+    }
+    fn push(&mut self, name: impl Into<Option<Box<str>>>, kind: ExpressionKind, type_: Type) -> Id {
+        let name = name.into();
+        let id = self.context.id_generator.generate();
+        if let Some(name) = &name {
+            self.local_identifiers
+                .push(((*name).clone(), id, type_.clone()));
         }
+        self.body
+            .expressions
+            .push((id, name, Expression { kind, type_ }));
+        id
     }
 
-    fn tag_type_is_assignable_to(from: &TagType, to: &TagType) -> bool {
-        from.symbol == to.symbol
-            && match (from.value_type.as_ref(), to.value_type.as_ref()) {
-                (Some(from), Some(to)) => Self::is_assignable_to(from, to),
-                (None, None) => true,
-                _ => false,
-            }
-    }
-
-    // Utils
     fn with_scope<T>(&mut self, fun: impl FnOnce(&mut Self) -> T) -> T {
         let scope = self.local_identifiers.len();
         let result = fun(self);
@@ -1164,15 +1021,16 @@ impl<'c> Context<'c> {
         self.local_identifiers
             .iter()
             .rev()
-            .find(|(box variable_name, _, _, _)| variable_name == name)
-            .map(|(_, id, _, type_)| (*id, type_))
+            .find(|(box variable_name, _, _)| variable_name == name)
+            .map(|(_, id, type_)| (*id, type_))
     }
+}
 
-    fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {
-        self.errors.push(CompilerError {
-            path: self.path.to_path_buf(),
-            span,
-            message: message.into(),
-        });
-    }
+#[derive(Debug)]
+enum LoweredExpression {
+    Expression { id: Id, type_: Type },
+    FunctionReference(Id),
+    TypeReference(Type),
+    EnumVariantReference { enum_: Type, variant: Box<str> },
+    Error,
 }

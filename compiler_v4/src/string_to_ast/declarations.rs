@@ -48,8 +48,8 @@ pub fn declarations(mut parser: Parser) -> (Parser, Vec<AstDeclaration>) {
 fn declaration<'a>(parser: Parser) -> Option<(Parser, AstDeclaration)> {
     None.or_else(|| struct_(parser).map(|(parser, it)| (parser, AstDeclaration::Struct(it))))
         .or_else(|| enum_(parser).map(|(parser, it)| (parser, AstDeclaration::Enum(it))))
-        .or_else(|| function(parser).map(|(parser, it)| (parser, AstDeclaration::Function(it))))
         .or_else(|| assignment(parser).map(|(parser, it)| (parser, AstDeclaration::Assignment(it))))
+        .or_else(|| function(parser).map(|(parser, it)| (parser, AstDeclaration::Function(it))))
 }
 
 #[instrument(level = "trace")]
@@ -188,6 +188,41 @@ fn enum_variant<'a>(parser: Parser) -> Option<(Parser, AstEnumVariant, Option<Pa
 }
 
 #[instrument(level = "trace")]
+pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
+    let parser = let_keyword(parser)?.and_trailing_whitespace();
+
+    let (parser, name) = raw_identifier(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error_result(parser, "This assignment is missing a name.");
+
+    let (parser, type_) = if let Some(parser) = colon(parser).and_trailing_whitespace() {
+        let (parser, type_) = type_(parser)
+            .and_trailing_whitespace()
+            .unwrap_or_ast_error(parser, "This assignment is missing a type after the colon.");
+        (parser, Some(type_))
+    } else {
+        (parser, None)
+    };
+
+    let (parser, equals_sign_error) = equals_sign(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This assignment is missing an equals sign.");
+
+    let (parser, value) =
+        expression(parser).unwrap_or_ast_error(parser, "This assignment is missing a value.");
+
+    Some((
+        parser,
+        AstAssignment {
+            name,
+            type_,
+            equals_sign_error,
+            value,
+        },
+    ))
+}
+
+#[instrument(level = "trace")]
 fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
     let parser = fun_keyword(parser)?.and_trailing_whitespace();
 
@@ -270,40 +305,5 @@ fn parameter<'a>(parser: Parser) -> Option<(Parser, AstParameter, Option<Parser>
             comma_error: None,
         },
         parser_for_missing_comma_error,
-    ))
-}
-
-#[instrument(level = "trace")]
-pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
-    let parser = let_keyword(parser)?.and_trailing_whitespace();
-
-    let (parser, name) = raw_identifier(parser)
-        .and_trailing_whitespace()
-        .unwrap_or_ast_error_result(parser, "This assignment is missing a name.");
-
-    let (parser, type_) = if let Some(parser) = colon(parser).and_trailing_whitespace() {
-        let (parser, type_) = type_(parser)
-            .and_trailing_whitespace()
-            .unwrap_or_ast_error(parser, "This assignment is missing a type after the colon.");
-        (parser, Some(type_))
-    } else {
-        (parser, None)
-    };
-
-    let (parser, equals_sign_error) = equals_sign(parser)
-        .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This assignment is missing an equals sign.");
-
-    let (parser, value) =
-        expression(parser).unwrap_or_ast_error(parser, "This assignment is missing a value.");
-
-    Some((
-        parser,
-        AstAssignment {
-            name,
-            type_,
-            equals_sign_error,
-            value,
-        },
     ))
 }
