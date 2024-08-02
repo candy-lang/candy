@@ -164,14 +164,15 @@ fn enum_<'a>(parser: Parser) -> Option<(Parser, AstEnum)> {
 fn enum_variant<'a>(parser: Parser) -> Option<(Parser, AstEnumVariant, Option<Parser>)> {
     let (parser, name) = raw_identifier(parser)?.and_trailing_whitespace();
 
-    let (parser, type_) = if let Some(parser) = colon(parser).and_trailing_whitespace() {
-        let (parser, type_) = type_(parser)
+    let (parser, type_) =
+        colon(parser)
             .and_trailing_whitespace()
-            .unwrap_or_ast_error(parser, "This enum variant is missing a type.");
-        (parser, Some(type_))
-    } else {
-        (parser, None)
-    };
+            .map_or((parser, None), |parser| {
+                let (parser, type_) = type_(parser)
+                    .and_trailing_whitespace()
+                    .unwrap_or_ast_error(parser, "This enum variant is missing a type.");
+                (parser, Some(type_))
+            });
 
     let (parser, parser_for_missing_comma_error) =
         comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));
@@ -195,14 +196,16 @@ pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
         .and_trailing_whitespace()
         .unwrap_or_ast_error_result(parser, "This assignment is missing a name.");
 
-    let (parser, type_) = if let Some(parser) = colon(parser).and_trailing_whitespace() {
-        let (parser, type_) = type_(parser)
+    let (parser, type_) =
+        colon(parser)
             .and_trailing_whitespace()
-            .unwrap_or_ast_error(parser, "This assignment is missing a type after the colon.");
-        (parser, Some(type_))
-    } else {
-        (parser, None)
-    };
+            .map_or((parser, None), |parser| {
+                let (parser, type_) = type_(parser).and_trailing_whitespace().unwrap_or_ast_error(
+                    parser,
+                    "This assignment is missing a type after the colon.",
+                );
+                (parser, Some(type_))
+            });
 
     let (parser, equals_sign_error) = equals_sign(parser)
         .and_trailing_whitespace()

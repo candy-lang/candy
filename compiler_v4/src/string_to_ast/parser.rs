@@ -48,15 +48,6 @@ impl<'s> Parser<'s> {
             span: start_offset..self.offset,
         }
     }
-    #[must_use]
-    pub fn string_to(self, end_offset: Offset) -> AstString {
-        assert!(self.offset <= end_offset);
-        AstString {
-            string: self.source[*self.offset..*end_offset].into(),
-            file: self.file.to_path_buf(),
-            span: self.offset..end_offset,
-        }
-    }
 
     #[must_use]
     pub fn error_at_current_offset(self, message: impl Into<String>) -> AstError {

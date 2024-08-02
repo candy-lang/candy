@@ -343,7 +343,7 @@ impl CollectAstErrors for AstParameter {
 impl CollectAstErrors for AstType {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         match &self {
-            AstType::Named(named) => named.collect_errors_to(errors),
+            Self::Named(named) => named.collect_errors_to(errors),
         }
     }
 }

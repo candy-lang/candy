@@ -181,7 +181,7 @@ pub struct Expression {
 }
 impl Expression {
     #[must_use]
-    pub fn error() -> Self {
+    pub const fn error() -> Self {
         Self {
             kind: ExpressionKind::Error,
             type_: Type::Error,

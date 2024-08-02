@@ -722,8 +722,6 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                     });
             }
             AstExpression::Call(call) => {
-                let receiver = self.lower_expression_raw(&call.receiver, None);
-
                 fn lower_arguments(
                     builder: &mut BodyBuilder,
                     arguments: &[AstArgument],
@@ -754,6 +752,8 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                     }
                 }
 
+                let receiver = self.lower_expression_raw(&call.receiver, None);
+
                 match receiver {
                     LoweredExpression::Expression { .. } => {
                         // TODO: report actual error location
@@ -775,7 +775,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
 
                                 let arguments =
                                     lower_arguments(self, &call.arguments, &parameter_types);
-                                if let Some(arguments) = arguments {
+                                arguments.map_or(LoweredExpression::Error, |arguments| {
                                     self.push_lowered(
                                         None,
                                         ExpressionKind::Call {
@@ -784,9 +784,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                                         },
                                         return_type,
                                     )
-                                } else {
-                                    LoweredExpression::Error
-                                }
+                                })
                             }
                         }
                     }
@@ -802,7 +800,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                                             .map(|(_, type_)| type_.clone())
                                             .collect_vec(),
                                     );
-                                    if let Some(fields) = fields {
+                                    fields.map_or(LoweredExpression::Error, |fields| {
                                         self.push_lowered(
                                             None,
                                             ExpressionKind::CreateStruct {
@@ -811,9 +809,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                                             },
                                             type_,
                                         )
-                                    } else {
-                                        LoweredExpression::Error
-                                    }
+                                    })
                                 }
                                 TypeDeclaration::Enum { .. } => {
                                     // TODO: report actual error location
@@ -845,7 +841,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                         let parameter_types = [variant_type.unwrap()];
                         let arguments =
                             lower_arguments(self, &call.arguments, parameter_types.as_slice());
-                        if let Some(arguments) = arguments {
+                        arguments.map_or(LoweredExpression::Error, |arguments| {
                             self.push_lowered(
                                 None,
                                 ExpressionKind::CreateEnum {
@@ -855,9 +851,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                                 },
                                 enum_,
                             )
-                        } else {
-                            LoweredExpression::Error
-                        }
+                        })
                     }
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
