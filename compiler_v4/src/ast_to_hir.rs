@@ -36,14 +36,7 @@ pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
             Named::Functions(ids) => {
                 assert!(!ids.is_empty());
 
-                let ValueDeclaration::Function(function) = context
-                    .value_declarations
-                    .get(ids.first().unwrap())
-                    .unwrap()
-                else {
-                    unreachable!();
-                };
-
+                let function = context.functions.get(ids.first().unwrap()).unwrap();
                 let parameters_are_empty = function.parameters.is_empty();
                 let return_type = function.return_type.clone();
                 if ids.len() > 1 {
@@ -77,9 +70,9 @@ struct Context<'a> {
     ast: &'a Ast,
     id_generator: IdGenerator<Id>,
     global_identifiers: FxHashMap<Box<str>, Named>,
-    // TODO: Split into assignments and functions
-    value_declarations: FxHashMap<Id, ValueDeclaration<'a>>,
+    assignments: FxHashMap<Id, AssignmentDeclaration<'a>>,
     assignment_dependency_graph: DiGraph<Id, ()>,
+    functions: FxHashMap<Id, FunctionDeclaration<'a>>,
     errors: Vec<CompilerError>,
     hir: Hir,
 }
@@ -87,11 +80,6 @@ struct Context<'a> {
 enum Named {
     Assignment(Id),
     Functions(Vec<Id>),
-}
-#[derive(Debug)]
-enum ValueDeclaration<'a> {
-    Assignment(AssignmentDeclaration<'a>),
-    Function(FunctionDeclaration<'a>),
 }
 #[derive(Debug)]
 struct AssignmentDeclaration<'a> {
@@ -115,8 +103,9 @@ impl<'a> Context<'a> {
             ast,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
             global_identifiers: FxHashMap::default(),
-            value_declarations: FxHashMap::default(),
+            assignments: FxHashMap::default(),
             assignment_dependency_graph: DiGraph::new(),
+            functions: FxHashMap::default(),
             errors: vec![],
             hir: Hir::default(),
         }
@@ -154,39 +143,39 @@ impl<'a> Context<'a> {
         let mut assignments = vec![];
         let mut functions = vec![];
         for (name, named) in self.global_identifiers {
-            let ids = match named {
-                Named::Assignment(id) => vec![id],
-                Named::Functions(ids) => ids,
-            };
-            for id in ids {
-                let declaration = self.value_declarations.remove(&id).unwrap();
-                match declaration {
-                    ValueDeclaration::Assignment(AssignmentDeclaration { type_, body, .. }) => {
-                        assignments.push((
+            match named {
+                Named::Assignment(id) => {
+                    let AssignmentDeclaration { type_, body, .. } =
+                        self.assignments.remove(&id).unwrap();
+                    assignments.push((
+                        id,
+                        name.clone(),
+                        Assignment {
+                            type_,
+                            body: body.unwrap(),
+                        },
+                    ));
+                }
+                Named::Functions(ids) => {
+                    for id in ids {
+                        let FunctionDeclaration {
+                            parameters,
+                            return_type,
+                            body,
+                            ..
+                        } = self.functions.remove(&id).unwrap();
+                        functions.push((
                             id,
                             name.clone(),
-                            Assignment {
-                                type_,
+                            Function {
+                                parameters,
+                                return_type,
                                 body: body.unwrap(),
                             },
                         ));
                     }
-                    ValueDeclaration::Function(FunctionDeclaration {
-                        parameters,
-                        return_type,
-                        body,
-                        ..
-                    }) => functions.push((
-                        id,
-                        name.clone(),
-                        Function {
-                            parameters,
-                            return_type,
-                            body: body.unwrap(),
-                        },
-                    )),
                 }
-            }
+            };
         }
         self.hir.assignments = assignments.into();
         self.hir.functions = functions.into();
@@ -309,14 +298,14 @@ impl<'a> Context<'a> {
         let name = builtin_function.as_ref();
         let parameters = parameters.into();
         let id = builtin_function.id();
-        self.value_declarations.force_insert(
+        self.functions.force_insert(
             id,
-            ValueDeclaration::Function(FunctionDeclaration {
+            FunctionDeclaration {
                 ast: None,
                 parameters,
                 return_type,
                 body: Some(BodyOrBuiltin::Builtin(builtin_function)),
-            }),
+            },
         );
         self.global_identifiers
             .force_insert(name.into(), Named::Functions(vec![id]));
@@ -462,22 +451,19 @@ impl<'a> Context<'a> {
 
         let graph_index = self.assignment_dependency_graph.add_node(id);
 
-        self.value_declarations.force_insert(
+        self.assignments.force_insert(
             id,
-            ValueDeclaration::Assignment(AssignmentDeclaration {
+            AssignmentDeclaration {
                 ast: assignment,
                 type_,
                 graph_index,
                 body: None,
-            }),
+            },
         );
         Some(id)
     }
     fn lower_assignment(&mut self, id: Id) {
-        let declaration = self.value_declarations.get(&id).unwrap();
-        let ValueDeclaration::Assignment(declaration) = declaration else {
-            unreachable!();
-        };
+        let declaration = self.assignments.get(&id).unwrap();
         let value = declaration.ast.value.clone();
         let type_ = declaration.type_.clone();
         let graph_index = declaration.graph_index;
@@ -491,21 +477,12 @@ impl<'a> Context<'a> {
         });
 
         for dependency_id in global_assignment_dependencies {
-            let ValueDeclaration::Assignment(dependency) =
-                self.value_declarations.get(&dependency_id).unwrap()
-            else {
-                unreachable!();
-            };
+            let dependency = self.assignments.get(&dependency_id).unwrap();
             self.assignment_dependency_graph
                 .add_edge(graph_index, dependency.graph_index, ());
         }
 
-        match self.value_declarations.get_mut(&id).unwrap() {
-            ValueDeclaration::Assignment(AssignmentDeclaration { body, .. }) => {
-                *body = Some(hir_body);
-            }
-            ValueDeclaration::Function(_) => unreachable!(),
-        }
+        self.assignments.get_mut(&id).unwrap().body = Some(hir_body);
     }
 
     fn lower_function_signature(&mut self, function: &'a AstFunction) -> Option<Id> {
@@ -535,14 +512,14 @@ impl<'a> Context<'a> {
                 entry.insert(Named::Functions(vec![id]));
             }
         }
-        self.value_declarations.force_insert(
+        self.functions.force_insert(
             id,
-            ValueDeclaration::Function(FunctionDeclaration {
+            FunctionDeclaration {
                 ast: Some(function),
                 parameters,
                 return_type,
                 body: None,
-            }),
+            },
         );
         Some(id)
     }
@@ -572,10 +549,7 @@ impl<'a> Context<'a> {
             .collect()
     }
     fn lower_function(&mut self, id: Id) {
-        let declaration = self.value_declarations.get(&id).unwrap();
-        let ValueDeclaration::Function(declaration) = declaration else {
-            unreachable!();
-        };
+        let declaration = self.functions.get(&id).unwrap();
         let body = declaration.ast.unwrap().body.clone();
         let parameters = declaration.parameters.clone();
         let return_type = declaration.return_type.clone();
@@ -588,12 +562,7 @@ impl<'a> Context<'a> {
             builder.lower_statements(&body, Some(&return_type));
         });
 
-        match self.value_declarations.get_mut(&id).unwrap() {
-            ValueDeclaration::Assignment(_) => unreachable!(),
-            ValueDeclaration::Function(FunctionDeclaration { body, .. }) => {
-                *body = Some(BodyOrBuiltin::Body(hir_body));
-            }
-        };
+        self.functions.get_mut(&id).unwrap().body = Some(BodyOrBuiltin::Body(hir_body));
     }
 
     fn is_assignable_to(from: &Type, to: &Type) -> bool {
@@ -754,13 +723,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         Named::Assignment(id) => {
                             let id = *id;
                             self.global_assignment_dependencies.insert(id);
-                            let type_ = match self.context.value_declarations.get(&id).unwrap() {
-                                ValueDeclaration::Assignment(AssignmentDeclaration {
-                                    type_,
-                                    ..
-                                }) => type_.clone(),
-                                ValueDeclaration::Function(_) => unreachable!(),
-                            };
+                            let type_ = self.context.assignments.get(&id).unwrap().type_.clone();
                             self.push_lowered(None, ExpressionKind::Reference(id), type_)
                         }
                         Named::Functions(functions) => {
@@ -883,31 +846,26 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         LoweredExpression::Error
                     }
                     LoweredExpression::FunctionReference(function_id) => {
-                        match self.context.value_declarations.get(&function_id).unwrap() {
-                            ValueDeclaration::Assignment(_) => unreachable!(),
-                            ValueDeclaration::Function(FunctionDeclaration {
-                                parameters,
-                                return_type,
-                                ..
-                            }) => {
-                                let parameter_types =
-                                    parameters.iter().map(|it| it.type_.clone()).collect_vec();
-                                let return_type = return_type.clone();
+                        let function = self.context.functions.get(&function_id).unwrap();
+                        let parameter_types = function
+                            .parameters
+                            .iter()
+                            .map(|it| it.type_.clone())
+                            .collect_vec();
+                        let return_type = function.return_type.clone();
 
-                                let arguments =
-                                    lower_arguments(self, call, &call.arguments, &parameter_types);
-                                arguments.map_or(LoweredExpression::Error, |arguments| {
-                                    self.push_lowered(
-                                        None,
-                                        ExpressionKind::Call {
-                                            receiver: function_id,
-                                            arguments,
-                                        },
-                                        return_type,
-                                    )
-                                })
-                            }
-                        }
+                        let arguments =
+                            lower_arguments(self, call, &call.arguments, &parameter_types);
+                        arguments.map_or(LoweredExpression::Error, |arguments| {
+                            self.push_lowered(
+                                None,
+                                ExpressionKind::Call {
+                                    receiver: function_id,
+                                    arguments,
+                                },
+                                return_type,
+                            )
+                        })
                     }
                     LoweredExpression::TypeReference(type_) => match &type_ {
                         Type::Named(type_name) => {
