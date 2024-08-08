@@ -133,6 +133,7 @@ fn compile(options: CompileOptions) -> ProgramResult {
     process::Command::new("gcc")
         .args([
             c_path.to_str().unwrap(),
+            "-O3",
             "-o",
             executable_path.to_str().unwrap(),
         ])
