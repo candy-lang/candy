@@ -145,6 +145,7 @@ pub enum AstExpression {
     Navigation(AstNavigation),
     // Lambda(AstLambda),
     Body(AstBody),
+    Switch(AstSwitch),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -182,12 +183,14 @@ pub struct AstParenthesized {
 pub struct AstCall {
     pub receiver: Box<AstExpression>,
     pub arguments: Vec<AstArgument>,
+    pub opening_parenthesis_span: Range<Offset>,
     pub closing_parenthesis_error: Option<AstError>,
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstArgument {
     pub value: AstExpression,
     pub comma_error: Option<AstError>,
+    pub span: Range<Offset>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -212,6 +215,22 @@ pub struct AstBody {
 pub enum AstStatement {
     Assignment(AstAssignment),
     Expression(AstExpression),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstSwitch {
+    pub value: AstResult<Box<AstExpression>>,
+    pub opening_curly_brace_error: Option<AstError>,
+    pub cases: Vec<AstSwitchCase>,
+    pub closing_curly_brace_error: Option<AstError>,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstSwitchCase {
+    pub variant: AstResult<AstString>,
+    pub value_name: Option<(AstResult<AstString>, Option<AstError>)>,
+    pub arrow_error: Option<AstError>,
+    pub expression: AstResult<AstExpression>,
+    pub comma_error: Option<AstError>,
 }
 
 pub trait CollectAstErrors {
@@ -363,6 +382,7 @@ impl CollectAstErrors for AstExpression {
             Self::Call(call) => call.collect_errors_to(errors),
             Self::Navigation(navigation) => navigation.collect_errors_to(errors),
             Self::Body(body) => body.collect_errors_to(errors),
+            Self::Switch(switch) => switch.collect_errors_to(errors),
         }
     }
 }
@@ -434,5 +454,22 @@ impl CollectAstErrors for AstStatement {
             Self::Expression(expression) => expression.collect_errors_to(errors),
             Self::Assignment(assignment) => assignment.collect_errors_to(errors),
         }
+    }
+}
+impl CollectAstErrors for AstSwitch {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.value.collect_errors_to(errors);
+        self.opening_curly_brace_error.collect_errors_to(errors);
+        self.cases.collect_errors_to(errors);
+        self.closing_curly_brace_error.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstSwitchCase {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.variant.collect_errors_to(errors);
+        self.value_name.collect_errors_to(errors);
+        self.arrow_error.collect_errors_to(errors);
+        self.expression.collect_errors_to(errors);
+        self.comma_error.collect_errors_to(errors);
     }
 }

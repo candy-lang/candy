@@ -1,7 +1,8 @@
 use crate::{
     ast::{
-        Ast, AstArgument, AstAssignment, AstBody, AstDeclaration, AstEnum, AstExpression,
-        AstFunction, AstNamedType, AstParameter, AstStatement, AstStruct, AstTextPart, AstType,
+        Ast, AstArgument, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
+        AstFunction, AstNamedType, AstParameter, AstStatement, AstStruct, AstSwitch, AstTextPart,
+        AstType,
     },
     error::CompilerError,
     hir::{
@@ -67,12 +68,12 @@ pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
 }
 
 #[derive(Debug)]
-struct Context<'c> {
-    path: &'c Path,
-    ast: &'c Ast,
+struct Context<'a> {
+    path: &'a Path,
+    ast: &'a Ast,
     id_generator: IdGenerator<Id>,
     // TODO: Split into assignments and functions
-    value_declarations: FxHashMap<Id, ValueDeclaration<'c>>,
+    value_declarations: FxHashMap<Id, ValueDeclaration<'a>>,
     global_identifiers: FxHashMap<Box<str>, Named>,
     errors: Vec<CompilerError>,
     hir: Hir,
@@ -101,8 +102,8 @@ struct FunctionDeclaration<'a> {
     body: Option<BodyOrBuiltin>,
 }
 
-impl<'c> Context<'c> {
-    fn new(path: &'c Path, ast: &'c Ast) -> Self {
+impl<'a> Context<'a> {
+    fn new(path: &'a Path, ast: &'a Ast) -> Self {
         Self {
             path,
             ast,
@@ -163,6 +164,46 @@ impl<'c> Context<'c> {
             let b_id = self.id_generator.generate();
             self.add_builtin_function(
                 BuiltinFunction::IntAdd,
+                [
+                    Parameter {
+                        id: a_id,
+                        name: "a".into(),
+                        type_: Type::int(),
+                    },
+                    Parameter {
+                        id: b_id,
+                        name: "b".into(),
+                        type_: Type::int(),
+                    },
+                ],
+                Type::int(),
+            );
+        }
+        {
+            let a_id = self.id_generator.generate();
+            let b_id = self.id_generator.generate();
+            self.add_builtin_function(
+                BuiltinFunction::IntCompareTo,
+                [
+                    Parameter {
+                        id: a_id,
+                        name: "a".into(),
+                        type_: Type::int(),
+                    },
+                    Parameter {
+                        id: b_id,
+                        name: "b".into(),
+                        type_: Type::int(),
+                    },
+                ],
+                Type::Named("Ordering".into()),
+            );
+        }
+        {
+            let a_id = self.id_generator.generate();
+            let b_id = self.id_generator.generate();
+            self.add_builtin_function(
+                BuiltinFunction::IntSubtract,
                 [
                     Parameter {
                         id: a_id,
@@ -260,7 +301,7 @@ impl<'c> Context<'c> {
         }
     }
 
-    fn lower_struct(&mut self, struct_type: &'c AstStruct) {
+    fn lower_struct(&mut self, struct_type: &'a AstStruct) {
         let Some(name) = struct_type.name.value() else {
             return;
         };
@@ -285,7 +326,7 @@ impl<'c> Context<'c> {
             }
         };
     }
-    fn lower_enum(&mut self, enum_type: &'c AstEnum) {
+    fn lower_enum(&mut self, enum_type: &'a AstEnum) {
         let Some(name) = enum_type.name.value() else {
             return;
         };
@@ -343,7 +384,7 @@ impl<'c> Context<'c> {
         }
     }
 
-    fn lower_assignment_signature(&mut self, assignment: &'c AstAssignment) -> Option<Id> {
+    fn lower_assignment_signature(&mut self, assignment: &'a AstAssignment) -> Option<Id> {
         let name = assignment.name.value()?;
 
         let id = self.id_generator.generate();
@@ -388,7 +429,7 @@ impl<'c> Context<'c> {
         let value = declaration.ast.value.clone();
         let type_ = declaration.type_.clone();
 
-        let hir_body = self.build_body(|builder| {
+        let hir_body = BodyBuilder::build(self, |builder| {
             if let Some(value) = value.value() {
                 builder.lower_expression(value, Some(&type_));
             } else {
@@ -404,7 +445,7 @@ impl<'c> Context<'c> {
         }
     }
 
-    fn lower_function_signature(&mut self, function: &'c AstFunction) -> Option<Id> {
+    fn lower_function_signature(&mut self, function: &'a AstFunction) -> Option<Id> {
         let name = function.name.value()?;
 
         let id = self.id_generator.generate();
@@ -442,7 +483,7 @@ impl<'c> Context<'c> {
         );
         Some(id)
     }
-    fn lower_parameters(&mut self, parameters: &'c [AstParameter]) -> Box<[Parameter]> {
+    fn lower_parameters(&mut self, parameters: &'a [AstParameter]) -> Box<[Parameter]> {
         let mut parameter_names = FxHashSet::default();
         parameters
             .iter()
@@ -476,7 +517,7 @@ impl<'c> Context<'c> {
         let parameters = declaration.parameters.clone();
         let return_type = declaration.return_type.clone();
 
-        let hir_body = self.build_body(|builder| {
+        let hir_body = BodyBuilder::build(self, |builder| {
             for parameter in parameters.iter() {
                 builder.push_parameter(parameter.clone());
             }
@@ -499,12 +540,6 @@ impl<'c> Context<'c> {
         }
     }
 
-    fn build_body(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
-        let mut builder = BodyBuilder::new(self);
-        fun(&mut builder);
-        builder.body
-    }
-
     fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {
         self.errors.push(CompilerError {
             path: self.path.to_path_buf(),
@@ -514,19 +549,28 @@ impl<'c> Context<'c> {
     }
 }
 
-struct BodyBuilder<'c0, 'c1> {
-    context: &'c0 mut Context<'c1>,
+struct BodyBuilder<'c, 'a> {
+    context: &'c mut Context<'a>,
     local_identifiers: Vec<(Box<str>, Id, Type)>,
     body: Body,
 }
-impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
+impl<'c, 'a> BodyBuilder<'c, 'a> {
     #[must_use]
-    fn new(context: &'c0 mut Context<'c1>) -> Self {
-        Self {
+    fn build(context: &'c mut Context<'a>, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
+        let mut builder = Self {
             context,
             local_identifiers: vec![],
             body: Body::default(),
-        }
+        };
+        fun(&mut builder);
+        builder.body
+    }
+    #[must_use]
+    fn build_inner(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
+        BodyBuilder::build(self.context, |builder| {
+            builder.local_identifiers = self.local_identifiers.clone();
+            fun(builder);
+        })
     }
 
     fn lower_statements(
@@ -724,6 +768,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
             AstExpression::Call(call) => {
                 fn lower_arguments(
                     builder: &mut BodyBuilder,
+                    call: &AstCall,
                     arguments: &[AstArgument],
                     parameter_types: &[Type],
                 ) -> Option<Box<[Id]>> {
@@ -739,9 +784,13 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                     if arguments.len() == parameter_types.len() {
                         Some(arguments)
                     } else {
-                        // TODO: report actual error location
                         builder.context.add_error(
-                            Offset(0)..Offset(0),
+                            if arguments.len() < parameter_types.len() {
+                                call.opening_parenthesis_span.clone()
+                            } else {
+                                call.arguments[parameter_types.len()].span.start
+                                    ..call.arguments.last().unwrap().span.end
+                            },
                             format!(
                                 "Expected {} argument(s), got {}.",
                                 parameter_types.len(),
@@ -774,7 +823,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                                 let return_type = return_type.clone();
 
                                 let arguments =
-                                    lower_arguments(self, &call.arguments, &parameter_types);
+                                    lower_arguments(self, call, &call.arguments, &parameter_types);
                                 arguments.map_or(LoweredExpression::Error, |arguments| {
                                     self.push_lowered(
                                         None,
@@ -794,6 +843,7 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                                 TypeDeclaration::Struct { fields } => {
                                     let fields = lower_arguments(
                                         self,
+                                        call,
                                         &call.arguments,
                                         &fields
                                             .iter()
@@ -839,8 +889,12 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                                     .clone(),
                             };
                         let parameter_types = [variant_type.unwrap()];
-                        let arguments =
-                            lower_arguments(self, &call.arguments, parameter_types.as_slice());
+                        let arguments = lower_arguments(
+                            self,
+                            call,
+                            &call.arguments,
+                            parameter_types.as_slice(),
+                        );
                         arguments.map_or(LoweredExpression::Error, |arguments| {
                             self.push_lowered(
                                 None,
@@ -866,10 +920,9 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                 match receiver {
                     LoweredExpression::Expression { id, type_ } => match &type_ {
                         Type::Named(type_name) => {
-                            dbg!(&type_, navigation);
                             // TODO: resolve instance functions
-                            match &self.context.hir.type_declarations[type_name] {
-                                TypeDeclaration::Struct { fields } => {
+                            match &self.context.hir.type_declarations.get(type_name) {
+                                Some(TypeDeclaration::Struct { fields }) => {
                                     if let Some((_, field_type)) =
                                         fields.iter().find(|(name, _)| name == &key.string)
                                     {
@@ -892,11 +945,21 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
                                         LoweredExpression::Error
                                     }
                                 }
-                                TypeDeclaration::Enum { .. } => {
+                                Some(TypeDeclaration::Enum { .. }) => {
                                     self.context.add_error(
                                         key.span.clone(),
                                         format!(
                                             "Enum `{type_:?}` doesn't have a field `{}`",
+                                            key.string
+                                        ),
+                                    );
+                                    LoweredExpression::Error
+                                }
+                                None => {
+                                    self.context.add_error(
+                                        key.span.clone(),
+                                        format!(
+                                            "Builtin type `{type_:?}` doesn't have a field `{}`",
                                             key.string
                                         ),
                                     );
@@ -968,6 +1031,111 @@ impl<'c0, 'c1> BodyBuilder<'c0, 'c1> {
             AstExpression::Body(AstBody { statements, .. }) => {
                 let (id, type_) = self.lower_statements(statements, context_type);
                 LoweredExpression::Expression { id, type_ }
+            }
+            AstExpression::Switch(AstSwitch { value, cases, .. }) => {
+                let Some(value) = value.value() else {
+                    return LoweredExpression::Error;
+                };
+                let (value, enum_) = self.lower_expression(value, None);
+
+                let variants = match &enum_ {
+                    Type::Named(type_name) => {
+                        match &self.context.hir.type_declarations[type_name] {
+                            TypeDeclaration::Struct { .. } => {
+                                // TODO: report actual error location
+                                self.context.add_error(
+                                    Offset(0)..Offset(0),
+                                    format!("Can't switch over struct `{enum_:?}`"),
+                                );
+                                return LoweredExpression::Error;
+                            }
+                            TypeDeclaration::Enum { variants } => variants.clone(),
+                        }
+                    }
+                    Type::Error => return LoweredExpression::Error,
+                };
+
+                let mut variant_names = FxHashSet::default();
+                let mut return_type = context_type.cloned();
+                let cases = cases
+                    .iter()
+                    .filter_map(|case| try {
+                        let variant = case.variant.value()?.clone();
+                        let Some((_, value_type)) =
+                            variants.iter().find(|(it, _)| it == &variant.string)
+                        else {
+                            self.context.add_error(
+                                variant.span.clone(),
+                                format!("Unknown variant in switch: `{}`", *variant),
+                            );
+                            return None;
+                        };
+
+                        if !variant_names.insert(variant.clone()) {
+                            self.context.add_error(
+                                variant.span.clone(),
+                                format!("Duplicate variant in switch: `{}`", *variant),
+                            );
+                            return None;
+                        }
+
+                        let variant_value = match (value_type, &case.value_name) {
+                            (None, None) => None,
+                            (None, Some(_)) => {
+                                self.context.add_error(
+                                    variant.span.clone(),
+                                    format!(
+                                        "Switch case specifies value name for variant `{}` that doesn't have any value",
+                                        *variant
+                                    ),
+                                );
+                                return None;
+                            },
+                            (Some(_), None) => {
+                                self.context.add_error(
+                                    variant.span.clone(),
+                                    format!(
+                                        "Switch case is missing a value name for variant `{}`",
+                                        *variant
+                                    ),
+                                );
+                                return None;
+                            },
+                            (Some(value_type), Some((value_name, _))) => {
+                                let value_name = value_name.value()?;
+                                Some((value_type.clone(),value_name.string.clone()))
+                            },
+                        };
+
+                        let mut value_id = None;
+                        let body = self.build_inner(|builder| {
+                            value_id = variant_value.map(|(type_,name)| {
+                                let id = builder.context.id_generator.generate();
+                                builder.push_parameter(Parameter { id, name, type_ });
+                                id
+                            });
+                            if let Some(expression) = case.expression.value() {
+                                let (_, new_return_type) = builder.lower_expression(expression, return_type.as_ref());
+                                if return_type.is_none() {
+                                    return_type = Some(new_return_type);
+                                }
+                            }
+                        });
+                        (variant.string, value_id, body)
+                    })
+                    .collect();
+
+                // TODO: check for missing variants
+
+                self.push_lowered(
+                    None,
+                    ExpressionKind::Switch {
+                        value,
+                        enum_,
+                        cases,
+                    },
+                    return_type.unwrap_or_else(Type::never),
+                )
             }
         }
     }

@@ -12,7 +12,7 @@ pub fn whitespace(mut parser: Parser) -> Option<Parser> {
         // TODO: report tabs as errors
         parser = parser
             .consume_while(|c| matches!(c, ' ' | '\r' | '\n' | '\t'))
-            .map_or(parser, |(new_parser, _)| new_parser);
+            .0;
 
         // Comment
         parser = comment(parser).unwrap_or(parser);
@@ -26,9 +26,10 @@ pub fn whitespace(mut parser: Parser) -> Option<Parser> {
 
 #[instrument(level = "trace")]
 fn comment(parser: Parser) -> Option<Parser> {
-    octothorpe(parser)?
+    let parser = octothorpe(parser)?
         .consume_while(|c| !matches!(c, '\n' | '\r'))
-        .map(|(parser, _)| parser)
+        .0;
+    Some(parser)
 }
 
 #[extension_trait]

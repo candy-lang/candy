@@ -64,6 +64,6 @@ fn text_part_interpolation(parser: Parser) -> Option<(Parser, AstTextPart)> {
 #[instrument(level = "trace")]
 fn text_part_text(parser: Parser) -> Option<(Parser, AstTextPart)> {
     parser
-        .consume_while(|c| !matches!(c, '{' | '"' | '\r' | '\n'))
+        .consume_while_not_empty(|c| !matches!(c, '{' | '"' | '\r' | '\n'))
         .map(|(parser, text)| (parser, AstTextPart::Text(text.string)))
 }

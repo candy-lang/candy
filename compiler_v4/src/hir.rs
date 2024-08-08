@@ -116,63 +116,66 @@ pub enum BodyOrBuiltin {
 pub struct Body {
     pub expressions: Vec<(Id, Option<Box<str>>, Expression)>,
 }
-// impl Body {
-//     #[must_use]
-//     pub fn type_of(&self, id: Id) -> Option<Cow<Type>> {
-//         self.expressions
-//             .iter()
-//             .find_map(|(i, _, expression, type_)| {
-//                 if i == &id {
-//                     Some(Cow::Borrowed(type_))
-//                 } else {
-//                     expression.type_of(id)
-//                 }
-//             })
-//     }
-//     // #[must_use]
-//     // pub fn get(&self, id: Id) -> Option<&Assignment> {
-//     //     match self {
-//     //         Body::Builtin(_) => None,
-//     //         Body::Written { expressions } => {
-//     //             expressions.iter().find_map(|(i, _, expression, _)| {
-//     //                 if i == &id {
-//     //                     Some(expression)
-//     //                 } else {
-//     //                     expression.get(id)
-//     //                 }
-//     //             })
-//     //         }
-//     //     }
-//     // }
+impl Body {
+    pub fn return_value_id(&self) -> Id {
+        self.expressions.last().unwrap().0
+    }
+    // #[must_use]
+    // pub fn type_of(&self, id: Id) -> Option<Cow<Type>> {
+    //     self.expressions
+    //         .iter()
+    //         .find_map(|(i, _, expression, type_)| {
+    //             if i == &id {
+    //                 Some(Cow::Borrowed(type_))
+    //             } else {
+    //                 expression.type_of(id)
+    //             }
+    //         })
+    // }
+    // #[must_use]
+    // pub fn get(&self, id: Id) -> Option<&Assignment> {
+    //     match self {
+    //         Body::Builtin(_) => None,
+    //         Body::Written { expressions } => {
+    //             expressions.iter().find_map(|(i, _, expression, _)| {
+    //                 if i == &id {
+    //                     Some(expression)
+    //                 } else {
+    //                     expression.get(id)
+    //                 }
+    //             })
+    //         }
+    //     }
+    // }
 
-//     fn collect_defined_and_referenced_ids(
-//         &self,
-//         defined_ids: &mut FxHashSet<Id>,
-//         referenced_ids: &mut FxHashSet<Id>,
-//     ) {
-//         for (id, _, expression, _) in &self.expressions {
-//             defined_ids.insert(*id);
-//             match expression {
-//                 Expression::Int(_)
-//                 | Expression::Text(_)
-//                 | Expression::Tag { .. }
-//                 | Expression::Struct(_)
-//                 | Expression::StructAccess { .. }
-//                 | Expression::ValueWithTypeAnnotation { .. }
-//                 | Expression::Reference(_)
-//                 | Expression::Call { .. }
-//                 | Expression::Or { .. }
-//                 | Expression::CreateOrVariant { .. }
-//                 | Expression::Type(_)
-//                 | Expression::Error => {}
-//                 Expression::Lambda(Lambda { parameters, body }) => {
-//                     defined_ids.extend(parameters.iter().map(|it| it.id));
-//                     body.collect_defined_and_referenced_ids(defined_ids, referenced_ids);
-//                 }
-//             }
-//         }
-//     }
-// }
+    // fn collect_defined_and_referenced_ids(
+    //     &self,
+    //     defined_ids: &mut FxHashSet<Id>,
+    //     referenced_ids: &mut FxHashSet<Id>,
+    // ) {
+    //     for (id, _, expression, _) in &self.expressions {
+    //         defined_ids.insert(*id);
+    //         match expression {
+    //             Expression::Int(_)
+    //             | Expression::Text(_)
+    //             | Expression::Tag { .. }
+    //             | Expression::Struct(_)
+    //             | Expression::StructAccess { .. }
+    //             | Expression::ValueWithTypeAnnotation { .. }
+    //             | Expression::Reference(_)
+    //             | Expression::Call { .. }
+    //             | Expression::Or { .. }
+    //             | Expression::CreateOrVariant { .. }
+    //             | Expression::Type(_)
+    //             | Expression::Error => {}
+    //             Expression::Lambda(Lambda { parameters, body }) => {
+    //                 defined_ids.extend(parameters.iter().map(|it| it.id));
+    //                 body.collect_defined_and_referenced_ids(defined_ids, referenced_ids);
+    //             }
+    //         }
+    //     }
+    // }
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Expression {
@@ -221,6 +224,11 @@ pub enum ExpressionKind {
         receiver: Id,
         arguments: Box<[Id]>,
     },
+    Switch {
+        value: Id,
+        enum_: Type,
+        cases: Box<[(Box<str>, Option<Id>, Body)]>,
+    },
     Error,
 }
 // impl Expression {
@@ -254,6 +262,8 @@ pub enum ExpressionKind {
 #[strum(serialize_all = "camelCase")]
 pub enum BuiltinFunction {
     IntAdd,
+    IntCompareTo,
+    IntSubtract,
     Print,
     TextConcat,
 }

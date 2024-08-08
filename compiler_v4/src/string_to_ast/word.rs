@@ -41,5 +41,5 @@ const MEANINGFUL_PUNCTUATION: &str = r#"=,.:|()[]{}->#""#;
 ///  – for example, the word `Magic🌵` is an invalid symbol.
 #[instrument(level = "trace")]
 pub fn word(parser: Parser) -> Option<(Parser, AstString)> {
-    parser.consume_while(|c| !c.is_whitespace() && !MEANINGFUL_PUNCTUATION.contains(c))
+    parser.consume_while_not_empty(|c| !c.is_whitespace() && !MEANINGFUL_PUNCTUATION.contains(c))
 }

@@ -115,7 +115,7 @@ impl<'h> Context<'h> {
                             self.push(";");
                         }
                     }
-                    self.push("} tag;\n};\n");
+                    self.push("} value;\n};\n");
 
                     self.push("typedef struct ");
                     self.push(name);
@@ -190,6 +190,22 @@ impl<'h> Context<'h> {
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
                         result_pointer->value = {a}->value + {b}->value;
+                        return result_pointer;",
+                        a = parameters[0].id,
+                        b = parameters[1].id,
+                    )),
+                    BuiltinFunction::IntCompareTo => self.push(format!(
+                        "\
+                        Ordering* result_pointer = malloc(sizeof(Ordering));
+                        result_pointer->variant = {a} < {b} ? Ordering_less : {a} == {b} ? Ordering_equal : Ordering_greater;
+                        return result_pointer;",
+                        a = parameters[0].id,
+                        b = parameters[1].id,
+                    )),
+                    BuiltinFunction::IntSubtract => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {a}->value - {b}->value;
                         return result_pointer;",
                         a = parameters[0].id,
                         b = parameters[1].id,
@@ -315,6 +331,44 @@ impl<'h> Context<'h> {
                     self.push(format!("{argument}"));
                 }
                 self.push(");");
+            }
+            ExpressionKind::Switch {
+                value,
+                enum_,
+                cases,
+            } => {
+                let Type::Named(name) = enum_ else {
+                    unreachable!();
+                };
+                let TypeDeclaration::Enum { variants } = &self.hir.type_declarations[name] else {
+                    unreachable!();
+                };
+
+                self.lower_type(&expression.type_);
+                self.push(format!(" {id};\n"));
+
+                self.push(format!("switch ({value}->variant) {{"));
+                for (variant, value_id, body) in cases.iter() {
+                    self.push(format!("case {name}_{variant}:\n"));
+                    if let Some(value_id) = value_id {
+                        let variant_type = variants
+                            .iter()
+                            .find(|(var, _)| var == variant)
+                            .unwrap()
+                            .1
+                            .as_ref()
+                            .unwrap();
+                        self.lower_type(variant_type);
+                        self.push(format!(" {value_id} = {value}->value;\n"));
+                    }
+
+                    self.lower_body(body);
+
+                    self.push(format!("{id} = {};\n", body.return_value_id()));
+
+                    self.push("break;");
+                }
+                self.push("}");
             }
             ExpressionKind::Error => panic!("Error expression found."),
         }

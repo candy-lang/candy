@@ -22,6 +22,14 @@ impl<'s> Parser<'s> {
     }
 
     #[must_use]
+    pub const fn file(self) -> &'s Path {
+        self.file
+    }
+    #[must_use]
+    pub const fn source(self) -> &'s str {
+        self.source
+    }
+    #[must_use]
     pub const fn offset(self) -> Offset {
         self.offset
     }
@@ -71,22 +79,29 @@ impl<'s> Parser<'s> {
         }
     }
     #[must_use]
+    pub fn consume_while_not_empty(
+        self,
+        predicate: impl FnMut(char) -> bool,
+    ) -> Option<(Parser<'s>, AstString)> {
+        let (parser, string) = self.consume_while(predicate);
+        if string.is_empty() {
+            None
+        } else {
+            Some((parser, string))
+        }
+    }
+    #[must_use]
     pub fn consume_while(
         mut self,
         mut predicate: impl FnMut(char) -> bool,
-    ) -> Option<(Parser<'s>, AstString)> {
+    ) -> (Parser<'s>, AstString) {
         let start_offset = self.offset();
-        while let Some((new_parser, c)) = self.consume_char() {
-            if !predicate(c) {
-                break;
-            }
+        while let Some((new_parser, c)) = self.consume_char()
+            && predicate(c)
+        {
             self = new_parser;
         }
-        if start_offset == self.offset {
-            None
-        } else {
-            Some((self, self.string(start_offset)))
-        }
+        (self, self.string(start_offset))
     }
     #[must_use]
     fn consume_char(self) -> Option<(Parser<'s>, char)> {

@@ -1,8 +1,8 @@
 use super::{
     declarations::assignment,
     literal::{
-        closing_curly_brace, closing_parenthesis, comma, dot, opening_curly_brace,
-        opening_parenthesis,
+        arrow, closing_curly_brace, closing_parenthesis, comma, dot, opening_curly_brace,
+        opening_parenthesis, switch_keyword,
     },
     parser::{
         Parser, ParserUnwrapOrAstError, ParserWithResultUnwrapOrAstError,
@@ -10,14 +10,14 @@ use super::{
     },
     text::text,
     whitespace::{
-        whitespace, AndTrailingWhitespace, OptionWithValueAndTrailingWhitespace,
-        ValueAndTrailingWhitespace,
+        whitespace, AndTrailingWhitespace, OptionAndTrailingWhitespace,
+        OptionWithValueAndTrailingWhitespace, ValueAndTrailingWhitespace,
     },
     word::{raw_identifier, word},
 };
 use crate::ast::{
     AstArgument, AstBody, AstCall, AstError, AstExpression, AstIdentifier, AstInt, AstNavigation,
-    AstParenthesized, AstResult, AstStatement,
+    AstParenthesized, AstResult, AstStatement, AstSwitch, AstSwitchCase,
 };
 use replace_with::replace_with_or_abort;
 use tracing::instrument;
@@ -40,7 +40,8 @@ pub fn expression(parser: Parser) -> Option<(Parser, AstExpression)> {
         .or_else(|| {
             parenthesized(parser).map(|(parser, it)| (parser, AstExpression::Parenthesized(it)))
         })
-        .or_else(|| body(parser).map(|(parser, it)| (parser, AstExpression::Body(it))))?;
+        .or_else(|| body(parser).map(|(parser, it)| (parser, AstExpression::Body(it))))
+        .or_else(|| switch(parser).map(|(parser, it)| (parser, AstExpression::Switch(it))))?;
 
     loop {
         fn parse_suffix<'a>(
@@ -154,6 +155,95 @@ pub fn statement(parser: Parser) -> Option<(Parser, AstStatement)> {
 }
 
 #[instrument(level = "trace")]
+fn switch<'a>(parser: Parser) -> Option<(Parser, AstSwitch)> {
+    let parser = switch_keyword(parser)?.and_trailing_whitespace();
+
+    let (parser, value) = expression(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(
+            parser,
+            "This switch is missing an expression to switch over.",
+        );
+
+    let (mut parser, opening_curly_brace_error) = opening_curly_brace(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This switch is missing an opening curly brace.");
+
+    let mut cases: Vec<AstSwitchCase> = vec![];
+    let mut parser_for_missing_comma_error: Option<Parser> = None;
+    while let Some((new_parser, case, new_parser_for_missing_comma_error)) =
+        switch_case(parser.and_trailing_whitespace())
+    {
+        if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
+            cases.last_mut().unwrap().comma_error = Some(
+                parser_for_missing_comma_error
+                    .error_at_current_offset("This parameter is missing a comma."),
+            );
+        }
+
+        parser = new_parser;
+        cases.push(case);
+        parser_for_missing_comma_error = new_parser_for_missing_comma_error;
+    }
+    let parser = parser.and_trailing_whitespace();
+
+    let (parser, closing_curly_brace_error) = closing_curly_brace(parser)
+        .unwrap_or_ast_error(parser, "This switch is missing a closing curly brace.");
+
+    Some((
+        parser,
+        AstSwitch {
+            value: value.map(Box::new),
+            opening_curly_brace_error,
+            cases,
+            closing_curly_brace_error,
+        },
+    ))
+}
+#[instrument(level = "trace")]
+fn switch_case<'a>(parser: Parser) -> Option<(Parser, AstSwitchCase, Option<Parser>)> {
+    let (parser, variant) = raw_identifier(parser)?.and_trailing_whitespace();
+
+    let (parser, value_name) = opening_parenthesis(parser)
+        .and_trailing_whitespace()
+        .map_or((parser, None), |parser| {
+            let (parser, value_name) = raw_identifier(parser)
+                .and_trailing_whitespace()
+                .unwrap_or_ast_error_result(parser, "Switch case is missing a value name.");
+            let (parser, closing_parenthesis_error) = closing_parenthesis(parser)
+                .and_trailing_whitespace()
+                .unwrap_or_ast_error(
+                    parser,
+                    "Switch case is missing a closing parenthesis after the value name.",
+                );
+            (parser, Some((value_name, closing_parenthesis_error)))
+        });
+
+    let (parser, arrow_error) = arrow(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "Switch case is missing an arrow.");
+
+    let (parser, expression) = expression(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This switch case is missing an expression.");
+
+    let (parser, parser_for_missing_comma_error) =
+        comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));
+
+    Some((
+        parser,
+        AstSwitchCase {
+            variant,
+            value_name,
+            arrow_error,
+            expression,
+            comma_error: None,
+        },
+        parser_for_missing_comma_error,
+    ))
+}
+
+#[instrument(level = "trace")]
 fn expression_suffix_navigation<'s>(
     parser: Parser<'s>,
     current: &mut AstExpression,
@@ -182,7 +272,9 @@ fn expression_suffix_call<'s>(
 ) -> Option<Parser<'s>> {
     let parser = whitespace(parser).unwrap_or(parser);
 
+    let opening_parenthesis_start = parser.offset();
     let mut parser = opening_parenthesis(parser)?.and_trailing_whitespace();
+    let opening_parenthesis_span = opening_parenthesis_start..parser.offset();
 
     let mut arguments: Vec<AstArgument> = vec![];
     let mut parser_for_missing_comma_error: Option<Parser> = None;
@@ -208,6 +300,7 @@ fn expression_suffix_call<'s>(
     replace_with_or_abort(current, |current| {
         AstExpression::Call(AstCall {
             receiver: Box::new(current),
+            opening_parenthesis_span,
             arguments,
             closing_parenthesis_error,
         })
@@ -217,6 +310,7 @@ fn expression_suffix_call<'s>(
 }
 #[instrument(level = "trace")]
 fn argument<'a>(parser: Parser) -> Option<(Parser, AstArgument, Option<Parser>)> {
+    let start_offset = parser.offset();
     let (parser, value) = expression(parser)?.and_trailing_whitespace();
 
     let (parser, parser_for_missing_comma_error) =
@@ -227,6 +321,7 @@ fn argument<'a>(parser: Parser) -> Option<(Parser, AstArgument, Option<Parser>)>
         AstArgument {
             value,
             comma_error: None,
+            span: start_offset..parser.offset(),
         },
         parser_for_missing_comma_error,
     ))
