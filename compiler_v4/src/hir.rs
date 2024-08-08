@@ -17,6 +17,7 @@ impl Display for Id {
 pub struct Hir {
     pub type_declarations: FxHashMap<Box<str>, TypeDeclaration>,
     pub assignments: Box<[(Id, Box<str>, Assignment)]>,
+    pub assignment_initialization_order: Vec<Id>,
     pub functions: Box<[(Id, Box<str>, Function)]>,
 }
 // impl Hir {
@@ -264,6 +265,7 @@ pub enum BuiltinFunction {
     IntAdd,
     IntCompareTo,
     IntSubtract,
+    IntToText,
     Print,
     TextConcat,
 }

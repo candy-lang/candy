@@ -21,6 +21,21 @@ struct MyStruct {
 enum Bool { true, false }
 let true: Bool = Bool.true
 let false: Bool = Bool.false
+fun boolToText(bool: Bool) Text {
+  switch bool {
+    true => "true",
+    false => "false",
+  }
+}
+
+enum Ordering { less, equal, greater }
+fun orderingToText(ordering: Ordering) Text {
+  switch ordering {
+    less => "less",
+    equal => "equal",
+    greater => "greater",
+  }
+}
 
 enum MyEnum {
   foo: Int,
@@ -55,30 +70,34 @@ let valueWithExplicitType: Int = 42
 # }
 # aDate.add(Duration(days: 1)) # is equivalent to `add(aDate, Duration(days: 1))`
 
-fun fibonacci(n: Int) Int {
-  n
-  # switch n.isLessThan(2) {
-  #   true => n,
-  #   false => fibonacci(n.subtract(1).add(fibonacci(n.subtract(2))))
-  # }
+fun isLessThan(a: Int, b: Int) Bool {
+  switch intCompareTo(a, b) {
+    less => true,
+    equal => false,
+    greater => false,
+  }
 }
-
-fun printHello(name: Text) {
-  print("Hello, {name}!")
+fun fibonacci(n: Int) Int {
+  switch isLessThan(n, 2) {
+    true => n,
+    false => intAdd(fibonacci(intSubtract(n, 1)), fibonacci(intSubtract(n, 2))),
+  }
 }
 
 fun main() Int {
-  # (x: Int) { x }
-
-  let helloWorld = "Hello, World!"
-  printHello("World")
-
-  # let theAnswer = 40.add(2)
-  let theAnswer = 42
-  let theAnswerText = "42"
-  print("The answer is {theAnswerText}!")
-
-  theAnswer
+#  # (x: Int) { x }
+#
+#  let helloWorld = "Hello, World!"
+#  printHello("World")
+#
+#  # let theAnswer = 40.add(2)
+#  let theAnswer = 42
+#  let theAnswerText = "42"
+#  print("The answer is {theAnswerText}!")
+#
+#  theAnswer
+  print("fibonacci(20) = {intToText(fibonacci(20))}")
+  0
 }
 
 # fibonacci

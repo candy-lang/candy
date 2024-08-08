@@ -14,6 +14,10 @@ use crate::{
     utils::HashMapExtension,
 };
 use itertools::{Itertools, Position};
+use petgraph::{
+    algo::toposort,
+    graph::{DiGraph, NodeIndex},
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{collections::hash_map::Entry, ops::Range, path::Path};
 use strum::VariantArray;
@@ -72,13 +76,14 @@ struct Context<'a> {
     path: &'a Path,
     ast: &'a Ast,
     id_generator: IdGenerator<Id>,
+    global_identifiers: FxHashMap<Box<str>, Named>,
     // TODO: Split into assignments and functions
     value_declarations: FxHashMap<Id, ValueDeclaration<'a>>,
-    global_identifiers: FxHashMap<Box<str>, Named>,
+    assignment_dependency_graph: DiGraph<Id, ()>,
     errors: Vec<CompilerError>,
     hir: Hir,
 }
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 enum Named {
     Assignment(Id),
     Functions(Vec<Id>),
@@ -92,6 +97,7 @@ enum ValueDeclaration<'a> {
 struct AssignmentDeclaration<'a> {
     ast: &'a AstAssignment,
     type_: Type,
+    graph_index: NodeIndex,
     body: Option<Body>,
 }
 #[derive(Debug)]
@@ -108,14 +114,43 @@ impl<'a> Context<'a> {
             path,
             ast,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
-            value_declarations: FxHashMap::default(),
             global_identifiers: FxHashMap::default(),
+            value_declarations: FxHashMap::default(),
+            assignment_dependency_graph: DiGraph::new(),
             errors: vec![],
             hir: Hir::default(),
         }
     }
 
     fn into_hir(mut self) -> (Hir, Vec<CompilerError>) {
+        match toposort(&self.assignment_dependency_graph, None) {
+            Ok(order) => {
+                self.hir.assignment_initialization_order = order
+                    .iter()
+                    .map(|it| *self.assignment_dependency_graph.node_weight(*it).unwrap())
+                    .collect();
+            }
+            Err(cycle) => {
+                let id = *self
+                    .assignment_dependency_graph
+                    .node_weight(cycle.node_id())
+                    .unwrap();
+                self.add_error(
+                    // TODO: report actual error location
+                    Offset(0)..Offset(0),
+                    // TODO: print full cycle
+                    format!(
+                        "Cycle in global assignments including `{}`",
+                        self.global_identifiers
+                            .iter()
+                            .find(|(_, named)| *named == &Named::Assignment(id))
+                            .unwrap()
+                            .0,
+                    ),
+                );
+            }
+        }
+
         let mut assignments = vec![];
         let mut functions = vec![];
         for (name, named) in self.global_identifiers {
@@ -155,6 +190,7 @@ impl<'a> Context<'a> {
         }
         self.hir.assignments = assignments.into();
         self.hir.functions = functions.into();
+
         (self.hir, self.errors)
     }
 
@@ -217,6 +253,18 @@ impl<'a> Context<'a> {
                     },
                 ],
                 Type::int(),
+            );
+        }
+        {
+            let int_id = self.id_generator.generate();
+            self.add_builtin_function(
+                BuiltinFunction::IntToText,
+                [Parameter {
+                    id: int_id,
+                    name: "int".into(),
+                    type_: Type::int(),
+                }],
+                Type::text(),
             );
         }
         {
@@ -411,11 +459,15 @@ impl<'a> Context<'a> {
                 entry.insert(Named::Assignment(id));
             }
         }
+
+        let graph_index = self.assignment_dependency_graph.add_node(id);
+
         self.value_declarations.force_insert(
             id,
             ValueDeclaration::Assignment(AssignmentDeclaration {
                 ast: assignment,
                 type_,
+                graph_index,
                 body: None,
             }),
         );
@@ -428,14 +480,25 @@ impl<'a> Context<'a> {
         };
         let value = declaration.ast.value.clone();
         let type_ = declaration.type_.clone();
+        let graph_index = declaration.graph_index;
 
-        let hir_body = BodyBuilder::build(self, |builder| {
+        let (hir_body, global_assignment_dependencies) = BodyBuilder::build(self, |builder| {
             if let Some(value) = value.value() {
                 builder.lower_expression(value, Some(&type_));
             } else {
                 builder.push_error();
             }
         });
+
+        for dependency_id in global_assignment_dependencies {
+            let ValueDeclaration::Assignment(dependency) =
+                self.value_declarations.get(&dependency_id).unwrap()
+            else {
+                unreachable!();
+            };
+            self.assignment_dependency_graph
+                .add_edge(graph_index, dependency.graph_index, ());
+        }
 
         match self.value_declarations.get_mut(&id).unwrap() {
             ValueDeclaration::Assignment(AssignmentDeclaration { body, .. }) => {
@@ -517,7 +580,7 @@ impl<'a> Context<'a> {
         let parameters = declaration.parameters.clone();
         let return_type = declaration.return_type.clone();
 
-        let hir_body = BodyBuilder::build(self, |builder| {
+        let (hir_body, _) = BodyBuilder::build(self, |builder| {
             for parameter in parameters.iter() {
                 builder.push_parameter(parameter.clone());
             }
@@ -551,26 +614,34 @@ impl<'a> Context<'a> {
 
 struct BodyBuilder<'c, 'a> {
     context: &'c mut Context<'a>,
+    global_assignment_dependencies: FxHashSet<Id>,
     local_identifiers: Vec<(Box<str>, Id, Type)>,
     body: Body,
 }
 impl<'c, 'a> BodyBuilder<'c, 'a> {
     #[must_use]
-    fn build(context: &'c mut Context<'a>, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
+    fn build(
+        context: &'c mut Context<'a>,
+        fun: impl FnOnce(&mut BodyBuilder),
+    ) -> (Body, FxHashSet<Id>) {
         let mut builder = Self {
             context,
+            global_assignment_dependencies: FxHashSet::default(),
             local_identifiers: vec![],
             body: Body::default(),
         };
         fun(&mut builder);
-        builder.body
+        (builder.body, builder.global_assignment_dependencies)
     }
     #[must_use]
     fn build_inner(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
         BodyBuilder::build(self.context, |builder| {
             builder.local_identifiers = self.local_identifiers.clone();
             fun(builder);
+            self.global_assignment_dependencies
+                .extend(&builder.global_assignment_dependencies);
         })
+        .0
     }
 
     fn lower_statements(
@@ -682,6 +753,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     match named {
                         Named::Assignment(id) => {
                             let id = *id;
+                            self.global_assignment_dependencies.insert(id);
                             let type_ = match self.context.value_declarations.get(&id).unwrap() {
                                 ValueDeclaration::Assignment(AssignmentDeclaration {
                                     type_,

@@ -177,7 +177,7 @@ fn switch<'a>(parser: Parser) -> Option<(Parser, AstSwitch)> {
         if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
             cases.last_mut().unwrap().comma_error = Some(
                 parser_for_missing_comma_error
-                    .error_at_current_offset("This parameter is missing a comma."),
+                    .error_at_current_offset("This case is missing a comma."),
             );
         }
 

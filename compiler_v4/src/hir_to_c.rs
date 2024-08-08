@@ -46,6 +46,10 @@ impl<'h> Context<'h> {
         self.lower_function_declarations();
         self.push("\n");
 
+        self.push("/// Assignment Definitions\n\n");
+        self.lower_assignment_definitions();
+        self.push("\n");
+
         self.push("/// Function Definitions\n\n");
         self.lower_function_definitions();
         // TODO: init assignments in main in correct order
@@ -56,9 +60,11 @@ impl<'h> Context<'h> {
             .iter()
             .find(|(_, box name, _)| name == "main")
             .unwrap();
-        self.push(format!(
-            "int main() {{ return {main_function_id}()->value; }}\n",
-        ));
+        self.push("int main() {\n");
+        for id in &self.hir.assignment_initialization_order {
+            self.push(format!("init{id}();\n"));
+        }
+        self.push(format!("return {main_function_id}()->value;\n}}\n"));
     }
 
     fn lower_type_declarations(&mut self) {
@@ -134,6 +140,18 @@ impl<'h> Context<'h> {
             self.push(format!(" {id};\n"));
         }
     }
+    fn lower_assignment_definitions(&mut self) {
+        for (id, name, assignment) in self.hir.assignments.iter() {
+            self.push(format!("// {name}\n"));
+
+            self.push(format!("void init{id}() {{\n"));
+            self.lower_body_expressions(&assignment.body);
+            self.push(format!(
+                "{id} = {};\n}}\n\n",
+                assignment.body.return_value_id(),
+            ));
+        }
+    }
 
     fn lower_function_declarations(&mut self) {
         for (id, name, function) in self.hir.functions.iter() {
@@ -197,7 +215,9 @@ impl<'h> Context<'h> {
                     BuiltinFunction::IntCompareTo => self.push(format!(
                         "\
                         Ordering* result_pointer = malloc(sizeof(Ordering));
-                        result_pointer->variant = {a} < {b} ? Ordering_less : {a} == {b} ? Ordering_equal : Ordering_greater;
+                        result_pointer->variant = {a}->value < {b}->value    ? Ordering_less
+                                                  : {a}->value == {b}->value ? Ordering_equal
+                                                                             : Ordering_greater;
                         return result_pointer;",
                         a = parameters[0].id,
                         b = parameters[1].id,
@@ -209,6 +229,17 @@ impl<'h> Context<'h> {
                         return result_pointer;",
                         a = parameters[0].id,
                         b = parameters[1].id,
+                    )),
+                    BuiltinFunction::IntToText => self.push(format!(
+                        "\
+                        int length = snprintf(NULL, 0, \"%ld\", {int}->value);
+                        char* result = malloc(length + 1);
+                        snprintf(result, length + 1, \"%ld\", {int}->value);
+                        
+                        Text* result_pointer = malloc(sizeof(Text));
+                        result_pointer->value = result;
+                        return result_pointer;",
+                        int = parameters[0].id,
                     )),
                     BuiltinFunction::Print => {
                         self.push(format!("puts({}->value);\n", parameters[0].id));
@@ -235,6 +266,10 @@ impl<'h> Context<'h> {
         }
     }
     fn lower_body(&mut self, body: &Body) {
+        self.lower_body_expressions(body);
+        self.push(format!("return {};", body.return_value_id()));
+    }
+    fn lower_body_expressions(&mut self, body: &Body) {
         for (id, name, expression) in &body.expressions {
             if let Some(name) = name {
                 self.push(format!("// {name}\n"));
@@ -243,7 +278,6 @@ impl<'h> Context<'h> {
             self.lower_expression(*id, expression);
             self.push("\n");
         }
-        self.push(format!("return {};", body.expressions.last().unwrap().0));
     }
     fn lower_expression(&mut self, id: Id, expression: &Expression) {
         match &expression.kind {
@@ -302,7 +336,7 @@ impl<'h> Context<'h> {
                 self.lower_type_without_pointer(&expression.type_);
                 self.push("));\n");
 
-                self.push(format!("{id}->symbol = {name}_{variant},"));
+                self.push(format!("{id}->variant = {name}_{variant};"));
                 if let Some(value) = value {
                     self.push(format!("\n{id}->value = {value}"));
                 }
@@ -362,7 +396,7 @@ impl<'h> Context<'h> {
                         self.push(format!(" {value_id} = {value}->value;\n"));
                     }
 
-                    self.lower_body(body);
+                    self.lower_body_expressions(body);
 
                     self.push(format!("{id} = {};\n", body.return_value_id()));
 
