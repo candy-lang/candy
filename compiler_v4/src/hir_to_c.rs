@@ -353,11 +353,11 @@ impl<'h> Context<'h> {
                 self.push(format!(" {id} = {referenced_id};"));
             }
             ExpressionKind::Call {
-                receiver,
+                function,
                 arguments,
             } => {
                 self.lower_type(&expression.type_);
-                self.push(format!(" {id} = {receiver}("));
+                self.push(format!(" {id} = {function}("));
                 for (index, argument) in arguments.iter().enumerate() {
                     if index > 0 {
                         self.push(", ");

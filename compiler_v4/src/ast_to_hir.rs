@@ -91,9 +91,26 @@ struct AssignmentDeclaration<'a> {
 #[derive(Debug)]
 struct FunctionDeclaration<'a> {
     ast: Option<&'a AstFunction>,
+    name: Box<str>,
     parameters: Box<[Parameter]>,
     return_type: Type,
     body: Option<BodyOrBuiltin>,
+}
+impl<'a> FunctionDeclaration<'a> {
+    fn signature_to_string(&self) -> String {
+        format!(
+            "{}({})",
+            self.name,
+            self.parameters
+                .iter()
+                .map(|it| format!("{}: {}", it.name, it.type_))
+                .join(", "),
+        )
+    }
+
+    fn call_signature_to_string(function_name: &str, argument_types: &[Type]) -> String {
+        format!("{}({})", function_name, argument_types.iter().join(", "))
+    }
 }
 
 impl<'a> Context<'a> {
@@ -302,6 +319,7 @@ impl<'a> Context<'a> {
             id,
             FunctionDeclaration {
                 ast: None,
+                name: name.into(),
                 parameters,
                 return_type,
                 body: Some(BodyOrBuiltin::Builtin(builtin_function)),
@@ -516,6 +534,7 @@ impl<'a> Context<'a> {
             id,
             FunctionDeclaration {
                 ast: Some(function),
+                name: name.string.clone(),
                 parameters,
                 return_type,
                 body: None,
@@ -681,7 +700,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     (id, type_)
                 }
             }
-            LoweredExpression::FunctionReference(_) => {
+            LoweredExpression::FunctionReferences { .. } => {
                 // TODO: report actual error location
                 self.context
                     .add_error(Offset(0)..Offset(0), "Function must be called.");
@@ -726,16 +745,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             let type_ = self.context.assignments.get(&id).unwrap().type_.clone();
                             self.push_lowered(None, ExpressionKind::Reference(id), type_)
                         }
-                        Named::Functions(functions) => {
-                            assert!(!functions.is_empty());
-                            if functions.len() > 1 {
-                                self.context.add_error(
-                                    identifier.span.clone(),
-                                    "Function overloads are not yet supported",
-                                );
-                                LoweredExpression::Error
-                            } else {
-                                LoweredExpression::FunctionReference(functions[0])
+                        Named::Functions(function_ids) => {
+                            assert!(!function_ids.is_empty());
+                            LoweredExpression::FunctionReferences {
+                                receiver: None,
+                                function_ids: function_ids.iter().copied().collect(),
                             }
                         }
                     }
@@ -778,7 +792,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         self.push(
                             None,
                             ExpressionKind::Call {
-                                receiver: BuiltinFunction::TextConcat.id(),
+                                function: BuiltinFunction::TextConcat.id(),
                                 arguments: [lhs, rhs].into(),
                             },
                             Type::text(),
@@ -845,27 +859,148 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             .add_error(Offset(0)..Offset(0), "Cannot call this type");
                         LoweredExpression::Error
                     }
-                    LoweredExpression::FunctionReference(function_id) => {
-                        let function = self.context.functions.get(&function_id).unwrap();
-                        let parameter_types = function
-                            .parameters
-                            .iter()
-                            .map(|it| it.type_.clone())
-                            .collect_vec();
-                        let return_type = function.return_type.clone();
+                    LoweredExpression::FunctionReferences {
+                        receiver,
+                        function_ids,
+                    } => {
+                        assert!(!function_ids.is_empty());
 
-                        let arguments =
-                            lower_arguments(self, call, &call.arguments, &parameter_types);
-                        arguments.map_or(LoweredExpression::Error, |arguments| {
-                            self.push_lowered(
-                                None,
-                                ExpressionKind::Call {
-                                    receiver: function_id,
-                                    arguments,
-                                },
-                                return_type,
+                        let arguments = receiver
+                            .into_iter()
+                            .chain(
+                                call.arguments
+                                    .iter()
+                                    .map(|argument| self.lower_expression(&argument.value, None)),
                             )
-                        })
+                            .collect::<Box<_>>();
+
+                        let (parameter_count_matches, parameter_count_mismatches) = function_ids
+                            .iter()
+                            .map(|id| (*id, &self.context.functions[id]))
+                            .partition::<Vec<_>, _>(|(_, it)| {
+                                it.parameters.len() == arguments.len()
+                            });
+
+                        if parameter_count_matches.is_empty() {
+                            self.context.add_error(
+                                call.opening_parenthesis_span.clone(),
+                                format!(
+                                    "No overload accepts exactly {} {}:\n{}",
+                                    arguments.len(),
+                                    if arguments.len() == 1 {
+                                        "argument"
+                                    } else {
+                                        "arguments"
+                                    },
+                                    parameter_count_mismatches
+                                        .iter()
+                                        .map(|(_, it)| it.signature_to_string())
+                                        .join("\n"),
+                                ),
+                            );
+                            return LoweredExpression::Error;
+                        }
+
+                        let argument_types = arguments
+                            .iter()
+                            .map(|(_, type_)| type_.clone())
+                            .collect::<Box<_>>();
+                        let (matches, mismatches) = parameter_count_matches
+                            .iter()
+                            .partition::<Vec<(Id, &FunctionDeclaration)>, _>(|(_, function)| {
+                                function
+                                    .parameters
+                                    .iter()
+                                    .zip_eq(argument_types.iter())
+                                    .all(|(parameter, argument_type)| {
+                                        &parameter.type_ == argument_type
+                                    })
+                            });
+
+                        if matches.is_empty() {
+                            self.context.add_error(
+                                call.opening_parenthesis_span.clone(),
+                                format!(
+                                    "No matching function found for:\n  {}\n{} with the same number of parameters:{}",
+                                    FunctionDeclaration::call_signature_to_string(mismatches.first().unwrap().1.name.as_ref(), argument_types.as_ref()),
+                                    if mismatches.len() == 1 {
+                                        "This is the candidate function"
+                                    }else {
+                                    "These are candidate functions"},
+                                    mismatches
+                                        .iter()
+                                        .map(|(_, it)| format!("\n• {}", it.signature_to_string()))
+                                        .join(""),
+                                ),
+                            );
+                            return LoweredExpression::Error;
+                        } else if matches.len() > 1 {
+                            self.context.add_error(
+                                call.opening_parenthesis_span.clone(),
+                                format!(
+                                    "Multiple matching function found for:\n  {}\nThese are candidate functions:{}",
+                                    FunctionDeclaration::call_signature_to_string(matches.first().unwrap().1.name.as_ref(), argument_types.as_ref()),
+                                    matches
+                                        .iter()
+                                        .map(|(_,it)| format!("\n• {}", it.signature_to_string()))
+                                        .join(""),
+                                ),
+                            );
+                            return LoweredExpression::Error;
+                        }
+
+                        let (function, signature) = matches[0];
+                        self.push_lowered(
+                            None,
+                            ExpressionKind::Call {
+                                function,
+                                arguments: arguments.iter().map(|(id, _)| *id).collect(),
+                            },
+                            signature.return_type.clone(),
+                        )
+                        // let parameter_types = function
+                        //     .parameters
+                        //     .iter()
+                        //     .map(|it| it.type_.clone())
+                        //     .collect_vec();
+                        // let return_type = function.return_type.clone();
+
+                        //   if full_matches.is_empty() then return error[LookupFunSolution, Str]({
+                        //     var out = string_builder().&
+                        //     out.
+                        //       "This call doesn't work:{newline}
+                        //       ' > {call_signature(name, type_args, arg_types)}{newline}{newline}"
+                        //     if name_matches.is_empty()
+                        //     then out.'"There are no defintions named "{{name}}"."'
+                        //     else {
+                        //       out."These definitions have the same name, but arguments don't match:"
+                        //       for match in name_matches do
+                        //         out."{newline} - {AstDef.fun_(match).signature()}"
+                        //     }
+                        //     out.to_str()
+                        //   })
+                        //   if full_matches.len.is_greater_than(1) then return error[LookupFunSolution, Str]({
+                        //     var out = string_builder().&
+                        //     out.
+                        //       "This call doesn't work:{newline}
+                        //       ' > {call_signature(name, type_args, arg_types)}{newline}{newline}
+                        //       'Multiple definitions match:"
+                        //     for match in full_matches do {
+                        //       var padded_signature = "{AstDef.fun_(match.fun_).signature()}"
+                        //         .pad_right(30, # )
+                        //       out."{newline} - {padded_signature}"
+                        //       if match.type_env.is_not_empty() then {
+                        //         out." with "
+                        //         var first = true
+                        //         for entry in match.type_env do {
+                        //           if first then first = false else out.", "
+                        //           out."{entry.key} = {entry.value}"
+                        //         }
+                        //       }
+                        //     }
+                        //     out.to_str()
+                        //   })
+                        //   ok[LookupFunSolution, Str](full_matches.get(0))
                     }
                     LoweredExpression::TypeReference(type_) => match &type_ {
                         Type::Named(type_name) => {
@@ -999,7 +1134,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         }
                         Type::Error => todo!(),
                     },
-                    LoweredExpression::FunctionReference(_) => {
+                    LoweredExpression::FunctionReferences { .. } => {
                         self.context.add_error(
                             key.span.clone(),
                             format!("Function doesn't have a field `{}`", key.string),
@@ -1221,9 +1356,18 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
 #[derive(Debug)]
 enum LoweredExpression {
-    Expression { id: Id, type_: Type },
-    FunctionReference(Id),
+    Expression {
+        id: Id,
+        type_: Type,
+    },
+    FunctionReferences {
+        receiver: Option<(Id, Type)>,
+        function_ids: Box<[Id]>,
+    },
     TypeReference(Type),
-    EnumVariantReference { enum_: Type, variant: Box<str> },
+    EnumVariantReference {
+        enum_: Type,
+        variant: Box<str>,
+    },
     Error,
 }

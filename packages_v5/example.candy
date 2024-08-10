@@ -21,7 +21,7 @@ struct MyStruct {
 enum Bool { true, false }
 let true: Bool = Bool.true
 let false: Bool = Bool.false
-fun boolToText(bool: Bool) Text {
+fun toText(bool: Bool) Text {
   switch bool {
     true => "true",
     false => "false",
@@ -29,7 +29,7 @@ fun boolToText(bool: Bool) Text {
 }
 
 enum Ordering { less, equal, greater }
-fun orderingToText(ordering: Ordering) Text {
+fun toText(ordering: Ordering) Text {
   switch ordering {
     less => "less",
     equal => "equal",
@@ -100,8 +100,6 @@ fun main() Int {
   0
 }
 
-# fibonacci
-# symbols, or types
 # calculator
 # 2048
 # sudoku

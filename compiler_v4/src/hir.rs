@@ -69,6 +69,14 @@ impl Type {
         Self::Named("Text".into())
     }
 }
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match &self {
+            Type::Named(name) => write!(f, "{name}"),
+            Type::Error => write!(f, "<error>"),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Assignment {
@@ -222,7 +230,7 @@ pub enum ExpressionKind {
     },
     Reference(Id),
     Call {
-        receiver: Id,
+        function: Id,
         arguments: Box<[Id]>,
     },
     Switch {
