@@ -72,8 +72,8 @@ impl Type {
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self {
-            Type::Named(name) => write!(f, "{name}"),
-            Type::Error => write!(f, "<error>"),
+            Self::Named(name) => write!(f, "{name}"),
+            Self::Error => write!(f, "<error>"),
         }
     }
 }

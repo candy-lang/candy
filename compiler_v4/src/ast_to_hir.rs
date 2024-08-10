@@ -1083,54 +1083,54 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 };
 
                 match receiver {
-                    LoweredExpression::Expression { id, type_ } => match &type_ {
+                    LoweredExpression::Expression {
+                        id: receiver_id,
+                        type_: receiver_type,
+                    } => match &receiver_type {
                         Type::Named(type_name) => {
-                            // TODO: resolve instance functions
-                            match &self.context.hir.type_declarations.get(type_name) {
-                                Some(TypeDeclaration::Struct { fields }) => {
-                                    if let Some((_, field_type)) =
-                                        fields.iter().find(|(name, _)| name == &key.string)
-                                    {
-                                        self.push_lowered(
-                                            None,
-                                            ExpressionKind::StructAccess {
-                                                struct_: id,
-                                                field: key.string.clone(),
-                                            },
-                                            field_type.clone(),
-                                        )
-                                    } else {
-                                        self.context.add_error(
-                                            key.span.clone(),
-                                            format!(
-                                                "Struct `{type_:?}` doesn't have a field `{}`",
-                                                key.string
-                                            ),
-                                        );
-                                        LoweredExpression::Error
-                                    }
-                                }
-                                Some(TypeDeclaration::Enum { .. }) => {
-                                    self.context.add_error(
-                                        key.span.clone(),
-                                        format!(
-                                            "Enum `{type_:?}` doesn't have a field `{}`",
-                                            key.string
-                                        ),
-                                    );
-                                    LoweredExpression::Error
-                                }
-                                None => {
-                                    self.context.add_error(
-                                        key.span.clone(),
-                                        format!(
-                                            "Builtin type `{type_:?}` doesn't have a field `{}`",
-                                            key.string
-                                        ),
-                                    );
-                                    LoweredExpression::Error
+                            let type_ = &self.context.hir.type_declarations.get(type_name);
+                            if let Some(TypeDeclaration::Struct { fields }) = type_
+                                && let Some((_, field_type)) =
+                                    fields.iter().find(|(name, _)| name == &key.string)
+                            {
+                                return self.push_lowered(
+                                    None,
+                                    ExpressionKind::StructAccess {
+                                        struct_: receiver_id,
+                                        field: key.string.clone(),
+                                    },
+                                    field_type.clone(),
+                                );
+                            }
+
+                            if let Some(Named::Functions(function_ids)) =
+                                self.context.global_identifiers.get(&key.string)
+                            {
+                                let function_ids = function_ids
+                                    .iter()
+                                    .map(|id| (*id, &self.context.functions[id]))
+                                    .filter(|(_, it)| {
+                                        !it.parameters.is_empty()
+                                            && it.parameters[0].type_ == receiver_type
+                                    })
+                                    .map(|(id, _)| id)
+                                    .collect::<Box<_>>();
+                                if !function_ids.is_empty() {
+                                    return LoweredExpression::FunctionReferences {
+                                        receiver: Some((receiver_id, receiver_type.clone())),
+                                        function_ids,
+                                    };
                                 }
                             }
+
+                            self.context.add_error(
+                                key.span.clone(),
+                                format!(
+                                    "Value of type `{receiver_type:?}` doesn't have a function or field `{}`",
+                                    key.string
+                                ),
+                            );
+                            LoweredExpression::Error
                         }
                         Type::Error => todo!(),
                     },
