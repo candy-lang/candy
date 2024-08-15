@@ -238,6 +238,14 @@ impl<'h> Context<'h> {
                         return result_pointer;",
                         int = parameters[0].id,
                     )),
+                    BuiltinFunction::Panic => {
+                        self.push(format!(
+                            "\
+                            fputs({}->value);
+                            exit(1);",
+                            parameters[0].id,
+                        ));
+                    }
                     BuiltinFunction::Print => {
                         self.push(format!("puts({}->value);\n", parameters[0].id));
                         let nothing_id = Id::from_usize(1);

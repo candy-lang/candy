@@ -274,6 +274,7 @@ pub enum BuiltinFunction {
     IntCompareTo,
     IntSubtract,
     IntToText,
+    Panic,
     Print,
     TextConcat,
 }
@@ -305,6 +306,11 @@ impl BuiltinFunction {
                 name: "toText".into(),
                 parameters: [("int".into(), Type::int())].into(),
                 return_type: Type::text(),
+            },
+            Self::Panic => BuiltinFunctionSignature {
+                name: "panic".into(),
+                parameters: [("message".into(), Type::text())].into(),
+                return_type: Type::never(),
             },
             Self::Print => BuiltinFunctionSignature {
                 name: "print".into(),
