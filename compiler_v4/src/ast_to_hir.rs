@@ -7,7 +7,7 @@ use crate::{
     error::CompilerError,
     hir::{
         Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
-        Hir, Id, Parameter, Type, TypeDeclaration,
+        Hir, Id, Parameter, SwitchCase, Type, TypeDeclaration,
     },
     id::IdGenerator,
     position::Offset,
@@ -201,132 +201,32 @@ impl<'a> Context<'a> {
     }
 
     fn add_builtin_functions(&mut self) {
-        {
-            let a_id = self.id_generator.generate();
-            let b_id = self.id_generator.generate();
-            self.add_builtin_function(
-                BuiltinFunction::IntAdd,
-                [
-                    Parameter {
-                        id: a_id,
-                        name: "a".into(),
-                        type_: Type::int(),
-                    },
-                    Parameter {
-                        id: b_id,
-                        name: "b".into(),
-                        type_: Type::int(),
-                    },
-                ],
-                Type::int(),
+        for builtin_function in BuiltinFunction::VARIANTS {
+            let id = builtin_function.id();
+            let signature = builtin_function.signature();
+            let parameters = signature
+                .parameters
+                .into_vec()
+                .into_iter()
+                .map(|(name, type_)| Parameter {
+                    id: self.id_generator.generate(),
+                    name,
+                    type_,
+                })
+                .collect::<Box<_>>();
+            self.functions.force_insert(
+                id,
+                FunctionDeclaration {
+                    ast: None,
+                    name: signature.name.clone(),
+                    parameters,
+                    return_type: signature.return_type,
+                    body: Some(BodyOrBuiltin::Builtin(*builtin_function)),
+                },
             );
+            self.global_identifiers
+                .force_insert(signature.name, Named::Functions(vec![id]));
         }
-        {
-            let a_id = self.id_generator.generate();
-            let b_id = self.id_generator.generate();
-            self.add_builtin_function(
-                BuiltinFunction::IntCompareTo,
-                [
-                    Parameter {
-                        id: a_id,
-                        name: "a".into(),
-                        type_: Type::int(),
-                    },
-                    Parameter {
-                        id: b_id,
-                        name: "b".into(),
-                        type_: Type::int(),
-                    },
-                ],
-                Type::Named("Ordering".into()),
-            );
-        }
-        {
-            let a_id = self.id_generator.generate();
-            let b_id = self.id_generator.generate();
-            self.add_builtin_function(
-                BuiltinFunction::IntSubtract,
-                [
-                    Parameter {
-                        id: a_id,
-                        name: "a".into(),
-                        type_: Type::int(),
-                    },
-                    Parameter {
-                        id: b_id,
-                        name: "b".into(),
-                        type_: Type::int(),
-                    },
-                ],
-                Type::int(),
-            );
-        }
-        {
-            let int_id = self.id_generator.generate();
-            self.add_builtin_function(
-                BuiltinFunction::IntToText,
-                [Parameter {
-                    id: int_id,
-                    name: "int".into(),
-                    type_: Type::int(),
-                }],
-                Type::text(),
-            );
-        }
-        {
-            let message_id = self.id_generator.generate();
-            self.add_builtin_function(
-                BuiltinFunction::Print,
-                [Parameter {
-                    id: message_id,
-                    name: "message".into(),
-                    type_: Type::text(),
-                }],
-                Type::nothing(),
-            );
-        }
-        {
-            let a_id = self.id_generator.generate();
-            let b_id = self.id_generator.generate();
-            self.add_builtin_function(
-                BuiltinFunction::TextConcat,
-                [
-                    Parameter {
-                        id: a_id,
-                        name: "a".into(),
-                        type_: Type::text(),
-                    },
-                    Parameter {
-                        id: b_id,
-                        name: "b".into(),
-                        type_: Type::text(),
-                    },
-                ],
-                Type::text(),
-            );
-        }
-    }
-    fn add_builtin_function(
-        &mut self,
-        builtin_function: BuiltinFunction,
-        parameters: impl Into<Box<[Parameter]>>,
-        return_type: Type,
-    ) {
-        let name = builtin_function.as_ref();
-        let parameters = parameters.into();
-        let id = builtin_function.id();
-        self.functions.force_insert(
-            id,
-            FunctionDeclaration {
-                ast: None,
-                name: name.into(),
-                parameters,
-                return_type,
-                body: Some(BodyOrBuiltin::Builtin(builtin_function)),
-            },
-        );
-        self.global_identifiers
-            .force_insert(name.into(), Named::Functions(vec![id]));
     }
 
     fn lower_declarations(&mut self) {
@@ -1286,7 +1186,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 }
                             }
                         });
-                        (variant.string, value_id, body)
+                        SwitchCase {
+                            variant: variant.string,
+                            value_id,
+                            body,
+                        }
                     })
                     .collect();
 

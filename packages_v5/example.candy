@@ -71,7 +71,7 @@ let valueWithExplicitType: Int = 42
 # aDate.add(Duration(days: 1)) # is equivalent to `add(aDate, Duration(days: 1))`
 
 fun isLessThan(a: Int, b: Int) Bool {
-  switch intCompareTo(a, b) {
+  switch a.compareTo(b) {
     less => true,
     equal => false,
     greater => false,
@@ -80,7 +80,7 @@ fun isLessThan(a: Int, b: Int) Bool {
 fun fibonacci(n: Int) Int {
   switch isLessThan(n, 2) {
     true => n,
-    false => intAdd(fibonacci(intSubtract(n, 1)), fibonacci(intSubtract(n, 2))),
+    false => fibonacci(n.subtract(1)).add(fibonacci(n.subtract(2))),
   }
 }
 
@@ -96,7 +96,9 @@ fun main() Int {
 #  print("The answer is {theAnswerText}!")
 #
 #  theAnswer
-  print("fibonacci(20) = {intToText(fibonacci(20))}")
+  print("fibonacci(20) = {toText(fibonacci(20))}")
+  print(Ordering.less.toText())
+  print(true.toText())
   0
 }
 

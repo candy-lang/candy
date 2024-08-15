@@ -236,9 +236,15 @@ pub enum ExpressionKind {
     Switch {
         value: Id,
         enum_: Type,
-        cases: Box<[(Box<str>, Option<Id>, Body)]>,
+        cases: Box<[SwitchCase]>,
     },
     Error,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct SwitchCase {
+    pub variant: Box<str>,
+    pub value_id: Option<Id>,
+    pub body: Body,
 }
 // impl Expression {
 //     #[must_use]
@@ -282,4 +288,46 @@ impl BuiltinFunction {
     pub fn id(self) -> Id {
         Id::from_usize(self as usize)
     }
+
+    #[must_use]
+    pub fn signature(self) -> BuiltinFunctionSignature {
+        match self {
+            Self::IntAdd => BuiltinFunctionSignature {
+                name: "add".into(),
+                parameters: [("a".into(), Type::int()), ("b".into(), Type::int())].into(),
+                return_type: Type::int(),
+            },
+            Self::IntCompareTo => BuiltinFunctionSignature {
+                name: "compareTo".into(),
+                parameters: [("a".into(), Type::int()), ("b".into(), Type::int())].into(),
+                return_type: Type::Named("Ordering".into()),
+            },
+            Self::IntSubtract => BuiltinFunctionSignature {
+                name: "subtract".into(),
+                parameters: [("a".into(), Type::int()), ("b".into(), Type::int())].into(),
+                return_type: Type::int(),
+            },
+            Self::IntToText => BuiltinFunctionSignature {
+                name: "toText".into(),
+                parameters: [("int".into(), Type::int())].into(),
+                return_type: Type::text(),
+            },
+            Self::Print => BuiltinFunctionSignature {
+                name: "print".into(),
+                parameters: [("message".into(), Type::text())].into(),
+                return_type: Type::nothing(),
+            },
+            Self::TextConcat => BuiltinFunctionSignature {
+                name: "concat".into(),
+                parameters: [("a".into(), Type::text()), ("b".into(), Type::text())].into(),
+                return_type: Type::text(),
+            },
+        }
+    }
+}
+#[derive(Debug)]
+pub struct BuiltinFunctionSignature {
+    pub name: Box<str>,
+    pub parameters: Box<[(Box<str>, Type)]>,
+    pub return_type: Type,
 }

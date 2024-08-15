@@ -382,12 +382,12 @@ impl<'h> Context<'h> {
                 self.push(format!(" {id};\n"));
 
                 self.push(format!("switch ({value}->variant) {{"));
-                for (variant, value_id, body) in cases.iter() {
-                    self.push(format!("case {name}_{variant}:\n"));
-                    if let Some(value_id) = value_id {
+                for case in cases.iter() {
+                    self.push(format!("case {name}_{}:\n", case.variant));
+                    if let Some(value_id) = case.value_id {
                         let variant_type = variants
                             .iter()
-                            .find(|(var, _)| var == variant)
+                            .find(|(var, _)| var == &case.variant)
                             .unwrap()
                             .1
                             .as_ref()
@@ -396,9 +396,9 @@ impl<'h> Context<'h> {
                         self.push(format!(" {value_id} = {value}->value;\n"));
                     }
 
-                    self.lower_body_expressions(body);
+                    self.lower_body_expressions(&case.body);
 
-                    self.push(format!("{id} = {};\n", body.return_value_id()));
+                    self.push(format!("{id} = {};\n", case.body.return_value_id()));
 
                     self.push("break;");
                 }
