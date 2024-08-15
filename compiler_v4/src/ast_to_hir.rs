@@ -96,32 +96,24 @@ impl<'a> Context<'a> {
     fn into_hir(mut self) -> (Hir, Vec<CompilerError>) {
         self.hir.main_function_id = self.find_main_function().unwrap_or_default();
 
-        match toposort(&self.assignment_dependency_graph, None) {
-            Ok(order) => {
-                self.hir.assignment_initialization_order = order
-                    .iter()
-                    .map(|it| *self.assignment_dependency_graph.node_weight(*it).unwrap())
-                    .collect();
-            }
-            Err(cycle) => {
-                let id = *self
-                    .assignment_dependency_graph
-                    .node_weight(cycle.node_id())
-                    .unwrap();
-                self.add_error(
-                    // TODO: report actual error location
-                    Offset(0)..Offset(0),
-                    // TODO: print full cycle
-                    format!(
-                        "Cycle in global assignments including `{}`",
-                        self.global_identifiers
-                            .iter()
-                            .find(|(_, named)| *named == &Named::Assignment(id))
-                            .unwrap()
-                            .0,
-                    ),
-                );
-            }
+        if let Err(cycle) = toposort(&self.assignment_dependency_graph, None) {
+            let id = *self
+                .assignment_dependency_graph
+                .node_weight(cycle.node_id())
+                .unwrap();
+            self.add_error(
+                // TODO: report actual error location
+                Offset(0)..Offset(0),
+                // TODO: print full cycle
+                format!(
+                    "Cycle in global assignments including `{}`",
+                    self.global_identifiers
+                        .iter()
+                        .find(|(_, named)| *named == &Named::Assignment(id))
+                        .unwrap()
+                        .0,
+                ),
+            );
         }
 
         let mut assignments = vec![];

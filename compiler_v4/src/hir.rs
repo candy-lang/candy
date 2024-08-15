@@ -2,7 +2,7 @@ use crate::{id::CountableId, impl_countable_id};
 use derive_more::Deref;
 use rustc_hash::FxHashMap;
 use std::fmt::{self, Display, Formatter};
-use strum::{AsRefStr, VariantArray};
+use strum::VariantArray;
 
 #[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Id(usize);
@@ -17,23 +17,32 @@ impl Display for Id {
 pub struct Hir {
     pub type_declarations: FxHashMap<Box<str>, TypeDeclaration>,
     pub assignments: Box<[(Id, Box<str>, Assignment)]>,
-    pub assignment_initialization_order: Vec<Id>,
     pub functions: Box<[(Id, Box<str>, Function)]>,
     pub main_function_id: Id,
 }
-// impl Hir {
-//     /// `None` means the ID belongs to a parameter.
-//     #[must_use]
-//     pub fn get(&self, id: Id) -> Option<&Assignment> {
-//         self.assignments.iter().find_map(|(i, _, assignment)| {
-//             if i == &id {
-//                 Some(assignment)
-//             } else {
-//                 assignment.get(id)
-//             }
-//         })
-//     }
-// }
+impl Hir {
+    #[must_use]
+    pub fn get_assignment(&self, id: Id) -> (&str, &Assignment) {
+        let (_, name, assignment) = self.assignments.iter().find(|(i, _, _)| *i == id).unwrap();
+        (name, assignment)
+    }
+    #[must_use]
+    pub fn get_function(&self, id: Id) -> (&str, &Function) {
+        let (_, name, function) = self.functions.iter().find(|(i, _, _)| *i == id).unwrap();
+        (name, function)
+    }
+    // /// `None` means the ID belongs to a parameter.
+    // #[must_use]
+    // pub fn get(&self, id: Id) -> Option<&Assignment> {
+    //     self.assignments.iter().find_map(|(i, _, assignment)| {
+    //         if i == &id {
+    //             Some(assignment)
+    //         } else {
+    //             assignment.get(id)
+    //         }
+    //     })
+    // }
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeDeclaration {
@@ -267,7 +276,7 @@ pub struct SwitchCase {
 //     }
 // }
 
-#[derive(AsRefStr, Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
 #[strum(serialize_all = "camelCase")]
 pub enum BuiltinFunction {
     IntAdd,

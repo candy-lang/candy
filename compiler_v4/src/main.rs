@@ -21,7 +21,8 @@ use ast_to_hir::ast_to_hir;
 use clap::{Parser, ValueHint};
 use error::CompilerError;
 use hir::Hir;
-use hir_to_c::hir_to_c;
+use hir_to_mono::hir_to_mono;
+use mono_to_c::mono_to_c;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -37,8 +38,10 @@ mod ast;
 mod ast_to_hir;
 mod error;
 mod hir;
-mod hir_to_c;
+mod hir_to_mono;
 mod id;
+mod mono;
+mod mono_to_c;
 mod position;
 mod string_to_ast;
 mod utils;
@@ -114,7 +117,9 @@ fn compile(options: CompileOptions) -> ProgramResult {
         return Err(Exit::CodeContainsErrors);
     }
 
-    let c_code = hir_to_c(&hir);
+    let mono = hir_to_mono(&hir);
+
+    let c_code = mono_to_c(&mono);
     debug!(
         "Compilation to C took {}.",
         format_duration(started_at.elapsed())
