@@ -193,13 +193,6 @@ pub struct Expression {
 }
 impl Expression {
     #[must_use]
-    pub const fn error() -> Self {
-        Self {
-            kind: ExpressionKind::Error,
-            type_: Type::Error,
-        }
-    }
-    #[must_use]
     pub fn nothing() -> Self {
         Self {
             kind: ExpressionKind::CreateStruct {
