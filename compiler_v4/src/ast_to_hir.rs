@@ -26,41 +26,6 @@ pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
     let mut context = Context::new(path, ast);
     context.add_builtin_functions();
     context.lower_declarations();
-
-    if let Some(named) = context.global_identifiers.get("main") {
-        match named {
-            Named::Assignment(_) => {
-                // TODO: report actual error location
-                context.add_error(Offset(0)..Offset(0), "`main` must be a function");
-            }
-            Named::Functions(ids) => {
-                assert!(!ids.is_empty());
-
-                let function = context.functions.get(ids.first().unwrap()).unwrap();
-                let parameters_are_empty = function.parameters.is_empty();
-                let return_type = function.return_type.clone();
-                if ids.len() > 1 {
-                    // TODO: report actual error location
-                    context.add_error(Offset(0)..Offset(0), "Main function may not be overloaded");
-                } else {
-                    if !parameters_are_empty {
-                        // TODO: report actual error location
-                        context.add_error(
-                            Offset(0)..Offset(0),
-                            "Main function must not have parameters",
-                        );
-                    }
-                    if return_type != Type::Error && return_type != Type::int() {
-                        // TODO: report actual error location
-                        context.add_error(Offset(0)..Offset(0), "Main function must return an Int");
-                    }
-                }
-            }
-        }
-    } else {
-        context.add_error(Offset(0)..Offset(0), "Program is missing a main function");
-    }
-
     context.into_hir()
 }
 
@@ -129,6 +94,8 @@ impl<'a> Context<'a> {
     }
 
     fn into_hir(mut self) -> (Hir, Vec<CompilerError>) {
+        self.hir.main_function_id = self.find_main_function().unwrap_or_default();
+
         match toposort(&self.assignment_dependency_graph, None) {
             Ok(order) => {
                 self.hir.assignment_initialization_order = order
@@ -198,6 +165,54 @@ impl<'a> Context<'a> {
         self.hir.functions = functions.into();
 
         (self.hir, self.errors)
+    }
+    fn find_main_function(&mut self) -> Option<Id> {
+        if let Some(named) = self.global_identifiers.get("main") {
+            match named {
+                Named::Assignment(assignment) => {
+                    let span = self.assignments[assignment]
+                        .ast
+                        .name
+                        .value()
+                        .unwrap()
+                        .span
+                        .clone();
+                    self.add_error(span, "`main` must be a function");
+                    None
+                }
+                Named::Functions(ids) => {
+                    assert!(!ids.is_empty());
+
+                    let function = &self.functions[ids.first().unwrap()];
+                    if ids.len() > 1 {
+                        self.add_error(
+                            function.ast.unwrap().name.value().unwrap().span.clone(),
+                            "Main function may not be overloaded",
+                        );
+                        None
+                    } else if !function.parameters.is_empty() {
+                        self.add_error(
+                            function.ast.unwrap().name.value().unwrap().span.clone(),
+                            "Main function must not have parameters",
+                        );
+                        None
+                    } else if function.return_type != Type::Error
+                        && function.return_type != Type::int()
+                    {
+                        self.add_error(
+                            function.ast.unwrap().name.value().unwrap().span.clone(),
+                            "Main function must return an Int",
+                        );
+                        None
+                    } else {
+                        Some(ids[0])
+                    }
+                }
+            }
+        } else {
+            self.add_error(Offset(0)..Offset(0), "Program is missing a main function");
+            None
+        }
     }
 
     fn add_builtin_functions(&mut self) {

@@ -54,17 +54,14 @@ impl<'h> Context<'h> {
         self.lower_function_definitions();
         // TODO: init assignments in main in correct order
 
-        let (main_function_id, _, _) = self
-            .hir
-            .functions
-            .iter()
-            .find(|(_, box name, _)| name == "main")
-            .unwrap();
         self.push("int main() {\n");
         for id in &self.hir.assignment_initialization_order {
             self.push(format!("init{id}();\n"));
         }
-        self.push(format!("return {main_function_id}()->value;\n}}\n"));
+        self.push(format!(
+            "return {}()->value;\n}}\n",
+            self.hir.main_function_id,
+        ));
     }
 
     fn lower_type_declarations(&mut self) {

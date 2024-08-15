@@ -19,6 +19,7 @@ pub struct Hir {
     pub assignments: Box<[(Id, Box<str>, Assignment)]>,
     pub assignment_initialization_order: Vec<Id>,
     pub functions: Box<[(Id, Box<str>, Function)]>,
+    pub main_function_id: Id,
 }
 // impl Hir {
 //     /// `None` means the ID belongs to a parameter.
