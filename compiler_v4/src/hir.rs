@@ -1,5 +1,6 @@
 use crate::{id::CountableId, impl_countable_id};
 use derive_more::Deref;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::fmt::{self, Display, Formatter};
 use strum::VariantArray;
@@ -8,6 +9,15 @@ use strum::VariantArray;
 pub struct Id(usize);
 impl_countable_id!(Id);
 impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "_{}", self.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TypeParameterId(usize);
+impl_countable_id!(TypeParameterId);
+impl Display for TypeParameterId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "_{}", self.0)
     }
@@ -47,42 +57,110 @@ impl Hir {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeDeclaration {
     Struct {
+        type_parameters: Box<[TypeParameter]>,
         fields: Box<[(Box<str>, Type)]>,
     },
     Enum {
+        type_parameters: Box<[TypeParameter]>,
         variants: Box<[(Box<str>, Option<Type>)]>,
     },
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct TypeParameter {
+    pub id: TypeParameterId,
+    pub name: Box<str>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Type {
-    Named(Box<str>),
+    Named {
+        name: Box<str>,
+        type_arguments: Box<[Type]>,
+    },
+    Parameter {
+        name: Box<str>,
+        id: TypeParameterId,
+    },
     // TODO: `Self` type
     Error,
 }
 impl Type {
-    #[must_use]
-    pub fn nothing() -> Self {
-        Self::Named("Nothing".into())
-    }
-    #[must_use]
-    pub fn never() -> Self {
-        Self::Named("Never".into())
-    }
-
+    // Builtin types
     #[must_use]
     pub fn int() -> Self {
-        Self::Named("Int".into())
+        Self::Named {
+            name: "Int".into(),
+            type_arguments: [].into(),
+        }
     }
     #[must_use]
     pub fn text() -> Self {
-        Self::Named("Text".into())
+        Self::Named {
+            name: "Text".into(),
+            type_arguments: [].into(),
+        }
+    }
+
+    // Standard library types
+    #[must_use]
+    pub fn nothing() -> Self {
+        Self::Named {
+            name: "Nothing".into(),
+            type_arguments: [].into(),
+        }
+    }
+    #[must_use]
+    pub fn never() -> Self {
+        Self::Named {
+            name: "Never".into(),
+            type_arguments: [].into(),
+        }
+    }
+    #[must_use]
+    pub fn ordering() -> Self {
+        Self::Named {
+            name: "Ordering".into(),
+            type_arguments: [].into(),
+        }
+    }
+
+    #[must_use]
+    pub fn build_environment(
+        type_parameters: &[TypeParameter],
+        type_arguments: &[Self],
+    ) -> FxHashMap<TypeParameterId, Self> {
+        type_parameters
+            .iter()
+            .map(|it| it.id)
+            .zip_eq(type_arguments.iter().cloned())
+            .collect()
+    }
+    #[must_use]
+    pub fn substitute(&self, environment: &FxHashMap<TypeParameterId, Self>) -> Self {
+        match self {
+            Self::Named { name, type_arguments } => Self::Named {
+                name: name.clone(),
+                type_arguments: type_arguments.iter().map(|it| it.substitute(environment)).collect(),
+            },
+            Self::Parameter { name, id } => environment.get(id).unwrap_or_else(|| panic!("Missing substitution for type parameter {name} (environment: {environment:?})")).clone(),
+            Self::Error => Self::Error,
+        }
     }
 }
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self {
-            Self::Named(name) => write!(f, "{name}"),
+            Self::Named {
+                name,
+                type_arguments,
+            } => {
+                write!(f, "{name}")?;
+                if !type_arguments.is_empty() {
+                    write!(f, "[{}]", type_arguments.iter().join(", "))?;
+                }
+                Ok(())
+            }
+            Self::Parameter { name, id: _ } => write!(f, "{name}"),
             Self::Error => write!(f, "<error>"),
         }
     }
@@ -115,6 +193,7 @@ pub struct Assignment {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Function {
+    pub type_parameters: Box<[TypeParameter]>,
     pub parameters: Box<[Parameter]>,
     pub return_type: Type,
     pub body: BodyOrBuiltin,
@@ -234,6 +313,7 @@ pub enum ExpressionKind {
     Reference(Id),
     Call {
         function: Id,
+        type_arguments: Box<[Type]>,
         arguments: Box<[Id]>,
     },
     Switch {
@@ -298,36 +378,43 @@ impl BuiltinFunction {
         match self {
             Self::IntAdd => BuiltinFunctionSignature {
                 name: "add".into(),
+                type_parameters: Box::default(),
                 parameters: [("a".into(), Type::int()), ("b".into(), Type::int())].into(),
                 return_type: Type::int(),
             },
             Self::IntCompareTo => BuiltinFunctionSignature {
                 name: "compareTo".into(),
+                type_parameters: Box::default(),
                 parameters: [("a".into(), Type::int()), ("b".into(), Type::int())].into(),
-                return_type: Type::Named("Ordering".into()),
+                return_type: Type::ordering(),
             },
             Self::IntSubtract => BuiltinFunctionSignature {
                 name: "subtract".into(),
+                type_parameters: Box::default(),
                 parameters: [("a".into(), Type::int()), ("b".into(), Type::int())].into(),
                 return_type: Type::int(),
             },
             Self::IntToText => BuiltinFunctionSignature {
                 name: "toText".into(),
+                type_parameters: Box::default(),
                 parameters: [("int".into(), Type::int())].into(),
                 return_type: Type::text(),
             },
             Self::Panic => BuiltinFunctionSignature {
                 name: "panic".into(),
+                type_parameters: Box::default(),
                 parameters: [("message".into(), Type::text())].into(),
                 return_type: Type::never(),
             },
             Self::Print => BuiltinFunctionSignature {
                 name: "print".into(),
+                type_parameters: Box::default(),
                 parameters: [("message".into(), Type::text())].into(),
                 return_type: Type::nothing(),
             },
             Self::TextConcat => BuiltinFunctionSignature {
                 name: "concat".into(),
+                type_parameters: Box::default(),
                 parameters: [("a".into(), Type::text()), ("b".into(), Type::text())].into(),
                 return_type: Type::text(),
             },
@@ -337,6 +424,7 @@ impl BuiltinFunction {
 #[derive(Debug)]
 pub struct BuiltinFunctionSignature {
     pub name: Box<str>,
+    pub type_parameters: Box<[Box<str>]>,
     pub parameters: Box<[(Box<str>, Type)]>,
     pub return_type: Type,
 }

@@ -1,13 +1,11 @@
 use super::{
     expression::{expression, statements},
     literal::{
-        closing_curly_brace, closing_parenthesis, colon, comma, enum_keyword, equals_sign,
-        fun_keyword, let_keyword, opening_curly_brace, opening_parenthesis, struct_keyword,
+        closing_bracket, closing_curly_brace, closing_parenthesis, colon, comma, enum_keyword,
+        equals_sign, fun_keyword, let_keyword, opening_bracket, opening_curly_brace,
+        opening_parenthesis, struct_keyword,
     },
-    parser::{
-        Parser, ParserUnwrapOrAstError, ParserWithResultUnwrapOrAstError,
-        ParserWithValueUnwrapOrAstError,
-    },
+    parser::{OptionOfParser, OptionOfParserWithResult, OptionOfParserWithValue, Parser},
     type_::type_,
     whitespace::{
         whitespace, AndTrailingWhitespace, OptionAndTrailingWhitespace,
@@ -16,8 +14,8 @@ use super::{
     word::raw_identifier,
 };
 use crate::ast::{
-    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstFunction, AstParameter, AstStruct,
-    AstStructField,
+    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstParameter,
+    AstString, AstStruct, AstStructField, AstTypeParameter, AstTypeParameters,
 };
 use tracing::instrument;
 
@@ -60,6 +58,8 @@ fn struct_<'a>(parser: Parser) -> Option<(Parser, AstStruct)> {
         .and_trailing_whitespace()
         .unwrap_or_ast_error_result(parser, "This struct is missing a name.");
 
+    let (parser, type_parameters) = type_parameters(parser).optional(parser);
+
     let (mut parser, opening_curly_brace_error) = opening_curly_brace(parser)
         .and_trailing_whitespace()
         .unwrap_or_ast_error(parser, "This struct is missing an opening curly brace.");
@@ -86,6 +86,7 @@ fn struct_<'a>(parser: Parser) -> Option<(Parser, AstStruct)> {
         parser,
         AstStruct {
             name,
+            type_parameters,
             opening_curly_brace_error,
             fields,
             closing_curly_brace_error,
@@ -127,6 +128,8 @@ fn enum_<'a>(parser: Parser) -> Option<(Parser, AstEnum)> {
         .and_trailing_whitespace()
         .unwrap_or_ast_error_result(parser, "This enum is missing a name.");
 
+    let (parser, type_parameters) = type_parameters(parser).optional(parser);
+
     let (mut parser, opening_curly_brace_error) = opening_curly_brace(parser)
         .and_trailing_whitespace()
         .unwrap_or_ast_error(parser, "This enum is missing an opening curly brace.");
@@ -154,6 +157,7 @@ fn enum_<'a>(parser: Parser) -> Option<(Parser, AstEnum)> {
         parser,
         AstEnum {
             name,
+            type_parameters,
             opening_curly_brace_error,
             variants,
             closing_curly_brace_error,
@@ -233,11 +237,14 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
         .and_trailing_whitespace()
         .unwrap_or_ast_error_result(parser, "This function is missing a name.");
 
+    let (parser, type_parameters) = type_parameters(parser).optional(parser);
+
     let (mut parser, opening_parenthesis_error) = opening_parenthesis(parser)
         .and_trailing_whitespace()
         .unwrap_or_ast_error(parser, "This function is missing an opening parenthesis.");
 
     let mut parameters: Vec<AstParameter> = vec![];
+    // TODO: error on duplicate parameter names
     let mut parser_for_missing_comma_error: Option<Parser> = None;
     while let Some((new_parser, variant, new_parser_for_missing_comma_error)) = parameter(parser) {
         if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
@@ -256,10 +263,7 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
         .and_trailing_whitespace()
         .unwrap_or_ast_error(parser, "This function is missing an closing parenthesis.");
 
-    let (parser, return_type) = type_(parser)
-        .map(|(parser, it)| (parser, Some(it)))
-        .unwrap_or((parser, None))
-        .and_trailing_whitespace();
+    let (parser, return_type) = type_(parser).optional(parser).and_trailing_whitespace();
 
     let (parser, opening_curly_brace_error) = opening_curly_brace(parser)
         .and_trailing_whitespace()
@@ -274,6 +278,7 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
         parser,
         AstFunction {
             name,
+            type_parameters,
             opening_parenthesis_error,
             parameters,
             closing_parenthesis_error,
@@ -305,6 +310,74 @@ fn parameter<'a>(parser: Parser) -> Option<(Parser, AstParameter, Option<Parser>
             name,
             colon_error,
             type_,
+            comma_error: None,
+        },
+        parser_for_missing_comma_error,
+    ))
+}
+
+#[instrument(level = "trace")]
+fn type_parameters<'s>(parser: Parser<'s>) -> Option<(Parser, AstTypeParameters)> {
+    let start_offset = parser.offset();
+    let mut parser = opening_bracket(parser)?.and_trailing_whitespace();
+
+    // TODO: error on duplicate type parameter names
+    let mut parameters: Vec<AstTypeParameter> = vec![];
+    let mut parser_for_missing_comma_error: Option<Parser> = None;
+    while let Some((new_parser, parameter, new_parser_for_missing_comma_error)) =
+        type_parameter(parser.and_trailing_whitespace())
+    {
+        if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
+            parameters.last_mut().unwrap().comma_error = Some(
+                parser_for_missing_comma_error
+                    .error_at_current_offset("This parameter is missing a comma."),
+            );
+        }
+
+        parser = new_parser;
+        parameters.push(parameter);
+        parser_for_missing_comma_error = new_parser_for_missing_comma_error;
+    }
+    let parser = parser.and_trailing_whitespace();
+
+    let (parser, closing_bracket_error) = closing_bracket(parser).unwrap_or_ast_error(
+        parser,
+        "These type parameters are missing a closing bracket.",
+    );
+
+    let empty_parameters_error = if parameters.is_empty() {
+        Some(AstError {
+            unparsable_input: AstString {
+                string: parser.source()[*start_offset..*parser.offset()].into(),
+                file: parser.file.to_path_buf(),
+                span: start_offset..parser.offset(),
+            },
+            error: "Type parameter brackets must not be empty.".into(),
+        })
+    } else {
+        None
+    };
+
+    Some((
+        parser,
+        AstTypeParameters {
+            parameters,
+            empty_parameters_error,
+            closing_bracket_error,
+        },
+    ))
+}
+#[instrument(level = "trace")]
+fn type_parameter<'a>(parser: Parser) -> Option<(Parser, AstTypeParameter, Option<Parser>)> {
+    let (parser, name) = raw_identifier(parser)?.and_trailing_whitespace();
+
+    let (parser, parser_for_missing_comma_error) =
+        comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));
+
+    Some((
+        parser,
+        AstTypeParameter {
+            name,
             comma_error: None,
         },
         parser_for_missing_comma_error,

@@ -1,13 +1,13 @@
 use crate::{
     ast::{
-        Ast, AstArgument, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
-        AstFunction, AstNamedType, AstParameter, AstStatement, AstStruct, AstSwitch, AstTextPart,
-        AstType,
+        Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
+        AstFunction, AstParameter, AstResult, AstStatement, AstStruct, AstSwitch, AstTextPart,
+        AstType, AstTypeParameter, AstTypeParameters,
     },
     error::CompilerError,
     hir::{
         Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
-        Hir, Id, Parameter, SwitchCase, Type, TypeDeclaration,
+        Hir, Id, Parameter, SwitchCase, Type, TypeDeclaration, TypeParameter, TypeParameterId,
     },
     id::IdGenerator,
     position::Offset,
@@ -19,7 +19,7 @@ use petgraph::{
     graph::{DiGraph, NodeIndex},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{collections::hash_map::Entry, ops::Range, path::Path};
+use std::{collections::hash_map::Entry, iter, ops::Range, path::Path};
 use strum::VariantArray;
 
 pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
@@ -34,6 +34,7 @@ struct Context<'a> {
     path: &'a Path,
     ast: &'a Ast,
     id_generator: IdGenerator<Id>,
+    type_parameter_id_generator: IdGenerator<TypeParameterId>,
     global_identifiers: FxHashMap<Box<str>, Named>,
     assignments: FxHashMap<Id, AssignmentDeclaration<'a>>,
     assignment_dependency_graph: DiGraph<Id, ()>,
@@ -57,6 +58,7 @@ struct AssignmentDeclaration<'a> {
 struct FunctionDeclaration<'a> {
     ast: Option<&'a AstFunction>,
     name: Box<str>,
+    type_parameters: Box<[TypeParameter]>,
     parameters: Box<[Parameter]>,
     return_type: Type,
     body: Option<BodyOrBuiltin>,
@@ -64,8 +66,16 @@ struct FunctionDeclaration<'a> {
 impl<'a> FunctionDeclaration<'a> {
     fn signature_to_string(&self) -> String {
         format!(
-            "{}({})",
+            "{}{}({})",
             self.name,
+            if self.type_parameters.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "[{}]",
+                    self.type_parameters.iter().map(|it| &it.name).join(", ")
+                )
+            },
             self.parameters
                 .iter()
                 .map(|it| format!("{}: {}", it.name, it.type_))
@@ -84,6 +94,7 @@ impl<'a> Context<'a> {
             path,
             ast,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
+            type_parameter_id_generator: IdGenerator::default(),
             global_identifiers: FxHashMap::default(),
             assignments: FxHashMap::default(),
             assignment_dependency_graph: DiGraph::new(),
@@ -135,6 +146,7 @@ impl<'a> Context<'a> {
                 Named::Functions(ids) => {
                     for id in ids {
                         let FunctionDeclaration {
+                            type_parameters,
                             parameters,
                             return_type,
                             body,
@@ -144,6 +156,7 @@ impl<'a> Context<'a> {
                             id,
                             name.clone(),
                             Function {
+                                type_parameters,
                                 parameters,
                                 return_type,
                                 body: body.unwrap(),
@@ -211,6 +224,15 @@ impl<'a> Context<'a> {
         for builtin_function in BuiltinFunction::VARIANTS {
             let id = builtin_function.id();
             let signature = builtin_function.signature();
+            let type_parameters = signature
+                .type_parameters
+                .into_vec()
+                .into_iter()
+                .map(|name| TypeParameter {
+                    id: self.type_parameter_id_generator.generate(),
+                    name,
+                })
+                .collect::<Box<_>>();
             let parameters = signature
                 .parameters
                 .into_vec()
@@ -226,6 +248,7 @@ impl<'a> Context<'a> {
                 FunctionDeclaration {
                     ast: None,
                     name: signature.name.clone(),
+                    type_parameters,
                     parameters,
                     return_type: signature.return_type,
                     body: Some(BodyOrBuiltin::Builtin(*builtin_function)),
@@ -268,13 +291,15 @@ impl<'a> Context<'a> {
             return;
         };
 
+        let type_parameters = self.lower_type_parameters(struct_type.type_parameters.as_ref());
+
         let fields = struct_type
             .fields
             .iter()
             .filter_map(|field| {
                 let name = field.name.value()?;
 
-                let type_ = self.lower_type(field.type_.value());
+                let type_ = self.lower_type(&type_parameters, field.type_.value());
                 Some((name.string.clone(), type_))
             })
             .collect();
@@ -284,7 +309,10 @@ impl<'a> Context<'a> {
                 self.add_error(name.span.clone(), "Duplicate type name");
             }
             Entry::Vacant(entry) => {
-                entry.insert(TypeDeclaration::Struct { fields });
+                entry.insert(TypeDeclaration::Struct {
+                    type_parameters,
+                    fields,
+                });
             }
         };
     }
@@ -293,13 +321,18 @@ impl<'a> Context<'a> {
             return;
         };
 
+        let type_parameters = self.lower_type_parameters(enum_type.type_parameters.as_ref());
+
         let variants = enum_type
             .variants
             .iter()
             .filter_map(|variant| {
                 let name = variant.name.value()?;
 
-                let type_ = variant.type_.as_ref().map(|it| self.lower_type(it.value()));
+                let type_ = variant
+                    .type_
+                    .as_ref()
+                    .map(|it| self.lower_type(&type_parameters, it.value()));
                 Some((name.string.clone(), type_))
             })
             .collect();
@@ -309,41 +342,149 @@ impl<'a> Context<'a> {
                 self.add_error(name.span.clone(), "Duplicate type name");
             }
             Entry::Vacant(entry) => {
-                entry.insert(TypeDeclaration::Enum { variants });
+                entry.insert(TypeDeclaration::Enum {
+                    type_parameters,
+                    variants,
+                });
             }
         };
     }
 
-    fn lower_type(&mut self, type_: impl Into<Option<&AstType>>) -> Type {
-        match type_.into() {
-            Some(AstType::Named(AstNamedType { name })) => {
-                let Some(name) = name.value() else {
-                    return Type::Error;
-                };
+    fn lower_type_parameters(
+        &mut self,
+        type_parameters: Option<&AstTypeParameters>,
+    ) -> Box<[TypeParameter]> {
+        type_parameters.map_or_else(Box::default, |it| {
+            it.parameters
+                .iter()
+                .filter_map(|it| {
+                    let name = it.name.value()?;
+                    let id = self.type_parameter_id_generator.generate();
+                    Some(TypeParameter {
+                        id,
+                        name: name.string.clone(),
+                    })
+                })
+                .collect()
+        })
+    }
+    fn lower_type(
+        &mut self,
+        type_parameters: &[TypeParameter],
+        type_: impl Into<Option<&AstType>>,
+    ) -> Type {
+        let type_: Option<&AstType> = type_.into();
+        let Some(type_) = type_ else {
+            return Type::Error;
+        };
 
-                if &*name.string == "Int" {
-                    return Type::int();
-                }
-                if &*name.string == "Text" {
-                    return Type::text();
-                }
+        let Some(name) = type_.name.value() else {
+            return Type::Error;
+        };
 
-                if self.ast.iter().any(|it| {
-                    matches!(
-                        it,
-                        AstDeclaration::Struct(AstStruct { name:it_name, .. })
-                            | AstDeclaration::Enum(AstEnum { name:it_name, .. })
-                        if it_name.value().map(|it| &it.string) == Some(&name.string)
-                    )
-                }) {
-                    Type::Named(name.string.clone())
-                } else {
-                    self.add_error(name.span.clone(), format!("Unknown type: `{}`", **name));
-                    Type::Error
-                }
+        if let Some((name, id)) = Self::resolve_type_parameter(type_parameters, &name.string) {
+            if let Some(type_arguments) = &type_.type_arguments {
+                self.add_error(
+                    type_arguments.span.clone(),
+                    "Type parameters can't have type arguments",
+                );
             }
-            None => Type::Error,
+            return Type::Parameter { name, id };
         }
+
+        let type_arguments = type_
+            .type_arguments
+            .as_ref()
+            .map_or_else(Box::default, |it| {
+                it.arguments
+                    .iter()
+                    .map(|it| self.lower_type(type_parameters, &it.type_))
+                    .collect::<Box<_>>()
+            });
+
+        if &*name.string == "Int" {
+            if !type_arguments.is_empty() {
+                self.add_error(
+                    type_.type_arguments.as_ref().unwrap().span.clone(),
+                    "Int does not take type arguments",
+                );
+            }
+            return Type::int();
+        }
+        if &*name.string == "Text" {
+            if !type_arguments.is_empty() {
+                self.add_error(
+                    type_.type_arguments.as_ref().unwrap().span.clone(),
+                    "Text does not take type arguments",
+                );
+            }
+            return Type::text();
+        }
+
+        let Some(type_parameters) = self.ast.iter().find_map(|it| match it {
+            AstDeclaration::Struct(AstStruct {
+                name: it_name,
+                type_parameters,
+                ..
+            })
+            | AstDeclaration::Enum(AstEnum {
+                name: it_name,
+                type_parameters,
+                ..
+            }) if it_name.value().map(|it| &it.string) == Some(&name.string) => Some(
+                type_parameters
+                    .as_ref()
+                    .map_or::<&[AstTypeParameter], _>(&[], |it| &it.parameters),
+            ),
+            _ => None,
+        }) else {
+            self.add_error(name.span.clone(), format!("Unknown type: `{}`", **name));
+            return Type::Error;
+        };
+
+        let type_arguments: Box<[Type]> = if type_arguments.len() == type_parameters.len() {
+            type_arguments
+        } else {
+            self.add_error(
+                type_.type_arguments.as_ref().unwrap().span.clone(),
+                format!(
+                    "Expected {} type {}, got {}.",
+                    type_parameters.len(),
+                    if type_parameters.len() == 1 {
+                        "argument"
+                    } else {
+                        "arguments"
+                    },
+                    type_arguments.len(),
+                ),
+            );
+            if type_arguments.len() < type_parameters.len() {
+                let missing_count = type_parameters.len() - type_arguments.len();
+                type_arguments
+                    .into_vec()
+                    .into_iter()
+                    .chain(iter::repeat_n(Type::Error, missing_count))
+                    .collect()
+            } else {
+                let mut type_arguments = type_arguments.into_vec();
+                type_arguments.truncate(type_parameters.len());
+                type_arguments.into_boxed_slice()
+            }
+        };
+
+        Type::Named {
+            name: name.string.clone(),
+            type_arguments,
+        }
+    }
+    fn resolve_type_parameter(
+        type_parameters: &[TypeParameter],
+        name: &str,
+    ) -> Option<(Box<str>, TypeParameterId)> {
+        type_parameters
+            .iter()
+            .find(|it| &*it.name == name)
+            .map(|it| (it.name.clone(), it.id))
     }
 
     fn lower_assignment_signature(&mut self, assignment: &'a AstAssignment) -> Option<Id> {
@@ -354,7 +495,7 @@ impl<'a> Context<'a> {
         let type_ = assignment
             .type_
             .as_ref()
-            .map_or(Type::Error, |it| self.lower_type(it.value()));
+            .map_or(Type::Error, |it| self.lower_type(&[], it.value()));
 
         match self.global_identifiers.entry(name.string.clone()) {
             Entry::Occupied(mut entry) => {
@@ -393,7 +534,7 @@ impl<'a> Context<'a> {
         let type_ = declaration.type_.clone();
         let graph_index = declaration.graph_index;
 
-        let (hir_body, global_assignment_dependencies) = BodyBuilder::build(self, |builder| {
+        let (hir_body, global_assignment_dependencies) = BodyBuilder::build(self, &[], |builder| {
             if let Some(value) = value.value() {
                 builder.lower_expression(value, Some(&type_));
             } else {
@@ -414,11 +555,14 @@ impl<'a> Context<'a> {
         let name = function.name.value()?;
 
         let id = self.id_generator.generate();
-        let parameters = self.lower_parameters(&function.parameters);
+
+        let type_parameters = self.lower_type_parameters(function.type_parameters.as_ref());
+
+        let parameters = self.lower_parameters(&type_parameters, &function.parameters);
         let return_type = function
             .return_type
             .as_ref()
-            .map_or_else(Type::nothing, |it| self.lower_type(it));
+            .map_or_else(Type::nothing, |it| self.lower_type(&type_parameters, it));
         match self.global_identifiers.entry(name.string.clone()) {
             Entry::Occupied(mut entry) => match entry.get_mut() {
                 Named::Functions(functions) => {
@@ -442,6 +586,7 @@ impl<'a> Context<'a> {
             FunctionDeclaration {
                 ast: Some(function),
                 name: name.string.clone(),
+                type_parameters,
                 parameters,
                 return_type,
                 body: None,
@@ -449,7 +594,11 @@ impl<'a> Context<'a> {
         );
         Some(id)
     }
-    fn lower_parameters(&mut self, parameters: &'a [AstParameter]) -> Box<[Parameter]> {
+    fn lower_parameters(
+        &mut self,
+        type_parameters: &[TypeParameter],
+        parameters: &'a [AstParameter],
+    ) -> Box<[Parameter]> {
         let mut parameter_names = FxHashSet::default();
         parameters
             .iter()
@@ -463,7 +612,7 @@ impl<'a> Context<'a> {
                     return None;
                 }
 
-                let type_ = self.lower_type(parameter.type_.value());
+                let type_ = self.lower_type(type_parameters, parameter.type_.value());
 
                 let id = self.id_generator.generate();
                 Parameter {
@@ -475,12 +624,13 @@ impl<'a> Context<'a> {
             .collect()
     }
     fn lower_function(&mut self, id: Id) {
-        let declaration = self.functions.get(&id).unwrap();
-        let body = declaration.ast.unwrap().body.clone();
-        let parameters = declaration.parameters.clone();
-        let return_type = declaration.return_type.clone();
+        let function = self.functions.get(&id).unwrap();
+        let body = function.ast.unwrap().body.clone();
+        let type_parameters = function.type_parameters.clone();
+        let parameters = function.parameters.clone();
+        let return_type = function.return_type.clone();
 
-        let (hir_body, _) = BodyBuilder::build(self, |builder| {
+        let (hir_body, _) = BodyBuilder::build(self, &type_parameters, |builder| {
             for parameter in parameters.iter() {
                 builder.push_parameter(parameter.clone());
             }
@@ -494,7 +644,26 @@ impl<'a> Context<'a> {
     fn is_assignable_to(from: &Type, to: &Type) -> bool {
         match (from, to) {
             (Type::Error, _) | (_, Type::Error) => true,
-            (Type::Named(from_name), Type::Named(to_name)) => from_name == to_name,
+            (
+                Type::Named {
+                    name: from_name,
+                    type_arguments: from_type_arguments,
+                },
+                Type::Named {
+                    name: to_name,
+                    type_arguments: to_type_arguments,
+                },
+            ) => {
+                from_name == to_name
+                    && from_type_arguments
+                        .iter()
+                        .zip_eq(to_type_arguments.iter())
+                        .all(|(from, to)| Self::is_assignable_to(from, to))
+            }
+            (Type::Parameter { id: from, name: _ }, Type::Parameter { id: to, name: _ }) => {
+                from == to
+            }
+            _ => false,
         }
     }
 
@@ -510,6 +679,7 @@ impl<'a> Context<'a> {
 struct BodyBuilder<'c, 'a> {
     context: &'c mut Context<'a>,
     global_assignment_dependencies: FxHashSet<Id>,
+    type_parameters: &'c [TypeParameter],
     local_identifiers: Vec<(Box<str>, Id, Type)>,
     body: Body,
 }
@@ -517,11 +687,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     #[must_use]
     fn build(
         context: &'c mut Context<'a>,
+        type_parameters: &'c [TypeParameter],
         fun: impl FnOnce(&mut BodyBuilder),
     ) -> (Body, FxHashSet<Id>) {
         let mut builder = Self {
             context,
             global_assignment_dependencies: FxHashSet::default(),
+            type_parameters,
             local_identifiers: vec![],
             body: Body::default(),
         };
@@ -530,7 +702,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     }
     #[must_use]
     fn build_inner(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
-        BodyBuilder::build(self.context, |builder| {
+        BodyBuilder::build(self.context, self.type_parameters, |builder| {
             builder.local_identifiers = self.local_identifiers.clone();
             fun(builder);
             self.global_assignment_dependencies
@@ -561,7 +733,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     let type_ = assignment
                         .type_
                         .as_ref()
-                        .map(|it| self.context.lower_type(it.value()));
+                        .map(|it| self.context.lower_type(&self.type_parameters, it.value()));
 
                     let (id, type_) = if let Some(value) = assignment.value.value() {
                         self.lower_expression(value, type_.as_ref())
@@ -613,7 +785,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     .add_error(Offset(0)..Offset(0), "Function must be called.");
                 (self.push_error(), Type::Error)
             }
-            LoweredExpression::TypeReference(_) => {
+            LoweredExpression::NamedTypeReference(_)
+            | LoweredExpression::TypeParameterReference { .. } => {
                 // TODO: report actual error location
                 self.context
                     .add_error(Offset(0)..Offset(0), "Type must be instantiated.");
@@ -660,8 +833,12 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             }
                         }
                     }
+                } else if let Some((name, id)) =
+                    Context::resolve_type_parameter(&self.type_parameters, name)
+                {
+                    LoweredExpression::TypeParameterReference { name, id }
                 } else if self.context.hir.type_declarations.get(name).is_some() {
-                    LoweredExpression::TypeReference(Type::Named(name.clone()))
+                    LoweredExpression::NamedTypeReference(name.clone())
                 } else {
                     self.context.add_error(
                         identifier.span.clone(),
@@ -700,6 +877,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             None,
                             ExpressionKind::Call {
                                 function: BuiltinFunction::TextConcat.id(),
+                                type_arguments: Box::default(),
                                 arguments: [lhs, rhs].into(),
                             },
                             Type::text(),
@@ -725,10 +903,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 fn lower_arguments(
                     builder: &mut BodyBuilder,
                     call: &AstCall,
-                    arguments: &[AstArgument],
+                    arguments: &AstResult<AstArguments>,
                     parameter_types: &[Type],
                 ) -> Option<Box<[Id]>> {
                     let arguments = arguments
+                        .arguments_or_default()
                         .iter()
                         .enumerate()
                         .map(|(index, argument)| {
@@ -742,10 +921,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     } else {
                         builder.context.add_error(
                             if arguments.len() < parameter_types.len() {
-                                call.opening_parenthesis_span.clone()
+                                // TODO: report actual error location
+                                call.arguments.value().map_or(Offset(0)..Offset(0), |it| {
+                                    it.opening_parenthesis_span.clone()
+                                })
                             } else {
-                                call.arguments[parameter_types.len()].span.start
-                                    ..call.arguments.last().unwrap().span.end
+                                let arguments = &call.arguments.value().unwrap().arguments;
+                                arguments[parameter_types.len()].span.start
+                                    ..arguments.last().unwrap().span.end
                             },
                             format!(
                                 "Expected {} argument(s), got {}.",
@@ -772,98 +955,206 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     } => {
                         assert!(!function_ids.is_empty());
 
+                        let type_arguments = call.type_arguments.as_ref().map(|it| {
+                            it.arguments
+                                .iter()
+                                .map(|it| self.context.lower_type(&self.type_parameters, &it.type_))
+                                .collect::<Box<_>>()
+                        });
+
                         let arguments = receiver
                             .into_iter()
                             .chain(
                                 call.arguments
+                                    .arguments_or_default()
                                     .iter()
                                     .map(|argument| self.lower_expression(&argument.value, None)),
                             )
                             .collect::<Box<_>>();
 
-                        let (parameter_count_matches, parameter_count_mismatches) = function_ids
+                        let matches = function_ids
                             .iter()
                             .map(|id| (*id, &self.context.functions[id]))
-                            .partition::<Vec<_>, _>(|(_, it)| {
-                                it.parameters.len() == arguments.len()
+                            .collect_vec();
+
+                        // Check type parameter count
+                        let matches = if let Some(type_arguments) = &type_arguments {
+                            let (matches, mismatches) =
+                                matches.iter().partition::<Vec<_>, _>(|(_, it)| {
+                                    it.type_parameters.len() == type_arguments.len()
+                                });
+                            if matches.is_empty() {
+                                self.context.add_error(
+                                    call.type_arguments.as_ref().unwrap().span.clone(),
+                                    format!(
+                                        "No overload accepts exactly {} {}:\n{}",
+                                        arguments.len(),
+                                        if arguments.len() == 1 {
+                                            "type argument"
+                                        } else {
+                                            "type arguments"
+                                        },
+                                        mismatches
+                                            .iter()
+                                            .map(|(_, it)| it.signature_to_string())
+                                            .join("\n"),
+                                    ),
+                                );
+                                return LoweredExpression::Error;
+                            }
+                            matches
+                        } else {
+                            matches
+                        };
+
+                        // TODO: report actual error location
+                        let arguments_start_span =
+                            call.arguments.value().map_or(Offset(0)..Offset(0), |it| {
+                                it.opening_parenthesis_span.clone()
                             });
 
-                        if parameter_count_matches.is_empty() {
-                            self.context.add_error(
-                                call.opening_parenthesis_span.clone(),
-                                format!(
-                                    "No overload accepts exactly {} {}:\n{}",
-                                    arguments.len(),
-                                    if arguments.len() == 1 {
-                                        "argument"
-                                    } else {
-                                        "arguments"
-                                    },
-                                    parameter_count_mismatches
-                                        .iter()
-                                        .map(|(_, it)| it.signature_to_string())
-                                        .join("\n"),
-                                ),
-                            );
-                            return LoweredExpression::Error;
-                        }
+                        // Check parameter count
+                        let matches = {
+                            let (matches, mismatches) =
+                                matches.iter().partition::<Vec<_>, _>(|(_, it)| {
+                                    it.parameters.len() == arguments.len()
+                                });
+                            if matches.is_empty() {
+                                self.context.add_error(
+                                    arguments_start_span,
+                                    format!(
+                                        "No overload accepts exactly {} {}:\n{}",
+                                        arguments.len(),
+                                        if arguments.len() == 1 {
+                                            "argument"
+                                        } else {
+                                            "arguments"
+                                        },
+                                        mismatches
+                                            .iter()
+                                            .map(|(_, it)| it.signature_to_string())
+                                            .join("\n"),
+                                    ),
+                                );
+                                return LoweredExpression::Error;
+                            }
+                            matches
+                        };
 
+                        // Check argument types
+                        // FIXME: Unify types
                         let argument_types = arguments
                             .iter()
                             .map(|(_, type_)| type_.clone())
                             .collect::<Box<_>>();
-                        let (matches, mismatches) = parameter_count_matches
-                            .iter()
-                            .partition::<Vec<(Id, &FunctionDeclaration)>, _>(|(_, function)| {
-                                function
-                                    .parameters
+                        let old_matches = matches;
+                        let mut matches = vec![];
+                        let mut mismatches = vec![];
+                        'outer: for (id, function) in old_matches {
+                            let mut type_solver = TypeSolver::new(&function.type_parameters);
+                            // Type arguments
+                            if let Some(type_arguments) = &type_arguments {
+                                for (type_argument, type_parameter) in type_arguments
                                     .iter()
-                                    .zip_eq(argument_types.iter())
-                                    .all(|(parameter, argument_type)| {
-                                        &parameter.type_ == argument_type
-                                    })
-                            });
+                                    .zip_eq(function.type_parameters.iter())
+                                {
+                                    match type_solver.unify(
+                                        type_argument,
+                                        &Type::Parameter {
+                                            name: type_parameter.name.clone(),
+                                            id: type_parameter.id,
+                                        },
+                                    ) {
+                                        Ok(true) => {}
+                                        Ok(false) => unreachable!(),
+                                        Err(reason) => {
+                                            mismatches.push((id, function, Some(reason)));
+                                            break 'outer;
+                                        }
+                                    };
+                                }
+                            }
+
+                            // Arguments
+                            for (argument_type, parameter) in
+                                argument_types.iter().zip_eq(function.parameters.iter())
+                            {
+                                match type_solver.unify(argument_type, &parameter.type_) {
+                                    Ok(true) => {}
+                                    Ok(false) => {
+                                        mismatches.push((id, function, None));
+                                        break 'outer;
+                                    }
+                                    Err(reason) => {
+                                        mismatches.push((id, function, Some(reason)));
+                                        break 'outer;
+                                    }
+                                };
+                            }
+
+                            match type_solver.finish() {
+                                Ok(environment) => matches.push((id, function, environment)),
+                                Err(error) => mismatches.push((id, function, Some(error))),
+                            }
+                        }
 
                         if matches.is_empty() {
                             self.context.add_error(
-                                call.opening_parenthesis_span.clone(),
+                                arguments_start_span,
                                 format!(
-                                    "No matching function found for:\n  {}\n{} with the same number of parameters:{}",
-                                    FunctionDeclaration::call_signature_to_string(mismatches.first().unwrap().1.name.as_ref(), argument_types.as_ref()),
+                                    "No matching function found for:\n  {}\n{}:{}",
+                                    FunctionDeclaration::call_signature_to_string(
+                                        mismatches.first().unwrap().1.name.as_ref(),
+                                        argument_types.as_ref()
+                                    ),
                                     if mismatches.len() == 1 {
                                         "This is the candidate function"
-                                    }else {
-                                    "These are candidate functions"},
+                                    } else {
+                                        "These are candidate functions"
+                                    },
                                     mismatches
                                         .iter()
-                                        .map(|(_, it)| format!("\n• {}", it.signature_to_string()))
+                                        .map(|(_, it, reason)| format!(
+                                            "\n• {}{}",
+                                            it.signature_to_string(),
+                                            reason
+                                                .as_ref()
+                                                .map_or_else(String::new, |reason| format!(
+                                                    " ({reason})"
+                                                )),
+                                        ))
                                         .join(""),
                                 ),
                             );
                             return LoweredExpression::Error;
                         } else if matches.len() > 1 {
                             self.context.add_error(
-                                call.opening_parenthesis_span.clone(),
+                                arguments_start_span,
                                 format!(
                                     "Multiple matching function found for:\n  {}\nThese are candidate functions:{}",
                                     FunctionDeclaration::call_signature_to_string(matches.first().unwrap().1.name.as_ref(), argument_types.as_ref()),
                                     matches
                                         .iter()
-                                        .map(|(_,it)| format!("\n• {}", it.signature_to_string()))
+                                        .map(|(_,it,_)| format!("\n• {}", it.signature_to_string()))
                                         .join(""),
                                 ),
                             );
                             return LoweredExpression::Error;
                         }
 
-                        let (function, signature) = matches[0];
+                        let (function, signature, environment) = matches.pop().unwrap();
                         self.push_lowered(
                             None,
                             ExpressionKind::Call {
                                 function,
+                                type_arguments: signature
+                                    .type_parameters
+                                    .iter()
+                                    .map(|it| environment.get(&it.id).unwrap().clone())
+                                    .collect(),
                                 arguments: arguments.iter().map(|(id, _)| *id).collect(),
                             },
-                            signature.return_type.clone(),
+                            signature.return_type.substitute(&environment),
                         )
                         // let parameter_types = function
                         //     .parameters
@@ -909,58 +1200,92 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         //   })
                         //   ok[LookupFunSolution, Str](full_matches.get(0))
                     }
-                    LoweredExpression::TypeReference(type_) => match &type_ {
-                        Type::Named(type_name) => {
-                            match self.context.hir.type_declarations.get(type_name).unwrap() {
-                                TypeDeclaration::Struct { fields } => {
-                                    let fields = lower_arguments(
-                                        self,
-                                        call,
-                                        &call.arguments,
-                                        &fields
-                                            .iter()
-                                            .map(|(_, type_)| type_.clone())
-                                            .collect_vec(),
-                                    );
-                                    fields.map_or(LoweredExpression::Error, |fields| {
-                                        self.push_lowered(
-                                            None,
-                                            ExpressionKind::CreateStruct {
-                                                struct_: type_.clone(),
-                                                fields,
-                                            },
-                                            type_,
-                                        )
-                                    })
+                    LoweredExpression::NamedTypeReference(type_) => {
+                        match self.context.hir.type_declarations.get(&type_) {
+                            Some(TypeDeclaration::Struct {
+                                type_parameters,
+                                fields,
+                            }) => {
+                                if !type_parameters.is_empty() {
+                                    todo!("Use type solver");
                                 }
-                                TypeDeclaration::Enum { .. } => {
-                                    // TODO: report actual error location
-                                    self.context.add_error(
-                                        Offset(0)..Offset(0),
-                                        "Enum variant is missing.",
-                                    );
-                                    LoweredExpression::Error
-                                }
+
+                                let fields = lower_arguments(
+                                    self,
+                                    call,
+                                    &call.arguments,
+                                    &fields.iter().map(|(_, type_)| type_.clone()).collect_vec(),
+                                );
+                                let type_ = Type::Named {
+                                    name: type_.clone(),
+                                    type_arguments: Box::default(),
+                                };
+                                fields.map_or(LoweredExpression::Error, |fields| {
+                                    self.push_lowered(
+                                        None,
+                                        ExpressionKind::CreateStruct {
+                                            struct_: type_.clone(),
+                                            fields,
+                                        },
+                                        type_,
+                                    )
+                                })
+                            }
+                            Some(TypeDeclaration::Enum { .. }) => {
+                                // TODO: report actual error location
+                                self.context
+                                    .add_error(Offset(0)..Offset(0), "Enum variant is missing.");
+                                LoweredExpression::Error
+                            }
+                            None => {
+                                // TODO: report actual error location
+                                self.context.add_error(
+                                    Offset(0)..Offset(0),
+                                    format!("Can't instantiate builtin type {type_} directly."),
+                                );
+                                LoweredExpression::Error
                             }
                         }
-                        Type::Error => todo!(),
-                    },
+                    }
+                    LoweredExpression::TypeParameterReference { name, .. } => {
+                        // TODO: report actual error location
+                        self.context.add_error(
+                            Offset(0)..Offset(0),
+                            format!("Can't instantiate type parameter {name} directly."),
+                        );
+                        LoweredExpression::Error
+                    }
                     LoweredExpression::EnumVariantReference { enum_, variant } => {
-                        let enum_name = match &enum_ {
-                            Type::Named(name) => name,
-                            Type::Error => unreachable!(),
+                        let (enum_name, type_arguments) = match &enum_ {
+                            Type::Named {
+                                name,
+                                type_arguments,
+                            } => (name, type_arguments),
+                            Type::Parameter { .. } | Type::Error => unreachable!(),
                         };
-                        let variant_type =
+                        let (type_parameters, variant_type) =
                             match self.context.hir.type_declarations.get(enum_name).unwrap() {
                                 TypeDeclaration::Struct { .. } => unreachable!(),
-                                TypeDeclaration::Enum { variants } => variants
-                                    .iter()
-                                    .find(|(name, _)| name == &variant)
-                                    .unwrap()
-                                    .1
-                                    .clone(),
+                                TypeDeclaration::Enum {
+                                    type_parameters,
+                                    variants,
+                                } => (
+                                    type_parameters,
+                                    variants
+                                        .iter()
+                                        .find(|(name, _)| name == &variant)
+                                        .unwrap()
+                                        .1
+                                        .as_ref()
+                                        .unwrap()
+                                        .clone(),
+                                ),
                             };
-                        let parameter_types = [variant_type.unwrap()];
+                        let variant_type = variant_type.substitute(&Type::build_environment(
+                            &type_parameters,
+                            &type_arguments,
+                        ));
+                        let parameter_types = [variant_type];
                         let arguments = lower_arguments(
                             self,
                             call,
@@ -994,9 +1319,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         id: receiver_id,
                         type_: receiver_type,
                     } => match &receiver_type {
-                        Type::Named(type_name) => {
-                            let type_ = &self.context.hir.type_declarations.get(type_name);
-                            if let Some(TypeDeclaration::Struct { fields }) = type_
+                        Type::Named {
+                            name,
+                            type_arguments,
+                        } => {
+                            let type_ = &self.context.hir.type_declarations.get(name);
+                            if let Some(TypeDeclaration::Struct {
+                                type_parameters,
+                                fields,
+                            }) = type_
                                 && let Some((_, field_type)) =
                                     fields.iter().find(|(name, _)| name == &key.string)
                             {
@@ -1006,10 +1337,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         struct_: receiver_id,
                                         field: key.string.clone(),
                                     },
-                                    field_type.clone(),
+                                    field_type.substitute(&Type::build_environment(
+                                        &type_parameters,
+                                        &type_arguments,
+                                    )),
                                 );
                             }
 
+                            // TODO: merge with global function resolution
                             if let Some(Named::Functions(function_ids)) =
                                 self.context.global_identifiers.get(&key.string)
                             {
@@ -1039,6 +1374,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             );
                             LoweredExpression::Error
                         }
+                        Type::Parameter { name, .. } => {
+                            self.context.add_error(
+                                key.span.clone(),
+                                format!(
+                                    "Navigation on value of type parameter type `{name}` is not supported yet."
+                                ),
+                            );
+                            LoweredExpression::Error
+                        }
                         Type::Error => todo!(),
                     },
                     LoweredExpression::FunctionReferences { .. } => {
@@ -1048,54 +1392,72 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         );
                         LoweredExpression::Error
                     }
-                    LoweredExpression::TypeReference(type_) => match &type_ {
-                        Type::Named(type_name) => {
-                            match self.context.hir.type_declarations.get(type_name).unwrap() {
-                                TypeDeclaration::Struct { .. } => {
+                    LoweredExpression::NamedTypeReference(type_) => {
+                        match self.context.hir.type_declarations.get(&type_).unwrap() {
+                            TypeDeclaration::Struct { .. } => {
+                                self.context.add_error(
+                                    key.span.clone(),
+                                    format!(
+                                        "Struct type `{type_:?}` doesn't have a field `{}`",
+                                        key.string,
+                                    ),
+                                );
+                                LoweredExpression::Error
+                            }
+                            TypeDeclaration::Enum {
+                                type_parameters,
+                                variants,
+                            } => {
+                                if !type_parameters.is_empty() {
+                                    todo!();
+                                }
+                                let type_ = Type::Named {
+                                    name: type_.clone(),
+                                    type_arguments: Box::default(),
+                                };
+
+                                if let Some((_, value_type)) =
+                                    variants.iter().find(|(name, _)| name == &key.string)
+                                {
+                                    if value_type.is_some() {
+                                        LoweredExpression::EnumVariantReference {
+                                            enum_: type_,
+                                            variant: key.string.clone(),
+                                        }
+                                    } else {
+                                        self.push_lowered(
+                                            None,
+                                            ExpressionKind::CreateEnum {
+                                                enum_: type_.clone(),
+                                                variant: key.string.clone(),
+                                                value: None,
+                                            },
+                                            type_.clone(),
+                                        )
+                                    }
+                                } else {
                                     self.context.add_error(
                                         key.span.clone(),
                                         format!(
-                                            "Struct type `{type_:?}` doesn't have a field `{}`",
+                                            "Enum `{type_:?}` doesn't have a variant `{}`",
                                             key.string,
                                         ),
                                     );
                                     LoweredExpression::Error
                                 }
-                                TypeDeclaration::Enum { variants } => {
-                                    if let Some((_, value_type)) =
-                                        variants.iter().find(|(name, _)| name == &key.string)
-                                    {
-                                        if value_type.is_some() {
-                                            LoweredExpression::EnumVariantReference {
-                                                enum_: type_,
-                                                variant: key.string.clone(),
-                                            }
-                                        } else {
-                                            self.push_lowered(
-                                                None,
-                                                ExpressionKind::CreateEnum {
-                                                    enum_: type_.clone(),
-                                                    variant: key.string.clone(),
-                                                    value: None,
-                                                },
-                                                type_.clone(),
-                                            )
-                                        }
-                                    } else {
-                                        self.context.add_error(
-                                            key.span.clone(),
-                                            format!(
-                                                "Enum `{type_:?}` doesn't have a variant `{}`",
-                                                key.string,
-                                            ),
-                                        );
-                                        LoweredExpression::Error
-                                    }
-                                }
                             }
                         }
-                        Type::Error => todo!(),
-                    },
+                    }
+                    LoweredExpression::TypeParameterReference { name, .. } => {
+                        self.context.add_error(
+                            key.span.clone(),
+                            format!(
+                                "Parameter type `{name:?}` doesn't have a field `{}`",
+                                key.string,
+                            ),
+                        );
+                        LoweredExpression::Error
+                    }
                     LoweredExpression::EnumVariantReference { .. } => todo!(),
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
@@ -1110,10 +1472,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 };
                 let (value, enum_) = self.lower_expression(value, None);
 
-                let variants = match &enum_ {
-                    Type::Named(type_name) => {
-                        match &self.context.hir.type_declarations[type_name] {
-                            TypeDeclaration::Struct { .. } => {
+                let (environment, variants) = match &enum_ {
+                    Type::Named {
+                        name,
+                        type_arguments,
+                    } => {
+                        match &self.context.hir.type_declarations.get(name) {
+                            Some(TypeDeclaration::Struct { .. }) => {
                                 // TODO: report actual error location
                                 self.context.add_error(
                                     Offset(0)..Offset(0),
@@ -1121,8 +1486,34 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 );
                                 return LoweredExpression::Error;
                             }
-                            TypeDeclaration::Enum { variants } => variants.clone(),
+                            Some(TypeDeclaration::Enum {
+                                type_parameters,
+                                variants,
+                            }) => (
+                                type_parameters
+                                    .iter()
+                                    .map(|it| it.id)
+                                    .zip_eq(type_arguments.iter().cloned())
+                                    .collect::<FxHashMap<_, _>>(),
+                                variants.clone(),
+                            ),
+                            None => {
+                                // TODO: report actual error location
+                                self.context.add_error(
+                                    Offset(0)..Offset(0),
+                                    format!("Can't switch over builtin type `{enum_:?}`"),
+                                );
+                                return LoweredExpression::Error;
+                            }
                         }
+                    }
+                    Type::Parameter { name, .. } => {
+                        // TODO: report actual error location
+                        self.context.add_error(
+                            Offset(0)..Offset(0),
+                            format!("Can't switch over type parameter `{name}`"),
+                        );
+                        return LoweredExpression::Error;
                     }
                     Type::Error => return LoweredExpression::Error,
                 };
@@ -1175,7 +1566,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             },
                             (Some(value_type), Some((value_name, _))) => {
                                 let value_name = value_name.value()?;
-                                Some((value_type.clone(),value_name.string.clone()))
+                                Some((value_type.substitute(&environment), value_name.string.clone()))
                             },
                         };
 
@@ -1275,10 +1666,100 @@ enum LoweredExpression {
         receiver: Option<(Id, Type)>,
         function_ids: Box<[Id]>,
     },
-    TypeReference(Type),
+    NamedTypeReference(Box<str>),
+    TypeParameterReference {
+        name: Box<str>,
+        id: TypeParameterId,
+    },
     EnumVariantReference {
         enum_: Type,
         variant: Box<str>,
     },
     Error,
+}
+
+struct TypeSolver<'h> {
+    type_parameters: &'h [TypeParameter],
+    environment: FxHashMap<TypeParameterId, Type>,
+}
+impl<'h> TypeSolver<'h> {
+    #[must_use]
+    fn new(type_parameters: &'h [TypeParameter]) -> Self {
+        Self {
+            type_parameters,
+            environment: FxHashMap::default(),
+        }
+    }
+
+    fn unify(&mut self, argument: &Type, parameter: &Type) -> Result<bool, Box<str>> {
+        match (argument, parameter) {
+            (Type::Error, _) | (_, Type::Error) => Ok(true),
+            (_, Type::Parameter { name, id }) => {
+                if let Some(mapped) = self.environment.get(id) {
+                    if let Type::Parameter { .. } = mapped {
+                        panic!("Type parameters can't depend on each other.")
+                    }
+                    let mapped = mapped.clone();
+                    return self.unify(argument, &mapped);
+                }
+
+                assert!(
+                    self.type_parameters.iter().any(|it| it.id == *id),
+                    "Unresolved type parameter: `{name}`"
+                );
+                match self.environment.entry(*id) {
+                    Entry::Occupied(entry) => {
+                        if !Context::is_assignable_to(entry.get(), argument) {
+                            return Err(format!("Type parameter {name} gets resolved to different types: `{}` and `{argument}`", entry.get()).into_boxed_str());
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(argument.clone());
+                    }
+                }
+                Ok(true)
+            }
+            (
+                Type::Named {
+                    name: argument_name,
+                    type_arguments: argument_type_arguments,
+                },
+                Type::Named {
+                    name: parameter_name,
+                    type_arguments: parameter_type_arguments,
+                },
+            ) => {
+                if argument_name != parameter_name
+                    || argument_type_arguments.len() != parameter_type_arguments.len()
+                {
+                    return Ok(false);
+                }
+
+                for (argument, parameter) in argument_type_arguments
+                    .iter()
+                    .zip_eq(parameter_type_arguments.iter())
+                {
+                    let result = self.unify(argument, parameter)?;
+                    if !result {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+            (Type::Parameter { .. }, Type::Named { .. }) => Ok(true),
+        }
+    }
+
+    fn finish(self) -> Result<FxHashMap<TypeParameterId, Type>, Box<str>> {
+        for type_parameter in self.type_parameters {
+            if !self.environment.contains_key(&type_parameter.id) {
+                return Err(format!(
+                    "The type parameter `{}` can't be resolved to a specific type.",
+                    &type_parameter.name
+                )
+                .into_boxed_str());
+            }
+        }
+        Ok(self.environment)
+    }
 }

@@ -16,6 +16,8 @@ define_literal!(dot, ".");
 define_literal!(colon, ":");
 define_literal!(opening_parenthesis, "(");
 define_literal!(closing_parenthesis, ")");
+define_literal!(opening_bracket, "[");
+define_literal!(closing_bracket, "]");
 define_literal!(opening_curly_brace, "{");
 define_literal!(closing_curly_brace, "}");
 define_literal!(double_quote, "\"");

@@ -1,6 +1,7 @@
 #![feature(
     anonymous_lifetime_in_impl_trait,
     box_patterns,
+    iter_repeat_n,
     let_chains,
     option_take_if,
     try_blocks

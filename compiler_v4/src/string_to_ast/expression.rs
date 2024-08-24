@@ -4,11 +4,9 @@ use super::{
         arrow, closing_curly_brace, closing_parenthesis, comma, dot, opening_curly_brace,
         opening_parenthesis, switch_keyword,
     },
-    parser::{
-        Parser, ParserUnwrapOrAstError, ParserWithResultUnwrapOrAstError,
-        ParserWithValueUnwrapOrAstError,
-    },
+    parser::{OptionOfParser, OptionOfParserWithResult, OptionOfParserWithValue, Parser},
     text::text,
+    type_::type_arguments,
     whitespace::{
         whitespace, AndTrailingWhitespace, OptionAndTrailingWhitespace,
         OptionWithValueAndTrailingWhitespace, ValueAndTrailingWhitespace,
@@ -16,8 +14,8 @@ use super::{
     word::{raw_identifier, word},
 };
 use crate::ast::{
-    AstArgument, AstBody, AstCall, AstError, AstExpression, AstIdentifier, AstInt, AstNavigation,
-    AstParenthesized, AstResult, AstStatement, AstSwitch, AstSwitchCase,
+    AstArgument, AstArguments, AstBody, AstCall, AstError, AstExpression, AstIdentifier, AstInt,
+    AstNavigation, AstParenthesized, AstResult, AstStatement, AstSwitch, AstSwitchCase,
 };
 use replace_with::replace_with_or_abort;
 use tracing::instrument;
@@ -272,6 +270,36 @@ fn expression_suffix_call<'s>(
 ) -> Option<Parser<'s>> {
     let parser = whitespace(parser).unwrap_or(parser);
 
+    let (parser, type_arguments) = type_arguments(parser).optional(parser);
+
+    let (parser, arguments) = match arguments(parser) {
+        Some((parser, arguments)) => (parser, AstResult::ok(arguments)),
+        None => {
+            if type_arguments.is_none() {
+                return None;
+            }
+            (
+                parser,
+                AstResult::error(
+                    None,
+                    parser.error_at_current_offset("This call is missing arguments."),
+                ),
+            )
+        }
+    };
+
+    replace_with_or_abort(current, |current| {
+        AstExpression::Call(AstCall {
+            receiver: Box::new(current),
+            type_arguments,
+            arguments,
+        })
+    });
+
+    Some(parser)
+}
+#[instrument(level = "trace")]
+fn arguments<'s>(parser: Parser<'s>) -> Option<(Parser, AstArguments)> {
     let opening_parenthesis_start = parser.offset();
     let mut parser = opening_parenthesis(parser)?.and_trailing_whitespace();
     let opening_parenthesis_span = opening_parenthesis_start..parser.offset();
@@ -284,7 +312,7 @@ fn expression_suffix_call<'s>(
         if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
             arguments.last_mut().unwrap().comma_error = Some(
                 parser_for_missing_comma_error
-                    .error_at_current_offset("This parameter is missing a comma."),
+                    .error_at_current_offset("This type argument is missing a comma."),
             );
         }
 
@@ -297,16 +325,14 @@ fn expression_suffix_call<'s>(
     let (parser, closing_parenthesis_error) = closing_parenthesis(parser)
         .unwrap_or_ast_error(parser, "This call is missing a closing parenthesis.");
 
-    replace_with_or_abort(current, |current| {
-        AstExpression::Call(AstCall {
-            receiver: Box::new(current),
+    Some((
+        parser,
+        AstArguments {
             opening_parenthesis_span,
             arguments,
             closing_parenthesis_error,
-        })
-    });
-
-    Some(parser)
+        },
+    ))
 }
 #[instrument(level = "trace")]
 fn argument<'a>(parser: Parser) -> Option<(Parser, AstArgument, Option<Parser>)> {

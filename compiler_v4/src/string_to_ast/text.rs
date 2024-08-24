@@ -1,7 +1,7 @@
 use super::{
     expression::expression,
     literal::{closing_curly_brace, double_quote, opening_curly_brace},
-    parser::{Parser, ParserUnwrapOrAstError, ParserWithValueUnwrapOrAstError},
+    parser::{OptionOfParser, OptionOfParserWithValue, Parser},
     whitespace::{AndTrailingWhitespace, ValueAndTrailingWhitespace},
 };
 use crate::ast::{AstText, AstTextPart};

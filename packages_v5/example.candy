@@ -84,7 +84,13 @@ fun fibonacci(n: Int) Int {
   }
 }
 
+fun identity[T](t: T) T {
+  t
+}
+
 fun main() Int {
+  identity(1)
+  identity("foo")
 #  # (x: Int) { x }
 #
 #  let helloWorld = "Hello, World!"

@@ -119,7 +119,7 @@ impl<'s> Parser<'s> {
 }
 
 #[extension_trait]
-pub impl<'s> ParserUnwrapOrAstError<'s> for Option<Parser<'s>> {
+pub impl<'s> OptionOfParser<'s> for Option<Parser<'s>> {
     #[must_use]
     fn unwrap_or_ast_error(
         self,
@@ -138,7 +138,15 @@ pub impl<'s> ParserUnwrapOrAstError<'s> for Option<Parser<'s>> {
     }
 }
 #[extension_trait]
-pub impl<T, 's> ParserWithValueUnwrapOrAstError<T, 's> for Option<(Parser<'s>, T)> {
+pub impl<T, 's> OptionOfParserWithValue<T, 's> for Option<(Parser<'s>, T)> {
+    #[must_use]
+    fn optional(self, original_parser: Parser<'s>) -> (Parser<'s>, Option<T>) {
+        if let Some((parser, value)) = self {
+            (parser, Some(value))
+        } else {
+            (original_parser, None)
+        }
+    }
     #[must_use]
     fn unwrap_or_ast_error(
         self,
@@ -156,7 +164,7 @@ pub impl<T, 's> ParserWithValueUnwrapOrAstError<T, 's> for Option<(Parser<'s>, T
     }
 }
 #[extension_trait]
-pub impl<T, 's> ParserWithResultUnwrapOrAstError<T, 's> for Option<(Parser<'s>, AstResult<T>)> {
+pub impl<T, 's> OptionOfParserWithResult<T, 's> for Option<(Parser<'s>, AstResult<T>)> {
     #[must_use]
     fn unwrap_or_ast_error_result(
         self,

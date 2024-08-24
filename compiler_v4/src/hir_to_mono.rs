@@ -1,5 +1,5 @@
 use crate::{
-    hir::{self, Hir},
+    hir::{self, Hir, Type},
     id::IdGenerator,
     mono::{self, Mono},
     utils::HashMapExtension,
@@ -29,7 +29,7 @@ impl<'h> Context<'h> {
             assignment_initialization_order: vec![],
             functions: FxHashMap::default(),
         };
-        let main_function = context.lower_function(hir.main_function_id);
+        let main_function = context.lower_function(hir.main_function_id, &[]);
         Mono {
             type_declarations: context
                 .type_declarations
@@ -62,7 +62,7 @@ impl<'h> Context<'h> {
         };
 
         let type_ = self.lower_type(&assignment.type_);
-        let (_, body) = BodyBuilder::build(self, |builder| {
+        let (_, body) = BodyBuilder::build(self, &FxHashMap::default(), |builder| {
             builder.lower_expressions(&assignment.body.expressions);
         });
         let assignment = mono::Assignment { type_, body };
@@ -71,14 +71,15 @@ impl<'h> Context<'h> {
         name.clone()
     }
 
-    fn lower_function(&mut self, id: hir::Id) -> Box<str> {
+    fn lower_function(&mut self, id: hir::Id, type_arguments: &[hir::Type]) -> Box<str> {
         let (name, function) = self.hir.get_function(id);
+        let environment = Type::build_environment(&function.type_parameters, type_arguments);
         let name = self.mangle_function(
             name,
             &function
                 .parameters
                 .iter()
-                .map(|it| it.type_.clone())
+                .map(|it| it.type_.substitute(&environment))
                 .collect_vec(),
         );
         match self.functions.entry(name.clone()) {
@@ -88,22 +89,23 @@ impl<'h> Context<'h> {
 
         let (parameters, body) = match &function.body {
             hir::BodyOrBuiltin::Body(body) => {
-                let (parameters, body) = BodyBuilder::build(self, |builder| {
+                let (parameters, body) = BodyBuilder::build(self, &environment, |builder| {
                     builder.add_parameters(&function.parameters);
                     builder.lower_expressions(&body.expressions);
                 });
                 (parameters, mono::BodyOrBuiltin::Body(body))
             }
             hir::BodyOrBuiltin::Builtin(builtin_function) => {
-                let (parameters, _) = BodyBuilder::build(self, |builder| {
+                let (parameters, _) = BodyBuilder::build(self, &environment, |builder| {
                     builder.add_parameters(&function.parameters);
                 });
                 (parameters, mono::BodyOrBuiltin::Builtin(*builtin_function))
             }
         };
+        let return_type = function.return_type.substitute(&environment);
         let function = mono::Function {
             parameters,
-            return_type: self.lower_type(&function.return_type),
+            return_type: self.lower_type(&return_type),
             body,
         };
         *self.functions.get_mut(&name).unwrap() = Some(function);
@@ -133,21 +135,44 @@ impl<'h> Context<'h> {
         };
 
         let declaration = match type_ {
-            hir::Type::Named(name) => match self.hir.type_declarations.get(name) {
-                Some(hir::TypeDeclaration::Struct { fields }) => {
+            hir::Type::Named {
+                name,
+                type_arguments,
+            } => match self.hir.type_declarations.get(name) {
+                Some(hir::TypeDeclaration::Struct {
+                    type_parameters,
+                    fields,
+                }) => {
                     entry.insert(None);
+                    let environment =
+                        hir::Type::build_environment(&type_parameters, &type_arguments);
                     let fields = fields
                         .iter()
-                        .map(|(name, type_)| (name.clone(), self.lower_type(type_)))
+                        .map(|(name, type_)| {
+                            (
+                                name.clone(),
+                                self.lower_type(&type_.substitute(&environment)),
+                            )
+                        })
                         .collect();
                     mono::TypeDeclaration::Struct { fields }
                 }
-                Some(hir::TypeDeclaration::Enum { variants }) => {
+                Some(hir::TypeDeclaration::Enum {
+                    type_parameters,
+                    variants,
+                }) => {
                     entry.insert(None);
+                    let environment =
+                        hir::Type::build_environment(&type_parameters, &type_arguments);
                     let variants = variants
                         .iter()
                         .map(|(name, type_)| {
-                            (name.clone(), type_.as_ref().map(|it| self.lower_type(it)))
+                            (
+                                name.clone(),
+                                type_
+                                    .as_ref()
+                                    .map(|type_| self.lower_type(&type_.substitute(&environment))),
+                            )
                         })
                         .collect();
                     mono::TypeDeclaration::Enum { variants }
@@ -157,20 +182,45 @@ impl<'h> Context<'h> {
                     return mangled_name;
                 }
             },
+            hir::Type::Parameter { name, id } => {
+                panic!("Type parameter {name} ({id}) should have been monomorphized.")
+            }
             hir::Type::Error => unreachable!(),
         };
         *self.type_declarations.get_mut(&mangled_name).unwrap() = Some(declaration);
         mangled_name
     }
     fn mangle_type(type_: &hir::Type) -> Box<str> {
+        let mut result = "".to_string();
+        Self::mangle_type_helper(&mut result, type_);
+        result.into_boxed_str()
+    }
+    fn mangle_type_helper(result: &mut String, type_: &hir::Type) {
         match type_ {
-            hir::Type::Named(name) => name.clone(),
-            hir::Type::Error => "Never".into(),
+            hir::Type::Named {
+                name,
+                type_arguments,
+            } => {
+                result.push_str(name);
+                if !type_arguments.is_empty() {
+                    result.push_str("$of$");
+                    for type_ in type_arguments.iter() {
+                        Self::mangle_type_helper(result, type_);
+                        result.push('&');
+                    }
+                    result.push_str("end$");
+                }
+            }
+            hir::Type::Parameter { name, id } => {
+                panic!("Type parameter {name} ({id}) should have been monomorphized.")
+            }
+            hir::Type::Error => result.push_str("Never"),
         }
     }
 }
 struct BodyBuilder<'c, 'h> {
     context: &'c mut Context<'h>,
+    environment: &'c FxHashMap<hir::TypeParameterId, hir::Type>,
     parameters: Vec<mono::Parameter>,
     body: mono::Body,
     id_generator: IdGenerator<mono::Id>,
@@ -180,10 +230,12 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
     #[must_use]
     fn build(
         context: &'c mut Context<'h>,
+        environment: &'c FxHashMap<hir::TypeParameterId, hir::Type>,
         fun: impl FnOnce(&mut BodyBuilder),
     ) -> (Box<[mono::Parameter]>, mono::Body) {
         let mut builder = Self {
             context,
+            environment,
             parameters: vec![],
             body: mono::Body::default(),
             id_generator: IdGenerator::default(),
@@ -196,6 +248,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
     fn build_inner(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> mono::Body {
         let mut builder = BodyBuilder {
             context: self.context,
+            environment: self.environment,
             parameters: vec![],
             body: mono::Body::default(),
             id_generator: IdGenerator::default(),
@@ -222,7 +275,9 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
         self.parameters.push(mono::Parameter {
             id,
             name: parameter.name.clone(),
-            type_: self.context.lower_type(&parameter.type_),
+            type_: self
+                .context
+                .lower_type(&parameter.type_.substitute(self.environment)),
         });
     }
 
@@ -301,9 +356,16 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
             }
             hir::ExpressionKind::Call {
                 function,
+                type_arguments,
                 arguments,
             } => {
-                let function = self.context.lower_function(*function);
+                let function = self.context.lower_function(
+                    *function,
+                    &type_arguments
+                        .iter()
+                        .map(|it| it.substitute(self.environment))
+                        .collect_vec(),
+                );
                 let arguments = self.lower_ids(arguments);
                 self.push(
                     id,
@@ -373,7 +435,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
         if let Some(hir_id) = hir_id.into() {
             self.id_mapping.force_insert(hir_id, id);
         }
-        let type_ = self.context.lower_type(type_);
+        let type_ = self.context.lower_type(&type_.substitute(self.environment));
         self.body
             .expressions
             .push((id, name.into(), mono::Expression { kind, type_ }));

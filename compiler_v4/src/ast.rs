@@ -69,6 +69,7 @@ pub enum AstDeclaration {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstStruct {
     pub name: AstResult<AstString>,
+    pub type_parameters: Option<AstTypeParameters>,
     pub opening_curly_brace_error: Option<AstError>,
     pub fields: Vec<AstStructField>,
     pub closing_curly_brace_error: Option<AstError>,
@@ -84,6 +85,7 @@ pub struct AstStructField {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstEnum {
     pub name: AstResult<AstString>,
+    pub type_parameters: Option<AstTypeParameters>,
     pub opening_curly_brace_error: Option<AstError>,
     pub variants: Vec<AstEnumVariant>,
     pub closing_curly_brace_error: Option<AstError>,
@@ -106,6 +108,7 @@ pub struct AstAssignment {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstFunction {
     pub name: AstResult<AstString>,
+    pub type_parameters: Option<AstTypeParameters>,
     pub opening_parenthesis_error: Option<AstError>,
     pub parameters: Vec<AstParameter>,
     pub closing_parenthesis_error: Option<AstError>,
@@ -122,15 +125,37 @@ pub struct AstParameter {
     pub comma_error: Option<AstError>,
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstTypeParameters {
+    pub parameters: Vec<AstTypeParameter>,
+    pub empty_parameters_error: Option<AstError>,
+    pub closing_bracket_error: Option<AstError>,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstTypeParameter {
+    pub name: AstResult<AstString>,
+    pub comma_error: Option<AstError>,
+}
+
 // Types
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum AstType {
-    Named(AstNamedType),
+pub struct AstType {
+    pub name: AstResult<AstString>,
+    pub type_arguments: Option<AstTypeArguments>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstTypeArguments {
+    pub span: Range<Offset>,
+    pub arguments: Vec<AstTypeArgument>,
+    pub empty_arguments_error: Option<AstError>,
+    pub closing_bracket_error: Option<AstError>,
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct AstNamedType {
-    pub name: AstResult<AstString>,
+pub struct AstTypeArgument {
+    pub type_: AstType,
+    pub comma_error: Option<AstError>,
 }
 
 // Expressions
@@ -182,8 +207,19 @@ pub struct AstParenthesized {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstCall {
     pub receiver: Box<AstExpression>,
-    pub arguments: Vec<AstArgument>,
+    pub type_arguments: Option<AstTypeArguments>,
+    pub arguments: AstResult<AstArguments>,
+}
+impl AstResult<AstArguments> {
+    #[must_use]
+    pub fn arguments_or_default(&self) -> &[AstArgument] {
+        self.value().map_or::<&[_], _>(&[], |it| &it.arguments)
+    }
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstArguments {
     pub opening_parenthesis_span: Range<Offset>,
+    pub arguments: Vec<AstArgument>,
     pub closing_parenthesis_error: Option<AstError>,
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -302,6 +338,7 @@ impl CollectAstErrors for AstDeclaration {
 impl CollectAstErrors for AstStruct {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.name.collect_errors_to(errors);
+        self.type_parameters.collect_errors_to(errors);
         self.opening_curly_brace_error.collect_errors_to(errors);
         self.fields.collect_errors_to(errors);
         self.closing_curly_brace_error.collect_errors_to(errors);
@@ -318,6 +355,7 @@ impl CollectAstErrors for AstStructField {
 impl CollectAstErrors for AstEnum {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.name.collect_errors_to(errors);
+        self.type_parameters.collect_errors_to(errors);
         self.opening_curly_brace_error.collect_errors_to(errors);
         self.variants.collect_errors_to(errors);
         self.closing_curly_brace_error.collect_errors_to(errors);
@@ -341,6 +379,7 @@ impl CollectAstErrors for AstAssignment {
 impl CollectAstErrors for AstFunction {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.name.collect_errors_to(errors);
+        self.type_parameters.collect_errors_to(errors);
         self.opening_parenthesis_error.collect_errors_to(errors);
         self.parameters.collect_errors_to(errors);
         self.closing_parenthesis_error.collect_errors_to(errors);
@@ -358,17 +397,37 @@ impl CollectAstErrors for AstParameter {
         self.comma_error.collect_errors_to(errors);
     }
 }
+impl CollectAstErrors for AstTypeParameters {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.parameters.collect_errors_to(errors);
+        self.empty_parameters_error.collect_errors_to(errors);
+        self.closing_bracket_error.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstTypeParameter {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.name.collect_errors_to(errors);
+        self.comma_error.collect_errors_to(errors);
+    }
+}
 
 impl CollectAstErrors for AstType {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
-        match &self {
-            Self::Named(named) => named.collect_errors_to(errors),
-        }
+        self.name.collect_errors_to(errors);
+        self.type_arguments.collect_errors_to(errors);
     }
 }
-impl CollectAstErrors for AstNamedType {
+impl CollectAstErrors for AstTypeArguments {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
-        self.name.collect_errors_to(errors);
+        self.arguments.collect_errors_to(errors);
+        self.empty_arguments_error.collect_errors_to(errors);
+        self.closing_bracket_error.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstTypeArgument {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.type_.collect_errors_to(errors);
+        self.comma_error.collect_errors_to(errors);
     }
 }
 
@@ -426,6 +485,12 @@ impl CollectAstErrors for AstParenthesized {
 impl CollectAstErrors for AstCall {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.receiver.collect_errors_to(errors);
+        self.type_arguments.collect_errors_to(errors);
+        self.arguments.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstArguments {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.arguments.collect_errors_to(errors);
         self.closing_parenthesis_error.collect_errors_to(errors);
     }
