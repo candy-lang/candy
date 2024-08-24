@@ -733,7 +733,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     let type_ = assignment
                         .type_
                         .as_ref()
-                        .map(|it| self.context.lower_type(&self.type_parameters, it.value()));
+                        .map(|it| self.context.lower_type(self.type_parameters, it.value()));
 
                     let (id, type_) = if let Some(value) = assignment.value.value() {
                         self.lower_expression(value, type_.as_ref())
@@ -834,7 +834,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         }
                     }
                 } else if let Some((name, id)) =
-                    Context::resolve_type_parameter(&self.type_parameters, name)
+                    Context::resolve_type_parameter(self.type_parameters, name)
                 {
                     LoweredExpression::TypeParameterReference { name, id }
                 } else if self.context.hir.type_declarations.get(name).is_some() {
@@ -958,7 +958,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         let type_arguments = call.type_arguments.as_ref().map(|it| {
                             it.arguments
                                 .iter()
-                                .map(|it| self.context.lower_type(&self.type_parameters, &it.type_))
+                                .map(|it| self.context.lower_type(self.type_parameters, &it.type_))
                                 .collect::<Box<_>>()
                         });
 
@@ -1281,10 +1281,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         .clone(),
                                 ),
                             };
-                        let variant_type = variant_type.substitute(&Type::build_environment(
-                            &type_parameters,
-                            &type_arguments,
-                        ));
+                        let variant_type = variant_type
+                            .substitute(&Type::build_environment(type_parameters, type_arguments));
                         let parameter_types = [variant_type];
                         let arguments = lower_arguments(
                             self,
@@ -1338,8 +1336,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         field: key.string.clone(),
                                     },
                                     field_type.substitute(&Type::build_environment(
-                                        &type_parameters,
-                                        &type_arguments,
+                                        type_parameters,
+                                        type_arguments,
                                     )),
                                 );
                             }
@@ -1432,7 +1430,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                                 variant: key.string.clone(),
                                                 value: None,
                                             },
-                                            type_.clone(),
+                                            type_,
                                         )
                                     }
                                 } else {

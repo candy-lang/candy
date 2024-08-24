@@ -95,16 +95,16 @@ impl<'h> Context<'h> {
 
                     if !variants.is_empty() {
                         self.push("enum {");
-                        for (variant, _) in variants.iter() {
-                            self.push(format!("{name}_{variant},"));
+                        for variant in variants.iter() {
+                            self.push(format!("{name}_{},", variant.name));
                         }
                         self.push("} variant;\n");
                     }
 
                     self.push("union {");
-                    for (variant, value_type) in variants.iter() {
-                        if let Some(value_type) = value_type {
-                            self.push(format!("{value_type}* {variant};"));
+                    for variant in variants.iter() {
+                        if let Some(value_type) = &variant.value_type {
+                            self.push(format!("{value_type}* {};", variant.name));
                         }
                     }
                     self.push("} value;\n};\n");
@@ -352,9 +352,9 @@ impl<'h> Context<'h> {
                     if let Some(value_id) = case.value_id {
                         let variant_type = variants
                             .iter()
-                            .find(|(var, _)| var == &case.variant)
+                            .find(|variant| variant.name == case.variant)
                             .unwrap()
-                            .1
+                            .value_type
                             .as_ref()
                             .unwrap();
                         self.push(format!("{variant_type}* {value_id} = {value}->value;\n"));

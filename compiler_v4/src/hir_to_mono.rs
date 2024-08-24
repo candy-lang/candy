@@ -166,13 +166,11 @@ impl<'h> Context<'h> {
                         hir::Type::build_environment(&type_parameters, &type_arguments);
                     let variants = variants
                         .iter()
-                        .map(|(name, type_)| {
-                            (
-                                name.clone(),
-                                type_
-                                    .as_ref()
-                                    .map(|type_| self.lower_type(&type_.substitute(&environment))),
-                            )
+                        .map(|(name, value_type)| mono::EnumVariant {
+                            name: name.clone(),
+                            value_type: value_type
+                                .as_ref()
+                                .map(|it| self.lower_type(&it.substitute(&environment))),
                         })
                         .collect();
                     mono::TypeDeclaration::Enum { variants }

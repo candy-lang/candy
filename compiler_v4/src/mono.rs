@@ -23,12 +23,13 @@ pub struct Mono {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeDeclaration {
-    Struct {
-        fields: Box<[(Box<str>, Box<str>)]>,
-    },
-    Enum {
-        variants: Box<[(Box<str>, Option<Box<str>>)]>,
-    },
+    Struct { fields: Box<[(Box<str>, Box<str>)]> },
+    Enum { variants: Box<[EnumVariant]> },
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct EnumVariant {
+    pub name: Box<str>,
+    pub value_type: Option<Box<str>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
