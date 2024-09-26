@@ -183,11 +183,9 @@ pub enum SolverSolution {
 impl Display for SolverSolution {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            SolverSolution::Unique(SolverSolutionUnique { refined_goal, .. }) => {
-                write!(f, "Unique({refined_goal})")
-            }
-            SolverSolution::Ambiguous => write!(f, "Ambiguous"),
-            SolverSolution::Impossible => write!(f, "Impossible"),
+            Self::Unique(solution) => write!(f, "Unique({solution})"),
+            Self::Ambiguous => write!(f, "Ambiguous"),
+            Self::Impossible => write!(f, "Impossible"),
         }
     }
 }
@@ -195,6 +193,15 @@ impl Display for SolverSolution {
 pub struct SolverSolutionUnique {
     pub refined_goal: SolverGoal,
     pub used_rule: SolverRule,
+}
+impl Display for SolverSolutionUnique {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "SolverSolutionUnique(refined goal: {}, used rule: {})",
+            self.refined_goal, self.used_rule,
+        )
+    }
 }
 
 #[derive(Debug)]
