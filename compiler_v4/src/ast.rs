@@ -62,6 +62,8 @@ pub type Ast = Vec<AstDeclaration>;
 pub enum AstDeclaration {
     Struct(AstStruct),
     Enum(AstEnum),
+    Trait(AstTrait),
+    Impl(AstImpl),
     Assignment(AstAssignment),
     Function(AstFunction),
 }
@@ -95,6 +97,26 @@ pub struct AstEnumVariant {
     pub name: AstResult<AstString>,
     pub type_: Option<AstResult<AstType>>,
     pub comma_error: Option<AstError>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstTrait {
+    pub name: AstResult<AstString>,
+    pub type_parameters: Option<AstTypeParameters>,
+    pub opening_curly_brace_error: Option<AstError>,
+    pub functions: Vec<AstFunction>,
+    pub closing_curly_brace_error: Option<AstError>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstImpl {
+    pub type_parameters: Option<AstTypeParameters>,
+    pub type_: AstResult<AstType>,
+    pub colon_error: Option<AstError>,
+    pub trait_: AstResult<AstType>,
+    pub opening_curly_brace_error: Option<AstError>,
+    pub functions: Vec<AstFunction>,
+    pub closing_curly_brace_error: Option<AstError>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -330,6 +352,8 @@ impl CollectAstErrors for AstDeclaration {
         match &self {
             Self::Struct(struct_) => struct_.collect_errors_to(errors),
             Self::Enum(enum_) => enum_.collect_errors_to(errors),
+            Self::Trait(trait_) => trait_.collect_errors_to(errors),
+            Self::Impl(impl_) => impl_.collect_errors_to(errors),
             Self::Assignment(assignment_) => assignment_.collect_errors_to(errors),
             Self::Function(function_) => function_.collect_errors_to(errors),
         }
@@ -366,6 +390,26 @@ impl CollectAstErrors for AstEnumVariant {
         self.name.collect_errors_to(errors);
         self.type_.collect_errors_to(errors);
         self.comma_error.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstTrait {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.name.collect_errors_to(errors);
+        self.type_parameters.collect_errors_to(errors);
+        self.opening_curly_brace_error.collect_errors_to(errors);
+        self.functions.collect_errors_to(errors);
+        self.closing_curly_brace_error.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstImpl {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.type_parameters.collect_errors_to(errors);
+        self.type_.collect_errors_to(errors);
+        self.colon_error.collect_errors_to(errors);
+        self.trait_.collect_errors_to(errors);
+        self.opening_curly_brace_error.collect_errors_to(errors);
+        self.functions.collect_errors_to(errors);
+        self.closing_curly_brace_error.collect_errors_to(errors);
     }
 }
 impl CollectAstErrors for AstAssignment {

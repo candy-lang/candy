@@ -3,8 +3,8 @@ use super::{
     list::list_of,
     literal::{
         closing_bracket, closing_curly_brace, closing_parenthesis, colon, comma, enum_keyword,
-        equals_sign, fun_keyword, let_keyword, opening_bracket, opening_curly_brace,
-        opening_parenthesis, struct_keyword,
+        equals_sign, fun_keyword, impl_keyword, let_keyword, opening_bracket, opening_curly_brace,
+        opening_parenthesis, struct_keyword, trait_keyword,
     },
     parser::{OptionOfParser, OptionOfParserWithResult, OptionOfParserWithValue, Parser},
     type_::type_,
@@ -15,8 +15,9 @@ use super::{
     word::raw_identifier,
 };
 use crate::ast::{
-    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstParameter,
-    AstString, AstStruct, AstStructField, AstTypeParameter, AstTypeParameters,
+    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstImpl,
+    AstParameter, AstString, AstStruct, AstStructField, AstTrait, AstTypeParameter,
+    AstTypeParameters,
 };
 use tracing::instrument;
 
@@ -24,6 +25,8 @@ use tracing::instrument;
 pub fn declaration<'a>(parser: Parser) -> Option<(Parser, AstDeclaration)> {
     None.or_else(|| struct_(parser).map(|(parser, it)| (parser, AstDeclaration::Struct(it))))
         .or_else(|| enum_(parser).map(|(parser, it)| (parser, AstDeclaration::Enum(it))))
+        .or_else(|| trait_(parser).map(|(parser, it)| (parser, AstDeclaration::Trait(it))))
+        .or_else(|| impl_(parser).map(|(parser, it)| (parser, AstDeclaration::Impl(it))))
         .or_else(|| assignment(parser).map(|(parser, it)| (parser, AstDeclaration::Assignment(it))))
         .or_else(|| function(parser).map(|(parser, it)| (parser, AstDeclaration::Function(it))))
 }
@@ -167,6 +170,78 @@ fn enum_variant<'a>(parser: Parser) -> Option<(Parser, AstEnumVariant, Option<Pa
             comma_error: None,
         },
         parser_for_missing_comma_error,
+    ))
+}
+
+#[instrument(level = "trace")]
+fn trait_<'a>(parser: Parser) -> Option<(Parser, AstTrait)> {
+    let parser = trait_keyword(parser)?.and_trailing_whitespace();
+
+    let (parser, name) = raw_identifier(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error_result(parser, "This trait is missing a name.");
+
+    let (parser, type_parameters) = type_parameters(parser).optional(parser);
+
+    let (parser, opening_curly_brace_error) = opening_curly_brace(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This trait is missing an opening curly brace.");
+
+    let (parser, functions) = list_of(parser, function);
+
+    let (parser, closing_curly_brace_error) = closing_curly_brace(parser)
+        .unwrap_or_ast_error(parser, "This trait is missing a closing curly brace.");
+
+    Some((
+        parser,
+        AstTrait {
+            name,
+            type_parameters,
+            opening_curly_brace_error,
+            functions,
+            closing_curly_brace_error,
+        },
+    ))
+}
+
+#[instrument(level = "trace")]
+fn impl_<'a>(parser: Parser) -> Option<(Parser, AstImpl)> {
+    let parser = impl_keyword(parser)?.and_trailing_whitespace();
+
+    let (parser, type_parameters) = type_parameters(parser).optional(parser);
+
+    let (parser, base_type) = type_(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This impl is missing a type.");
+
+    let (parser, colon_error) = colon(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This impl is missing a colon after the type.");
+
+    let (parser, trait_) = type_(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This impl is missing a trait.");
+
+    let (parser, opening_curly_brace_error) = opening_curly_brace(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This impl is missing an opening curly brace.");
+
+    let (parser, functions) = list_of(parser, function);
+
+    let (parser, closing_curly_brace_error) = closing_curly_brace(parser)
+        .unwrap_or_ast_error(parser, "This impl is missing a closing curly brace.");
+
+    Some((
+        parser,
+        AstImpl {
+            type_parameters,
+            type_: base_type,
+            colon_error,
+            trait_,
+            opening_curly_brace_error,
+            functions,
+            closing_curly_brace_error,
+        },
     ))
 }
 
