@@ -1,5 +1,6 @@
 use super::{
     declarations::assignment,
+    list::list_of,
     literal::{
         arrow, closing_curly_brace, closing_parenthesis, comma, dot, opening_curly_brace,
         opening_parenthesis, switch_keyword,
@@ -109,7 +110,7 @@ fn parenthesized<'a>(parser: Parser) -> Option<(Parser, AstParenthesized)> {
 fn body<'a>(parser: Parser) -> Option<(Parser, AstBody)> {
     let parser = opening_curly_brace(parser)?.and_trailing_whitespace();
 
-    let (parser, statements) = statements(parser);
+    let (parser, statements) = list_of(parser, statement);
 
     let (parser, closing_curly_brace_error) = closing_curly_brace(parser)
         .unwrap_or_ast_error(parser, "This body is missing a closing curly brace.");
@@ -121,29 +122,6 @@ fn body<'a>(parser: Parser) -> Option<(Parser, AstBody)> {
             closing_curly_brace_error,
         },
     ))
-}
-#[instrument(level = "trace")]
-pub fn statements(mut parser: Parser) -> (Parser, Vec<AstStatement>) {
-    let mut statements = vec![];
-    while !parser.is_at_end() {
-        let mut made_progress = false;
-
-        if let Some((new_parser, statement)) = statement(parser) {
-            parser = new_parser;
-            statements.push(statement);
-            made_progress = true;
-        }
-
-        if let Some(new_parser) = whitespace(parser) {
-            parser = new_parser;
-            made_progress = true;
-        }
-
-        if !made_progress {
-            break;
-        }
-    }
-    (parser, statements)
 }
 #[instrument(level = "trace")]
 pub fn statement(parser: Parser) -> Option<(Parser, AstStatement)> {

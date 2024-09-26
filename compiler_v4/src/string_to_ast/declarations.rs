@@ -1,5 +1,6 @@
 use super::{
-    expression::{expression, statements},
+    expression::{expression, statement},
+    list::list_of,
     literal::{
         closing_bracket, closing_curly_brace, closing_parenthesis, colon, comma, enum_keyword,
         equals_sign, fun_keyword, let_keyword, opening_bracket, opening_curly_brace,
@@ -8,8 +9,8 @@ use super::{
     parser::{OptionOfParser, OptionOfParserWithResult, OptionOfParserWithValue, Parser},
     type_::type_,
     whitespace::{
-        whitespace, AndTrailingWhitespace, OptionAndTrailingWhitespace,
-        OptionWithValueAndTrailingWhitespace, ValueAndTrailingWhitespace,
+        AndTrailingWhitespace, OptionAndTrailingWhitespace, OptionWithValueAndTrailingWhitespace,
+        ValueAndTrailingWhitespace,
     },
     word::raw_identifier,
 };
@@ -20,30 +21,7 @@ use crate::ast::{
 use tracing::instrument;
 
 #[instrument(level = "trace")]
-pub fn declarations(mut parser: Parser) -> (Parser, Vec<AstDeclaration>) {
-    let mut declarations = vec![];
-    while !parser.is_at_end() {
-        let mut made_progress = false;
-
-        if let Some((new_parser, declaration)) = declaration(parser) {
-            parser = new_parser;
-            declarations.push(declaration);
-            made_progress = true;
-        }
-
-        if let Some(new_parser) = whitespace(parser) {
-            parser = new_parser;
-            made_progress = true;
-        }
-
-        if !made_progress {
-            break;
-        }
-    }
-    (parser, declarations)
-}
-#[instrument(level = "trace")]
-fn declaration<'a>(parser: Parser) -> Option<(Parser, AstDeclaration)> {
+pub fn declaration<'a>(parser: Parser) -> Option<(Parser, AstDeclaration)> {
     None.or_else(|| struct_(parser).map(|(parser, it)| (parser, AstDeclaration::Struct(it))))
         .or_else(|| enum_(parser).map(|(parser, it)| (parser, AstDeclaration::Enum(it))))
         .or_else(|| assignment(parser).map(|(parser, it)| (parser, AstDeclaration::Assignment(it))))
@@ -269,7 +247,7 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
         .and_trailing_whitespace()
         .unwrap_or_ast_error(parser, "This function is missing an opening curly brace.");
 
-    let (parser, body) = statements(parser);
+    let (parser, body) = list_of(parser, statement);
 
     let (parser, closing_curly_brace_error) = closing_curly_brace(parser)
         .unwrap_or_ast_error(parser, "This function is missing a closing curly brace.");
