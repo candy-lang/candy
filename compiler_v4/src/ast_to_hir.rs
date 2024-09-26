@@ -348,7 +348,7 @@ impl<'a> Context<'a> {
             return;
         };
 
-        let type_parameters = self.lower_type_parameters(struct_type.type_parameters.as_ref());
+        let type_parameters = self.lower_type_parameters(&[], struct_type.type_parameters.as_ref());
 
         let fields = struct_type
             .fields
@@ -388,7 +388,7 @@ impl<'a> Context<'a> {
             return;
         };
 
-        let type_parameters = self.lower_type_parameters(enum_type.type_parameters.as_ref());
+        let type_parameters = self.lower_type_parameters(&[], enum_type.type_parameters.as_ref());
 
         let variants = enum_type
             .variants
@@ -432,7 +432,7 @@ impl<'a> Context<'a> {
             return;
         };
 
-        let type_parameters = self.lower_type_parameters(trait_.type_parameters.as_ref());
+        let type_parameters = self.lower_type_parameters(&[], trait_.type_parameters.as_ref());
 
         let functions = self.lower_function_signatures(&type_parameters, &trait_.functions);
 
@@ -459,7 +459,7 @@ impl<'a> Context<'a> {
         };
     }
     fn lower_impl(&mut self, impl_: &'a AstImpl) {
-        let type_parameters = self.lower_type_parameters(impl_.type_parameters.as_ref());
+        let type_parameters = self.lower_type_parameters(&[], impl_.type_parameters.as_ref());
 
         let Some(type_) = impl_.type_.value() else {
             return;
@@ -483,6 +483,7 @@ impl<'a> Context<'a> {
 
     fn lower_type_parameters(
         &mut self,
+        outer_type_parameters: &[TypeParameter],
         type_parameters: Option<&AstTypeParameters>,
     ) -> Box<[TypeParameter]> {
         type_parameters.map_or_else(Box::default, |it| {
@@ -491,10 +492,15 @@ impl<'a> Context<'a> {
                 .filter_map(|it| {
                     let name = it.name.value()?;
                     let id = self.type_parameter_id_generator.generate();
+                    let upper_bound = it
+                        .upper_bound
+                        .as_ref()
+                        .and_then(|it| it.value())
+                        .map(|it| Box::new(self.lower_type(outer_type_parameters, it)));
                     Some(TypeParameter {
                         id,
                         name: name.string.clone(),
-                        upper_bound: None, // TODO
+                        upper_bound,
                     })
                 })
                 .collect()
@@ -708,7 +714,8 @@ impl<'a> Context<'a> {
 
         let id = self.id_generator.generate();
 
-        let type_parameters = self.lower_type_parameters(function.type_parameters.as_ref());
+        let type_parameters =
+            self.lower_type_parameters(outer_type_parameters, function.type_parameters.as_ref());
         let all_type_parameters = outer_type_parameters
             .iter()
             .chain(type_parameters.iter())

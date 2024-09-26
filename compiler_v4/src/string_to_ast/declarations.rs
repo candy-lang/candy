@@ -183,7 +183,9 @@ fn trait_<'a>(parser: Parser) -> Option<(Parser, AstTrait)> {
         .and_trailing_whitespace()
         .unwrap_or_ast_error_result(parser, "This trait is missing a name.");
 
-    let (parser, type_parameters) = type_parameters(parser).optional(parser);
+    let (parser, type_parameters) = type_parameters(parser)
+        .optional(parser)
+        .and_trailing_whitespace();
 
     let (parser, opening_curly_brace_error) = opening_curly_brace(parser)
         .and_trailing_whitespace()
@@ -210,7 +212,9 @@ fn trait_<'a>(parser: Parser) -> Option<(Parser, AstTrait)> {
 fn impl_<'a>(parser: Parser) -> Option<(Parser, AstImpl)> {
     let parser = impl_keyword(parser)?.and_trailing_whitespace();
 
-    let (parser, type_parameters) = type_parameters(parser).optional(parser);
+    let (parser, type_parameters) = type_parameters(parser)
+        .optional(parser)
+        .and_trailing_whitespace();
 
     let (parser, base_type) = type_(parser)
         .and_trailing_whitespace()
@@ -426,6 +430,18 @@ fn type_parameters<'s>(parser: Parser<'s>) -> Option<(Parser, AstTypeParameters)
 fn type_parameter<'a>(parser: Parser) -> Option<(Parser, AstTypeParameter, Option<Parser>)> {
     let (parser, name) = raw_identifier(parser)?.and_trailing_whitespace();
 
+    let (parser, upper_bound) =
+        colon(parser)
+            .and_trailing_whitespace()
+            .map_or((parser, None), |parser| {
+                let (parser, upper_bound) =
+                    type_(parser).and_trailing_whitespace().unwrap_or_ast_error(
+                        parser,
+                        "This type parameter is missing an upper bound after the colon.",
+                    );
+                (parser, Some(upper_bound))
+            });
+
     let (parser, parser_for_missing_comma_error) =
         comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));
 
@@ -433,6 +449,7 @@ fn type_parameter<'a>(parser: Parser) -> Option<(Parser, AstTypeParameter, Optio
         parser,
         AstTypeParameter {
             name,
+            upper_bound,
             comma_error: None,
         },
         parser_for_missing_comma_error,

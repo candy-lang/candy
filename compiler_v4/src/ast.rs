@@ -156,6 +156,7 @@ pub struct AstTypeParameters {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstTypeParameter {
     pub name: AstResult<AstString>,
+    pub upper_bound: Option<AstResult<AstType>>,
     pub comma_error: Option<AstError>,
 }
 
@@ -451,6 +452,7 @@ impl CollectAstErrors for AstTypeParameters {
 impl CollectAstErrors for AstTypeParameter {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.name.collect_errors_to(errors);
+        self.upper_bound.collect_errors_to(errors);
         self.comma_error.collect_errors_to(errors);
     }
 }
