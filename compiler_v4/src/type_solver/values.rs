@@ -49,7 +49,7 @@ impl SolverType {
     // TODO(never, marcelgarus): Write property-based tests for this. For example, generate random types
     // and then check that the order of unifying doesn't matter and that applying the substitutions
     // actually results in the same type.
-    pub fn unify(&self, other: &SolverType) -> Option<FxHashMap<SolverVariable, SolverType>> {
+    pub fn unify(&self, other: &Self) -> Option<FxHashMap<SolverVariable, Self>> {
         match (&self, &other) {
             (Self::Variable(self_variable), Self::Variable(other_variable)) => {
                 // If both are variables, we return a substitution with the lexicographically first one being
@@ -70,18 +70,18 @@ impl SolverType {
                 } else {
                     (self_variable.clone(), other.clone())
                 };
-                return Some(FxHashMap::from_iter([entry]));
+                Some(FxHashMap::from_iter([entry]))
             }
             (Self::Value(_), Self::Variable(_)) => other.unify(self),
             (Self::Variable(self_variable), other @ Self::Value(_)) => {
-                if other.contains_variable(&self_variable) {
+                if other.contains_variable(self_variable) {
                     // This is an infinitely growing type. That's not allowed.
                     return None;
                 }
-                return Some(FxHashMap::from_iter([(
+                Some(FxHashMap::from_iter([(
                     self_variable.clone(),
                     (*other).clone(),
-                )]));
+                )]))
             }
 
             (Self::Value(self_value), Self::Value(other_value)) => {
@@ -109,14 +109,14 @@ impl SolverType {
                         queue.extend(existing_substitution.unify(&substitution.1)?.into_iter());
                     } else {
                         solution_space.insert(substitution.0.clone(), substitution.1.clone());
-                        solution_space.values_mut().for_each(|type_| {
+                        for type_ in solution_space.values_mut() {
                             *type_ =
                                 type_.substitute(substitution.0.clone(), substitution.1.clone());
-                        });
-                        queue.iter_mut().for_each(|(_, type_)| {
+                        }
+                        for (_, type_) in &mut queue {
                             *type_ =
                                 type_.substitute(substitution.0.clone(), substitution.1.clone());
-                        });
+                        }
                         if queue
                             .iter()
                             .any(|(variable, type_)| type_.contains_variable(variable))
@@ -173,11 +173,11 @@ pub struct SolverVariable {
 }
 impl SolverVariable {
     #[must_use]
-    pub fn new(type_: ParameterType) -> Self {
+    pub const fn new(type_: ParameterType) -> Self {
         Self { type_: Some(type_) }
     }
     #[must_use]
-    pub fn error() -> Self {
+    pub const fn error() -> Self {
         Self { type_: None }
     }
 }
@@ -190,7 +190,7 @@ impl SolverTypeTrait for SolverVariable {
     #[must_use]
     fn substitute_all(&self, substitutions: &FxHashMap<SolverVariable, SolverType>) -> SolverType {
         substitutions
-            .get(&self)
+            .get(self)
             .cloned()
             .unwrap_or_else(|| SolverType::Variable(self.clone()))
     }
@@ -203,7 +203,7 @@ impl SolverTypeTrait for SolverVariable {
         let mapping_len = mapping.len();
         mapping
             .entry(self.clone())
-            .or_insert_with(|| SolverVariable {
+            .or_insert_with(|| Self {
                 type_: Some(canonical_variable(mapping_len)),
             })
             .clone()
@@ -214,11 +214,9 @@ impl Display for SolverVariable {
         write!(
             f,
             "?{}",
-            if let Some(type_) = &self.type_ {
-                type_.to_string()
-            } else {
-                "<error>".to_string()
-            }
+            self.type_
+                .as_ref()
+                .map_or_else(|| "<error>".to_string(), ToString::to_string)
         )
     }
 }

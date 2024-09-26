@@ -14,7 +14,7 @@ use crate::{
     position::Offset,
     type_solver::{
         goals::{Environment, SolverGoal, SolverRule, SolverSolution, SolverSolutionUnique},
-        values::{canonical_variable, SolverType, SolverVariable},
+        values::{canonical_variable, SolverType, SolverValue, SolverVariable},
     },
     utils::HashMapExtension,
 };
@@ -311,7 +311,7 @@ impl<'a> Context<'a> {
                 .impls
                 .clone()
                 .iter()
-                .flat_map(|it| self.hirImplToSolverRules(it).into_iter())
+                .flat_map(|it| self.impl_to_solver_rules(it).into_iter())
                 .collect(),
         };
         println!("{}", self.environment);
@@ -904,7 +904,7 @@ impl<'a> Context<'a> {
 
     // }
 
-    fn hirImplToSolverRules(&mut self, impl_: &ImplDeclaration<'a>) -> FxHashSet<SolverRule> {
+    fn impl_to_solver_rules(&mut self, impl_: &ImplDeclaration<'a>) -> FxHashSet<SolverRule> {
         // Lower the constraints. For example, in the impl `impl[T: Equals] Foo[T]: Equals`, the
         // `solver_constraints` are a list containing `Equals(?T)`.
         let mut rules = FxHashSet::default();
@@ -912,7 +912,7 @@ impl<'a> Context<'a> {
         for type_parameter in impl_.type_parameters.iter() {
             if let Some(upper_bound) = &type_parameter.upper_bound {
                 let (solver_type, goals, new_rules) =
-                    self.hirInlineTypeToSolverTypeAndGoalsAndRules(upper_bound);
+                    Self::trait_to_solver_type_and_goals_and_rules(upper_bound);
                 rules.extend(new_rules.into_iter());
 
                 let SolverType::Variable(solver_variable) = solver_type else {
@@ -929,10 +929,7 @@ impl<'a> Context<'a> {
 
         // Lower the base type. For example, in the impl `impl Iterable[Int]: Foo`, the base type
         // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
-        let (solver_base, mut goals, new_rules) =
-            self.hirInlineTypeToSolverTypeAndGoalsAndRules(&impl_.type_);
-        rules.extend(new_rules);
-        solver_constraints.append(&mut goals);
+        let solver_base = Self::type_to_solver_type(&impl_.type_);
 
         // Lower the trait. For example, in the impl `impl Foo: Iterable[Int]`, the implemented trait
         // `Iterable[Int]` gets lowered to `?0` with the goals `Iterable(Int, ?0)`. Impls that don't
@@ -943,7 +940,7 @@ impl<'a> Context<'a> {
         //     Type::Parameter(_) | Type::Self_ { .. } | Type::Error => return FxHashSet::default(),
         // };
         let (solver_trait, mut trait_goals, new_rules) =
-            self.hirInlineTypeToSolverTypeAndGoalsAndRules(&impl_.trait_);
+            Self::trait_to_solver_type_and_goals_and_rules(&impl_.trait_);
         let SolverType::Variable(solver_trait) = solver_trait else {
             panic!("Traits didn't get lowered to `SolverVariable`s.");
         };
@@ -988,7 +985,7 @@ impl<'a> Context<'a> {
         rules
     }
 
-    fn findUniqueSolverSolutionFor(
+    fn find_unique_solver_solution_for(
         &mut self,
         base: &Type,
         trait_: &Type,
@@ -998,10 +995,10 @@ impl<'a> Context<'a> {
             "Can't reveal the impl for the error type",
         );
 
-        let (base_type, base_goals, _) = self.hirInlineTypeToSolverTypeAndGoalsAndRules(base);
+        let base_type = Self::type_to_solver_type(base);
 
         let (trait_type, mut trait_goals, _) =
-            self.hirInlineTypeToSolverTypeAndGoalsAndRules(trait_);
+            Self::trait_to_solver_type_and_goals_and_rules(trait_);
         let SolverType::Variable(trait_type) = trait_type else {
             panic!("This shouldn't happen. Trait should be lowered to a SolverVariable.");
         };
@@ -1016,7 +1013,7 @@ impl<'a> Context<'a> {
 
         let solution = self.environment.solve(
             trait_goal.substitute_all(&FxHashMap::from_iter([(trait_type, base_type)])),
-            &base_goals,
+            &[],
         );
         match solution {
             SolverSolution::Unique(solution) => Some(solution),
@@ -1024,15 +1021,31 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn hirInlineTypeToSolverTypeAndGoalsAndRules(
-        &mut self,
+    /// Turns a trait type into a [`SolverType`] and a list of [`SolverGoal`]s,
+    /// as well as a set of `SolverRule`s.
+    fn trait_to_solver_type_and_goals_and_rules(
         type_: &Type,
     ) -> (SolverType, Vec<SolverGoal>, FxHashSet<SolverRule>) {
-        /// Turns a `Type` into a `SolverType` and a list of `SolverGoal`s as well as a set of
-        /// `SolverRule`s.
-        let mut lowering_context = TypeLoweringContext::create(self);
-        let (solver_type, goals) = lowering_context.hirInlineTypeToSolverTypeAndGoals(type_);
+        let mut lowering_context = TypeLoweringContext::default();
+        let (solver_type, goals) = lowering_context.trait_to_solver_type_and_goals(type_);
         (solver_type.into(), goals, lowering_context.rules)
+    }
+    /// Turns a concrete [Type] (i.e., no trait) into a [`SolverType`].
+    fn type_to_solver_type(type_: &Type) -> SolverType {
+        match type_ {
+            Type::Named(type_) => SolverValue {
+                type_: type_.name.clone(),
+                parameters: type_
+                    .type_arguments
+                    .iter()
+                    .map(Self::type_to_solver_type)
+                    .collect(),
+            }
+            .into(),
+            Type::Self_ { .. } => todo!(),
+            Type::Parameter(type_) => SolverVariable::new(type_.clone()).into(),
+            Type::Error => SolverVariable::error().into(),
+        }
     }
 
     fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {
@@ -2137,42 +2150,27 @@ impl<'h> TypeSolver<'h> {
     }
 }
 
-struct TypeLoweringContext<'c, 'a> {
-    context: &'c mut Context<'a>,
+#[derive(Default)]
+struct TypeLoweringContext {
     next_canonical_index: usize,
     rules: FxHashSet<SolverRule>,
 }
-impl<'c, 'a> TypeLoweringContext<'c, 'a> {
-    fn create(context: &'c mut Context<'a>) -> Self {
-        Self {
-            context,
-            next_canonical_index: 0,
-            rules: FxHashSet::from_iter([SolverRule {
-                goal: SolverGoal {
-                    trait_: Type::Error.to_string().into_boxed_str(),
-                    parameters: [SolverType::Variable(SolverVariable::error())].into(),
-                },
-                subgoals: Box::default(),
-            }]),
-        }
-    }
-
-    fn getNextCanonicalVariable(&mut self) -> ParameterType {
+impl TypeLoweringContext {
+    fn get_next_canonical_variable(&mut self) -> ParameterType {
         let result = canonical_variable(self.next_canonical_index);
         self.next_canonical_index += 1;
         result
     }
 
-    fn hirInlineTypeToSolverTypeAndGoals(
+    fn trait_to_solver_type_and_goals(
         &mut self,
         type_: &Type,
     ) -> (SolverVariable, Vec<SolverGoal>) {
         match type_ {
             Type::Named(type_) => {
-                println!("hirInlineTypeToSolverTypeAndGoals({type_})");
                 // Example:
                 //
-                // hirInlineTypeToSolverTypeAndGoals(Foo[String, Int]) == (
+                // trait_to_solver_type_and_goals(Foo[String, Int]) == (
                 //   ?0,
                 //   Foo(?0, ?1, ?2), String(?1), Int(?2),
                 //   [
@@ -2196,7 +2194,7 @@ impl<'c, 'a> TypeLoweringContext<'c, 'a> {
 
                 for type_argument in type_.type_arguments.iter() {
                     let (type_argument, mut new_goals) =
-                        self.hirInlineTypeToSolverTypeAndGoals(type_argument);
+                        self.trait_to_solver_type_and_goals(type_argument);
                     solver_parameters.push(type_argument.into());
                     goals.append(&mut new_goals);
                 }
@@ -2205,7 +2203,7 @@ impl<'c, 'a> TypeLoweringContext<'c, 'a> {
                 // We'll return a substitution that will have to satisfy the trait. For example, given the
                 // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
                 // substitution.
-                let substitution = SolverVariable::new(self.getNextCanonicalVariable());
+                let substitution = SolverVariable::new(self.get_next_canonical_variable());
                 solver_parameters.push(substitution.clone().into());
                 goals.push(SolverGoal {
                     trait_: type_.name.clone(),
@@ -2233,8 +2231,7 @@ impl<'c, 'a> TypeLoweringContext<'c, 'a> {
                 // * `impl And: InfixAmpersand[Self, Bool]` has the lowered base type `?0` with the
                 //   additional goal `And(?0)`, so the `Self` gets replaced with `?0`, resulting in
                 //   `InfixAmpersand(?0, Bool) <- And(?0)`.
-                let (base_type, _) =
-                    self.hirInlineTypeToSolverTypeAndGoals(&base_type.clone().into());
+                let (base_type, _) = self.trait_to_solver_type_and_goals(&base_type.clone().into());
                 (base_type, vec![])
             }
             Type::Parameter(type_) => (SolverVariable::new(type_.clone()), vec![]),

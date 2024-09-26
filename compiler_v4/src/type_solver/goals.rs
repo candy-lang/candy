@@ -217,7 +217,7 @@ struct Solver {
 }
 impl Solver {
     fn new(rules: Vec<SolverRule>) -> Self {
-        Solver {
+        Self {
             rules,
             cache: FxHashMap::default(),
         }
@@ -239,7 +239,7 @@ impl Solver {
         }
         let solution = SolverTree { goal: goal.clone() }.solve(self);
         self.cache
-            .insert(goal.clone(), SolverTreeState::Solved(solution.clone()));
+            .insert(goal, SolverTreeState::Solved(solution.clone()));
         solution
     }
 }
