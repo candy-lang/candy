@@ -39,7 +39,9 @@ fn struct_<'a>(parser: Parser) -> Option<(Parser, AstStruct)> {
         .and_trailing_whitespace()
         .unwrap_or_ast_error_result(parser, "This struct is missing a name.");
 
-    let (parser, type_parameters) = type_parameters(parser).optional(parser);
+    let (parser, type_parameters) = type_parameters(parser)
+        .optional(parser)
+        .and_trailing_whitespace();
 
     let (mut parser, opening_curly_brace_error) = opening_curly_brace(parser)
         .and_trailing_whitespace()
