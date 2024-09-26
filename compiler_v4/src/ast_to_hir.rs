@@ -1,16 +1,21 @@
 use crate::{
     ast::{
         Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
-        AstFunction, AstParameter, AstResult, AstStatement, AstStruct, AstSwitch, AstTextPart,
-        AstType, AstTypeParameter, AstTypeParameters,
+        AstFunction, AstImpl, AstParameter, AstResult, AstStatement, AstStruct, AstSwitch,
+        AstTextPart, AstTrait, AstType, AstTypeParameter, AstTypeParameters,
     },
     error::CompilerError,
     hir::{
         Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
-        Hir, Id, Parameter, SwitchCase, Type, TypeDeclaration, TypeParameter, TypeParameterId,
+        Hir, Id, NamedType, Parameter, ParameterType, SwitchCase, Type, TypeDeclaration,
+        TypeDeclarationKind, TypeParameter, TypeParameterId,
     },
     id::IdGenerator,
     position::Offset,
+    type_solver::{
+        goals::{Environment, SolverGoal, SolverRule, SolverSolution, SolverSolutionUnique},
+        values::{canonical_variable, SolverType, SolverVariable},
+    },
     utils::HashMapExtension,
 };
 use itertools::{Itertools, Position};
@@ -35,6 +40,10 @@ struct Context<'a> {
     ast: &'a Ast,
     id_generator: IdGenerator<Id>,
     type_parameter_id_generator: IdGenerator<TypeParameterId>,
+    // TODO: merge structs and enums into this map, but split in final HIR
+    traits: FxHashMap<Box<str>, TraitDeclaration<'a>>,
+    impls: Vec<ImplDeclaration<'a>>,
+    environment: Environment,
     global_identifiers: FxHashMap<Box<str>, Named>,
     assignments: FxHashMap<Id, AssignmentDeclaration<'a>>,
     assignment_dependency_graph: DiGraph<Id, ()>,
@@ -42,6 +51,19 @@ struct Context<'a> {
     errors: Vec<CompilerError>,
     hir: Hir,
 }
+#[derive(Debug)]
+struct TraitDeclaration<'a> {
+    type_parameters: Box<[TypeParameter]>,
+    functions: FxHashMap<Id, FunctionDeclaration<'a>>,
+}
+#[derive(Clone, Debug)]
+struct ImplDeclaration<'a> {
+    type_parameters: Box<[TypeParameter]>,
+    type_: Type,
+    trait_: Type,
+    functions: FxHashMap<Id, FunctionDeclaration<'a>>,
+}
+
 #[derive(Debug, Eq, PartialEq)]
 enum Named {
     Assignment(Id),
@@ -54,7 +76,7 @@ struct AssignmentDeclaration<'a> {
     graph_index: NodeIndex,
     body: Option<Body>,
 }
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct FunctionDeclaration<'a> {
     ast: Option<&'a AstFunction>,
     name: Box<str>,
@@ -86,6 +108,17 @@ impl<'a> FunctionDeclaration<'a> {
     fn call_signature_to_string(function_name: &str, argument_types: &[Type]) -> String {
         format!("{}({})", function_name, argument_types.iter().join(", "))
     }
+
+    #[must_use]
+    fn into_function(self) -> Function {
+        Function {
+            name: self.name,
+            type_parameters: self.type_parameters,
+            parameters: self.parameters,
+            return_type: self.return_type,
+            body: self.body.unwrap(),
+        }
+    }
 }
 
 impl<'a> Context<'a> {
@@ -95,6 +128,10 @@ impl<'a> Context<'a> {
             ast,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
             type_parameter_id_generator: IdGenerator::default(),
+            traits: FxHashMap::default(),
+            impls: vec![],
+            // Placeholder until `lower_declarations(…)` runs:
+            environment: Environment { rules: vec![] },
             global_identifiers: FxHashMap::default(),
             assignments: FxHashMap::default(),
             assignment_dependency_graph: DiGraph::new(),
@@ -127,47 +164,32 @@ impl<'a> Context<'a> {
             );
         }
 
-        let mut assignments = vec![];
-        let mut functions = vec![];
+        let mut assignments = FxHashMap::default();
+        let mut functions = FxHashMap::default();
         for (name, named) in self.global_identifiers {
             match named {
                 Named::Assignment(id) => {
                     let AssignmentDeclaration { type_, body, .. } =
                         self.assignments.remove(&id).unwrap();
-                    assignments.push((
+                    assignments.force_insert(
                         id,
-                        name.clone(),
                         Assignment {
+                            name: name.clone(),
                             type_,
                             body: body.unwrap(),
                         },
-                    ));
+                    );
                 }
                 Named::Functions(ids) => {
                     for id in ids {
-                        let FunctionDeclaration {
-                            type_parameters,
-                            parameters,
-                            return_type,
-                            body,
-                            ..
-                        } = self.functions.remove(&id).unwrap();
-                        functions.push((
-                            id,
-                            name.clone(),
-                            Function {
-                                type_parameters,
-                                parameters,
-                                return_type,
-                                body: body.unwrap(),
-                            },
-                        ));
+                        functions
+                            .force_insert(id, self.functions.remove(&id).unwrap().into_function());
                     }
                 }
             };
         }
-        self.hir.assignments = assignments.into();
-        self.hir.functions = functions.into();
+        self.hir.assignments = assignments;
+        self.hir.functions = functions;
 
         (self.hir, self.errors)
     }
@@ -202,7 +224,7 @@ impl<'a> Context<'a> {
                         );
                         None
                     } else if function.return_type != Type::Error
-                        && function.return_type != Type::int()
+                        && function.return_type != NamedType::int().into()
                     {
                         self.add_error(
                             function.ast.unwrap().name.value().unwrap().span.clone(),
@@ -231,6 +253,7 @@ impl<'a> Context<'a> {
                 .map(|name| TypeParameter {
                     id: self.type_parameter_id_generator.generate(),
                     name,
+                    upper_bound: None,
                 })
                 .collect::<Box<_>>();
             let parameters = signature
@@ -260,29 +283,63 @@ impl<'a> Context<'a> {
     }
 
     fn lower_declarations(&mut self) {
+        // TODO: remove these vecs?
         let mut assignments_to_lower = vec![];
         let mut functions_to_lower = vec![];
         for declaration in self.ast {
             match declaration {
                 AstDeclaration::Struct(struct_) => self.lower_struct(struct_),
                 AstDeclaration::Enum(enum_) => self.lower_enum(enum_),
+                AstDeclaration::Trait(trait_) => self.lower_trait(trait_),
+                AstDeclaration::Impl(impl_) => self.lower_impl(impl_),
                 AstDeclaration::Assignment(assignment) => {
                     if let Some(id) = self.lower_assignment_signature(assignment) {
                         assignments_to_lower.push(id);
                     }
                 }
                 AstDeclaration::Function(function) => {
-                    if let Some(id) = self.lower_function_signature(function) {
+                    if let Some((id, function)) = self.lower_function_signature(&[], function) {
+                        self.functions.force_insert(id, function);
                         functions_to_lower.push(id);
                     }
                 }
+            }
+        }
+
+        self.environment = Environment {
+            rules: self
+                .impls
+                .clone()
+                .iter()
+                .flat_map(|it| self.hirImplToSolverRules(it).into_iter())
+                .collect(),
+        };
+        println!("{}", self.environment);
+
+        for trait_ in self.traits.keys().cloned().collect_vec() {
+            for (id, mut function) in self.traits[&trait_].functions.clone() {
+                self.lower_function(&mut function);
+                self.traits
+                    .get_mut(&trait_)
+                    .unwrap()
+                    .functions
+                    .insert(id, function)
+                    .unwrap();
+            }
+        }
+        for index in 0..self.impls.len() {
+            for (id, mut function) in self.impls[index].functions.clone() {
+                self.lower_function(&mut function);
+                self.impls[index].functions.insert(id, function).unwrap();
             }
         }
         for id in assignments_to_lower {
             self.lower_assignment(id);
         }
         for id in functions_to_lower {
-            self.lower_function(id);
+            let mut function = self.functions.get(&id).unwrap().clone();
+            self.lower_function(&mut function);
+            self.functions.insert(id, function).unwrap();
         }
     }
 
@@ -304,14 +361,24 @@ impl<'a> Context<'a> {
             })
             .collect();
 
+        if self.traits.contains_key(&name.string) {
+            self.add_error(
+                name.span.clone(),
+                format!("Duplicate type name: `{}`", name.string),
+            );
+            return;
+        }
         match self.hir.type_declarations.entry(name.string.clone()) {
             Entry::Occupied(_) => {
-                self.add_error(name.span.clone(), "Duplicate type name");
+                self.add_error(
+                    name.span.clone(),
+                    format!("Duplicate type name: `{}`", name.string),
+                );
             }
             Entry::Vacant(entry) => {
-                entry.insert(TypeDeclaration::Struct {
+                entry.insert(TypeDeclaration {
                     type_parameters,
-                    fields,
+                    kind: TypeDeclarationKind::Struct { fields },
                 });
             }
         };
@@ -337,17 +404,81 @@ impl<'a> Context<'a> {
             })
             .collect();
 
+        if self.traits.contains_key(&name.string) {
+            self.add_error(
+                name.span.clone(),
+                format!("Duplicate type name: `{}`", name.string),
+            );
+            return;
+        }
         match self.hir.type_declarations.entry(name.string.clone()) {
             Entry::Occupied(_) => {
-                self.add_error(name.span.clone(), "Duplicate type name");
+                self.add_error(
+                    name.span.clone(),
+                    format!("Duplicate type name: `{}`", name.string),
+                );
             }
             Entry::Vacant(entry) => {
-                entry.insert(TypeDeclaration::Enum {
+                entry.insert(TypeDeclaration {
                     type_parameters,
-                    variants,
+                    kind: TypeDeclarationKind::Enum { variants },
                 });
             }
         };
+    }
+
+    fn lower_trait(&mut self, trait_: &'a AstTrait) {
+        let Some(name) = trait_.name.value() else {
+            return;
+        };
+
+        let type_parameters = self.lower_type_parameters(trait_.type_parameters.as_ref());
+
+        let functions = self.lower_function_signatures(&type_parameters, &trait_.functions);
+
+        if self.hir.type_declarations.contains_key(&name.string) {
+            self.add_error(
+                name.span.clone(),
+                format!("Duplicate type name: `{}`", name.string),
+            );
+            return;
+        }
+        match self.traits.entry(name.string.clone()) {
+            Entry::Occupied(_) => {
+                self.add_error(
+                    name.span.clone(),
+                    format!("Duplicate type name: `{}`", name.string),
+                );
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(TraitDeclaration {
+                    type_parameters,
+                    functions,
+                });
+            }
+        };
+    }
+    fn lower_impl(&mut self, impl_: &'a AstImpl) {
+        let type_parameters = self.lower_type_parameters(impl_.type_parameters.as_ref());
+
+        let Some(type_) = impl_.type_.value() else {
+            return;
+        };
+        let type_ = self.lower_type(&type_parameters, type_);
+
+        let Some(trait_) = impl_.trait_.value() else {
+            return;
+        };
+        let trait_ = self.lower_type(&type_parameters, trait_);
+
+        let functions = self.lower_function_signatures(&type_parameters, &impl_.functions);
+
+        self.impls.push(ImplDeclaration {
+            type_parameters,
+            type_,
+            trait_,
+            functions,
+        });
     }
 
     fn lower_type_parameters(
@@ -363,6 +494,7 @@ impl<'a> Context<'a> {
                     Some(TypeParameter {
                         id,
                         name: name.string.clone(),
+                        upper_bound: None, // TODO
                     })
                 })
                 .collect()
@@ -389,7 +521,7 @@ impl<'a> Context<'a> {
                     "Type parameters can't have type arguments",
                 );
             }
-            return Type::Parameter { name, id };
+            return ParameterType { name, id }.into();
         }
 
         let type_arguments = type_
@@ -409,7 +541,7 @@ impl<'a> Context<'a> {
                     "Int does not take type arguments",
                 );
             }
-            return Type::int();
+            return NamedType::int().into();
         }
         if &*name.string == "Text" {
             if !type_arguments.is_empty() {
@@ -418,7 +550,7 @@ impl<'a> Context<'a> {
                     "Text does not take type arguments",
                 );
             }
-            return Type::text();
+            return NamedType::text().into();
         }
 
         let Some(type_parameters) = self.ast.iter().find_map(|it| match it {
@@ -428,6 +560,11 @@ impl<'a> Context<'a> {
                 ..
             })
             | AstDeclaration::Enum(AstEnum {
+                name: it_name,
+                type_parameters,
+                ..
+            })
+            | AstDeclaration::Trait(AstTrait {
                 name: it_name,
                 type_parameters,
                 ..
@@ -472,10 +609,11 @@ impl<'a> Context<'a> {
             }
         };
 
-        Type::Named {
+        NamedType {
             name: name.string.clone(),
             type_arguments,
         }
+        .into()
     }
     fn resolve_type_parameter(
         type_parameters: &[TypeParameter],
@@ -551,18 +689,37 @@ impl<'a> Context<'a> {
         self.assignments.get_mut(&id).unwrap().body = Some(hir_body);
     }
 
-    fn lower_function_signature(&mut self, function: &'a AstFunction) -> Option<Id> {
+    fn lower_function_signatures(
+        &mut self,
+        outer_type_parameters: &[TypeParameter],
+        functions: &'a [AstFunction],
+    ) -> FxHashMap<Id, FunctionDeclaration<'a>> {
+        functions
+            .iter()
+            .filter_map(|function| self.lower_function_signature(outer_type_parameters, function))
+            .collect()
+    }
+    fn lower_function_signature(
+        &mut self,
+        outer_type_parameters: &[TypeParameter],
+        function: &'a AstFunction,
+    ) -> Option<(Id, FunctionDeclaration<'a>)> {
         let name = function.name.value()?;
 
         let id = self.id_generator.generate();
 
         let type_parameters = self.lower_type_parameters(function.type_parameters.as_ref());
+        let all_type_parameters = outer_type_parameters
+            .iter()
+            .chain(type_parameters.iter())
+            .cloned()
+            .collect::<Box<_>>();
 
-        let parameters = self.lower_parameters(&type_parameters, &function.parameters);
-        let return_type = function
-            .return_type
-            .as_ref()
-            .map_or_else(Type::nothing, |it| self.lower_type(&type_parameters, it));
+        let parameters = self.lower_parameters(&all_type_parameters, &function.parameters);
+        let return_type = function.return_type.as_ref().map_or_else(
+            || NamedType::nothing().into(),
+            |it| self.lower_type(&all_type_parameters, it),
+        );
         match self.global_identifiers.entry(name.string.clone()) {
             Entry::Occupied(mut entry) => match entry.get_mut() {
                 Named::Functions(functions) => {
@@ -581,7 +738,7 @@ impl<'a> Context<'a> {
                 entry.insert(Named::Functions(vec![id]));
             }
         }
-        self.functions.force_insert(
+        Some((
             id,
             FunctionDeclaration {
                 ast: Some(function),
@@ -591,8 +748,7 @@ impl<'a> Context<'a> {
                 return_type,
                 body: None,
             },
-        );
-        Some(id)
+        ))
     }
     fn lower_parameters(
         &mut self,
@@ -623,48 +779,253 @@ impl<'a> Context<'a> {
             })
             .collect()
     }
-    fn lower_function(&mut self, id: Id) {
-        let function = self.functions.get(&id).unwrap();
-        let body = function.ast.unwrap().body.clone();
-        let type_parameters = function.type_parameters.clone();
-        let parameters = function.parameters.clone();
-        let return_type = function.return_type.clone();
-
-        let (hir_body, _) = BodyBuilder::build(self, &type_parameters, |builder| {
-            for parameter in parameters.iter() {
+    fn lower_function(&mut self, function: &mut FunctionDeclaration<'a>) {
+        let (hir_body, _) = BodyBuilder::build(self, &function.type_parameters, |builder| {
+            for parameter in function.parameters.iter() {
                 builder.push_parameter(parameter.clone());
             }
 
-            builder.lower_statements(&body, Some(&return_type));
+            builder.lower_statements(&function.ast.unwrap().body, Some(&function.return_type));
         });
 
-        self.functions.get_mut(&id).unwrap().body = Some(BodyOrBuiltin::Body(hir_body));
+        function.body = Some(BodyOrBuiltin::Body(hir_body));
     }
 
     fn is_assignable_to(from: &Type, to: &Type) -> bool {
         match (from, to) {
             (Type::Error, _) | (_, Type::Error) => true,
-            (
-                Type::Named {
-                    name: from_name,
-                    type_arguments: from_type_arguments,
-                },
-                Type::Named {
-                    name: to_name,
-                    type_arguments: to_type_arguments,
-                },
-            ) => {
-                from_name == to_name
-                    && from_type_arguments
+            (Type::Named(from), Type::Named(to)) => {
+                from.name == to.name
+                    && from
+                        .type_arguments
                         .iter()
-                        .zip_eq(to_type_arguments.iter())
+                        .zip_eq(to.type_arguments.iter())
                         .all(|(from, to)| Self::is_assignable_to(from, to))
             }
-            (Type::Parameter { id: from, name: _ }, Type::Parameter { id: to, name: _ }) => {
-                from == to
-            }
+            (Type::Parameter(from), Type::Parameter(to)) => from.id == to.id,
+            // TODO: Self type
             _ => false,
         }
+    }
+
+    // fn trait_upper_bound_to_type_solver_roles(trait_: &AstTrait) -> FxHashSet<SolverRule> {
+    //     // Lower the constraints. For example, in the impl `impl[T: Equals] Foo[T]: Equals`, the
+    //     // `solverConstraints` are a list containing `Equals(?T)`.
+    //     let rules = FxHashSet::default();
+    //     let solverConstraints = vec![];
+    //     for constraint in hirImpl.constraints(context).entries() {
+    //         let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, constraint.second);
+    //         rules.addAll(result.third.items());
+    //         solverConstraints.appendAll(
+    //             (result.second as Iterable<SolverGoal>).map<SolverGoal>({
+    //             it.substituteAll(
+    //                 Map.of1<SolverVariable, SolverType>(
+    //                 Tuple(
+    //                     result.first as SolverVariable,
+    //                     SolverVariable(Some<HirParameterType>(constraint.first)),
+    //                 ),
+    //                 ),
+    //             )
+    //             }),
+    //         );
+    //     }
+
+    //     // Lower the base type. For example, in the impl `impl Iterable[Int]: Foo`, the base type
+    //     // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
+    //     let baseType = hirImpl.baseType(context)
+    //     let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, baseType)
+    //     rules.addAll(result.third.items())
+    //     solverConstraints.appendAll(result.second)
+    //     let solverBase = result.first
+
+    //     // Lower the trait. For example, in the impl `impl Foo: Iterable[Int]`, the implemented trait
+    //     // `Iterable[Int]` gets lowered to `?0` with the goals `Iterable(Int, ?0)`. Impls that don't
+    //     // implement a trait – like `impl Foo { ... }` – don't correspond to a `SolverRule` and cause
+    //     // this function to return `None`.
+    //     let traitType = hirImpl.implementedTrait(context)
+    //     if (traitType is None) { return Tuple(Set.empty<SolverRule>(), List.empty<CompilerError>()) }
+    //     if (traitType.unwrap() is HirErrorType) {
+    //     return Tuple(Set.empty<SolverRule>(), List.empty<CompilerError>())
+    //     }
+    //     let traitType = (traitType.unwrap() as HirNamedType)
+    //     let result = hirInlineTypeToSolverTypeAndGoalsAndRules(context, traitType)
+    //     let solverTrait = (result.first as SolverVariable) // Traits get lowered to `SolverVariable`s.
+    //     let traitGoals = result.second
+    //     rules.addAll(result.third.items())
+    //     if ((traitGoals as Iterable).length() > 1) {
+    //     // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
+    //     // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
+    //     // probably have to look at how to put general-purpose logic implications in our solver (like
+    //     // `A B -> C D` instead of only having one implicative result like `A B -> C` in the solver).
+    //     // Or we need to somehow reduce this to multiple simple rules.
+    //     // For now, we're probably fine with only implementing "simple" traits like `Iterable<Int>`.
+    //     // (As "primitive" types like `List` etc. are also traits, resolving this todo is somewhat of
+    //     // a priority.)
+    //     return Tuple(
+    //         Set.empty<SolverRule>(),
+    //         List.of1<CompilerError>(CannotImplementTraitOfTraitCompilerError(hirImpl)),
+    //     )
+    //     }
+    //     assert((traitGoals as Iterable).length() == 1, "Should never happen.")
+    //     let traitGoal = (traitGoals as Iterable<SolverGoal>).single().unwrap()
+
+    //     // Let's play this through for the impl `impl[T: Equals] Iterable[T]: Equals`.
+    //     //
+    //     // These would be the values calculated above:
+    //     //
+    //     // * `constraints`: list with goal `Equals(?T)`
+    //     // * `solverBase`: type `?0` and goal `Iterable(?T, ?0)`
+    //     // * `solverTrait`: type `?1` and goal `Equals(?1)`
+    //     //
+    //     // The goal that this impl wants to achieve can be calculated by taking the `solverTrait`, which
+    //     // is guaranteed to have only one goal `Equals(?1)`, and replacing the `solverTrait`'s type `?1`
+    //     // with the `solverBase` type `?0` – which results in `Equals(?0)`.
+    //     // To achieve that goal, we have to satisfy the goals of the `solverBase` and the `constraints`.
+    //     // So, our total `SolverRule` would look like this: `Equals(?0) <- Iterable(?T, ?0), Equals(?T)`
+    //     Tuple(
+    //     Set.of1<SolverRule>(
+    //         SolverRule(
+    //         hirImpl,
+    //         traitGoal.substituteAll(Map.of1<SolverVariable, SolverType>(Tuple(solverTrait, solverBase))),
+    //         solverConstraints,
+    //         ),
+    //     ).union(rules),
+    //     List.empty<CompilerError>(),
+    //     )
+    // }
+    // fn hirInlineTypeToSolverTypeAndGoalsAndRules() {
+
+    // }
+
+    fn hirImplToSolverRules(&mut self, impl_: &ImplDeclaration<'a>) -> FxHashSet<SolverRule> {
+        // Lower the constraints. For example, in the impl `impl[T: Equals] Foo[T]: Equals`, the
+        // `solver_constraints` are a list containing `Equals(?T)`.
+        let mut rules = FxHashSet::default();
+        let mut solver_constraints = vec![];
+        for type_parameter in impl_.type_parameters.iter() {
+            if let Some(upper_bound) = &type_parameter.upper_bound {
+                let (solver_type, goals, new_rules) =
+                    self.hirInlineTypeToSolverTypeAndGoalsAndRules(upper_bound);
+                rules.extend(new_rules.into_iter());
+
+                let SolverType::Variable(solver_variable) = solver_type else {
+                    panic!();
+                };
+                let substitution = FxHashMap::from_iter([(
+                    solver_variable,
+                    SolverVariable::new(type_parameter.type_()).into(),
+                )]);
+                solver_constraints
+                    .extend(goals.into_iter().map(|it| it.substitute_all(&substitution)));
+            };
+        }
+
+        // Lower the base type. For example, in the impl `impl Iterable[Int]: Foo`, the base type
+        // `Iterable[Int]` gets lowered to `?0` with the goal `Iterable(Int, ?0)`.
+        let (solver_base, mut goals, new_rules) =
+            self.hirInlineTypeToSolverTypeAndGoalsAndRules(&impl_.type_);
+        rules.extend(new_rules);
+        solver_constraints.append(&mut goals);
+
+        // Lower the trait. For example, in the impl `impl Foo: Iterable[Int]`, the implemented trait
+        // `Iterable[Int]` gets lowered to `?0` with the goals `Iterable(Int, ?0)`. Impls that don't
+        // implement a trait – like `impl Foo { ... }` – don't correspond to a `SolverRule` and cause
+        // this function to return `None`.
+        // let trait_ = match &impl_.trait_ {
+        //     Type::Named(named_type) => named_type,
+        //     Type::Parameter(_) | Type::Self_ { .. } | Type::Error => return FxHashSet::default(),
+        // };
+        let (solver_trait, mut trait_goals, new_rules) =
+            self.hirInlineTypeToSolverTypeAndGoalsAndRules(&impl_.trait_);
+        let SolverType::Variable(solver_trait) = solver_trait else {
+            panic!("Traits didn't get lowered to `SolverVariable`s.");
+        };
+
+        rules.extend(new_rules);
+        if trait_goals.len() > 1 {
+            // TODO(never, marcelgarus): We can't implement a trait that contains another trait yet, like
+            // `Iterable<Equals>`. This does work in Rust (with boxing and explicit dynamism), so we'll
+            // probably have to look at how to put general-purpose logic implications in our solver (like
+            // `A B -> C D` instead of only having one implicative result like `A B -> C` in the solver).
+            // Or we need to somehow reduce this to multiple simple rules.
+            // For now, we're probably fine with only implementing "simple" traits like `Iterable<Int>`.
+            // (As "primitive" types like `List` etc. are also traits, resolving this todo is somewhat of
+            // a priority.)
+            self.add_error(
+                Offset(0)..Offset(0),
+                format!("Can't implement trait of trait: {impl_:?}."),
+            );
+            return FxHashSet::default();
+        }
+        assert_eq!(trait_goals.len(), 1);
+        let trait_goal = trait_goals.pop().unwrap();
+
+        // Let's play this through for the impl `impl[T: Equals] Iterable[T]: Equals`.
+        //
+        // These would be the values calculated above:
+        //
+        // * `constraints`: list with goal `Equals(?T)`
+        // * `solverBase`: type `?0` and goal `Iterable(?T, ?0)`
+        // * `solverTrait`: type `?1` and goal `Equals(?1)`
+        //
+        // The goal that this impl wants to achieve can be calculated by taking the `solverTrait`, which
+        // is guaranteed to have only one goal `Equals(?1)`, and replacing the `solverTrait`'s type `?1`
+        // with the `solverBase` type `?0` – which results in `Equals(?0)`.
+        // To achieve that goal, we have to satisfy the goals of the `solverBase` and the `constraints`.
+        // So, our total `SolverRule` would look like this: `Equals(?0) <- Iterable(?T, ?0), Equals(?T)`
+        let substitution = FxHashMap::from_iter([(solver_trait, solver_base)]);
+        rules.insert(SolverRule {
+            goal: trait_goal.substitute_all(&substitution),
+            subgoals: solver_constraints.into_boxed_slice(),
+        });
+        rules
+    }
+
+    fn findUniqueSolverSolutionFor(
+        &mut self,
+        base: &Type,
+        trait_: &Type,
+    ) -> Option<SolverSolutionUnique> {
+        assert!(
+            trait_ != &Type::Error,
+            "Can't reveal the impl for the error type",
+        );
+
+        let (base_type, base_goals, _) = self.hirInlineTypeToSolverTypeAndGoalsAndRules(base);
+
+        let (trait_type, mut trait_goals, _) =
+            self.hirInlineTypeToSolverTypeAndGoalsAndRules(trait_);
+        let SolverType::Variable(trait_type) = trait_type else {
+            panic!("This shouldn't happen. Trait should be lowered to a SolverVariable.");
+        };
+        if trait_goals.len() != 1 {
+            self.add_error(
+                Offset(0)..Offset(0),
+                "Trying to find impl for trait with trait as parameter",
+            );
+            return None;
+        }
+        let trait_goal = trait_goals.pop().unwrap();
+
+        let solution = self.environment.solve(
+            trait_goal.substitute_all(&FxHashMap::from_iter([(trait_type, base_type)])),
+            &base_goals,
+        );
+        match solution {
+            SolverSolution::Unique(solution) => Some(solution),
+            SolverSolution::Ambiguous | SolverSolution::Impossible => None,
+        }
+    }
+
+    fn hirInlineTypeToSolverTypeAndGoalsAndRules(
+        &mut self,
+        type_: &Type,
+    ) -> (SolverType, Vec<SolverGoal>, FxHashSet<SolverRule>) {
+        /// Turns a `Type` into a `SolverType` and a list of `SolverGoal`s as well as a set of
+        /// `SolverRule`s.
+        let mut lowering_context = TypeLoweringContext::create(self);
+        let (solver_type, goals) = lowering_context.hirInlineTypeToSolverTypeAndGoals(type_);
+        (solver_type.into(), goals, lowering_context.rules)
     }
 
     fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {
@@ -753,7 +1114,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         let last_expression = last_expression.unwrap_or_else(|| {
             // TODO: check return type
             let id = self.push_nothing();
-            (id, Type::nothing())
+            (id, NamedType::nothing().into())
         });
         let return_type = context_type.cloned().unwrap_or(last_expression.1);
         (last_expression.0, return_type)
@@ -852,7 +1213,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 int.value
                     .value()
                     .map_or(ExpressionKind::Error, |it| ExpressionKind::Int(*it)),
-                Type::int(),
+                NamedType::int(),
             ),
             AstExpression::Text(text) => {
                 let text = text
@@ -860,11 +1221,12 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     .iter()
                     .map::<Id, _>(|it| match it {
                         AstTextPart::Text(text) => {
-                            self.push(None, ExpressionKind::Text(text.clone()), Type::text())
+                            self.push(None, ExpressionKind::Text(text.clone()), NamedType::text())
                         }
                         AstTextPart::Interpolation { expression, .. } => {
                             if let Some(expression) = expression.value() {
-                                self.lower_expression(expression, Some(&Type::text())).0
+                                self.lower_expression(expression, Some(&NamedType::text().into()))
+                                    .0
                             } else {
                                 self.push_error()
                             }
@@ -880,15 +1242,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 type_arguments: Box::default(),
                                 arguments: [lhs, rhs].into(),
                             },
-                            Type::text(),
+                            NamedType::text(),
                         )
                     })
                     .unwrap_or_else(|| {
-                        self.push(None, ExpressionKind::Text("".into()), Type::text())
+                        self.push(None, ExpressionKind::Text("".into()), NamedType::text())
                     });
                 LoweredExpression::Expression {
                     id: text,
-                    type_: Type::text(),
+                    type_: NamedType::text().into(),
                 }
             }
             AstExpression::Parenthesized(parenthesized) => {
@@ -1060,10 +1422,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 {
                                     match type_solver.unify(
                                         type_argument,
-                                        &Type::Parameter {
+                                        &ParameterType {
                                             name: type_parameter.name.clone(),
                                             id: type_parameter.id,
-                                        },
+                                        }
+                                        .into(),
                                     ) {
                                         Ok(true) => {}
                                         Ok(false) => unreachable!(),
@@ -1202,9 +1565,9 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     }
                     LoweredExpression::NamedTypeReference(type_) => {
                         match self.context.hir.type_declarations.get(&type_) {
-                            Some(TypeDeclaration::Struct {
+                            Some(TypeDeclaration {
                                 type_parameters,
-                                fields,
+                                kind: TypeDeclarationKind::Struct { fields },
                             }) => {
                                 if !type_parameters.is_empty() {
                                     todo!("Use type solver");
@@ -1216,10 +1579,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                     &call.arguments,
                                     &fields.iter().map(|(_, type_)| type_.clone()).collect_vec(),
                                 );
-                                let type_ = Type::Named {
+                                let type_ = Type::Named(NamedType {
                                     name: type_.clone(),
                                     type_arguments: Box::default(),
-                                };
+                                });
                                 fields.map_or(LoweredExpression::Error, |fields| {
                                     self.push_lowered(
                                         None,
@@ -1231,12 +1594,19 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                     )
                                 })
                             }
-                            Some(TypeDeclaration::Enum { .. }) => {
+                            Some(TypeDeclaration {
+                                type_parameters,
+                                kind: TypeDeclarationKind::Enum { .. },
+                            }) => {
                                 // TODO: report actual error location
                                 self.context
                                     .add_error(Offset(0)..Offset(0), "Enum variant is missing.");
                                 LoweredExpression::Error
                             }
+                            Some(TypeDeclaration {
+                                type_parameters,
+                                kind: TypeDeclarationKind::Trait { .. },
+                            }) => unreachable!(),
                             None => {
                                 // TODO: report actual error location
                                 self.context.add_error(
@@ -1255,34 +1625,34 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         );
                         LoweredExpression::Error
                     }
-                    LoweredExpression::EnumVariantReference { enum_, variant } => {
-                        let (enum_name, type_arguments) = match &enum_ {
-                            Type::Named {
-                                name,
-                                type_arguments,
-                            } => (name, type_arguments),
-                            Type::Parameter { .. } | Type::Error => unreachable!(),
+                    LoweredExpression::EnumVariantReference {
+                        enum_: enum_type,
+                        variant,
+                    } => {
+                        let Type::Named(enum_named_type) = &enum_type else {
+                            unreachable!();
                         };
-                        let (type_parameters, variant_type) =
-                            match self.context.hir.type_declarations.get(enum_name).unwrap() {
-                                TypeDeclaration::Struct { .. } => unreachable!(),
-                                TypeDeclaration::Enum {
-                                    type_parameters,
-                                    variants,
-                                } => (
-                                    type_parameters,
-                                    variants
-                                        .iter()
-                                        .find(|(name, _)| name == &variant)
-                                        .unwrap()
-                                        .1
-                                        .as_ref()
-                                        .unwrap()
-                                        .clone(),
-                                ),
-                            };
-                        let variant_type = variant_type
-                            .substitute(&Type::build_environment(type_parameters, type_arguments));
+                        let enum_ = self
+                            .context
+                            .hir
+                            .type_declarations
+                            .get(&enum_named_type.name)
+                            .unwrap();
+                        let TypeDeclarationKind::Enum { variants } = &enum_.kind else {
+                            unreachable!();
+                        };
+                        let variant_type = variants
+                            .iter()
+                            .find(|(name, _)| name == &variant)
+                            .unwrap()
+                            .1
+                            .as_ref()
+                            .unwrap()
+                            .clone();
+                        let variant_type = variant_type.substitute(&Type::build_environment(
+                            &enum_.type_parameters,
+                            &enum_named_type.type_arguments,
+                        ));
                         let parameter_types = [variant_type];
                         let arguments = lower_arguments(
                             self,
@@ -1294,11 +1664,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             self.push_lowered(
                                 None,
                                 ExpressionKind::CreateEnum {
-                                    enum_: enum_.clone(),
+                                    enum_: enum_type.clone(),
                                     variant,
                                     value: arguments.first().copied(),
                                 },
-                                enum_,
+                                enum_type,
                             )
                         })
                     }
@@ -1317,14 +1687,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         id: receiver_id,
                         type_: receiver_type,
                     } => match &receiver_type {
-                        Type::Named {
-                            name,
-                            type_arguments,
-                        } => {
-                            let type_ = &self.context.hir.type_declarations.get(name);
-                            if let Some(TypeDeclaration::Struct {
+                        Type::Named(named_type) => {
+                            let type_ = &self.context.hir.type_declarations.get(&named_type.name);
+                            if let Some(TypeDeclaration {
                                 type_parameters,
-                                fields,
+                                kind: TypeDeclarationKind::Struct { fields },
                             }) = type_
                                 && let Some((_, field_type)) =
                                     fields.iter().find(|(name, _)| name == &key.string)
@@ -1337,7 +1704,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                     },
                                     field_type.substitute(&Type::build_environment(
                                         type_parameters,
-                                        type_arguments,
+                                        &named_type.type_arguments,
                                     )),
                                 );
                             }
@@ -1372,15 +1739,16 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             );
                             LoweredExpression::Error
                         }
-                        Type::Parameter { name, .. } => {
+                        Type::Parameter(type_) => {
                             self.context.add_error(
                                 key.span.clone(),
                                 format!(
-                                    "Navigation on value of type parameter type `{name}` is not supported yet."
+                                    "Navigation on value of type parameter type `{}` is not supported yet.",type_.name
                                 ),
                             );
                             LoweredExpression::Error
                         }
+                        Type::Self_ { .. } => todo!(),
                         Type::Error => todo!(),
                     },
                     LoweredExpression::FunctionReferences { .. } => {
@@ -1391,8 +1759,9 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         LoweredExpression::Error
                     }
                     LoweredExpression::NamedTypeReference(type_) => {
-                        match self.context.hir.type_declarations.get(&type_).unwrap() {
-                            TypeDeclaration::Struct { .. } => {
+                        let declaration = self.context.hir.type_declarations.get(&type_).unwrap();
+                        match &declaration.kind {
+                            TypeDeclarationKind::Struct { .. } => {
                                 self.context.add_error(
                                     key.span.clone(),
                                     format!(
@@ -1402,17 +1771,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 );
                                 LoweredExpression::Error
                             }
-                            TypeDeclaration::Enum {
-                                type_parameters,
-                                variants,
-                            } => {
-                                if !type_parameters.is_empty() {
+                            TypeDeclarationKind::Enum { variants } => {
+                                if !declaration.type_parameters.is_empty() {
                                     todo!();
                                 }
-                                let type_ = Type::Named {
+                                let type_ = NamedType {
                                     name: type_.clone(),
                                     type_arguments: Box::default(),
-                                };
+                                }
+                                .into();
 
                                 if let Some((_, value_type)) =
                                     variants.iter().find(|(name, _)| name == &key.string)
@@ -1444,6 +1811,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                     LoweredExpression::Error
                                 }
                             }
+                            TypeDeclarationKind::Trait { .. } => unreachable!(),
                         }
                     }
                     LoweredExpression::TypeParameterReference { name, .. } => {
@@ -1471,12 +1839,19 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 let (value, enum_) = self.lower_expression(value, None);
 
                 let (environment, variants) = match &enum_ {
-                    Type::Named {
-                        name,
-                        type_arguments,
-                    } => {
-                        match &self.context.hir.type_declarations.get(name) {
-                            Some(TypeDeclaration::Struct { .. }) => {
+                    Type::Named(type_) => {
+                        let Some(declaration) =
+                            &self.context.hir.type_declarations.get(&type_.name)
+                        else {
+                            // TODO: report actual error location
+                            self.context.add_error(
+                                Offset(0)..Offset(0),
+                                format!("Can't switch over builtin type `{enum_:?}`"),
+                            );
+                            return LoweredExpression::Error;
+                        };
+                        match &declaration.kind {
+                            TypeDeclarationKind::Struct { .. } => {
                                 // TODO: report actual error location
                                 self.context.add_error(
                                     Offset(0)..Offset(0),
@@ -1484,35 +1859,27 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 );
                                 return LoweredExpression::Error;
                             }
-                            Some(TypeDeclaration::Enum {
-                                type_parameters,
-                                variants,
-                            }) => (
-                                type_parameters
+                            TypeDeclarationKind::Enum { variants } => (
+                                declaration
+                                    .type_parameters
                                     .iter()
                                     .map(|it| it.id)
-                                    .zip_eq(type_arguments.iter().cloned())
+                                    .zip_eq(type_.type_arguments.iter().cloned())
                                     .collect::<FxHashMap<_, _>>(),
                                 variants.clone(),
                             ),
-                            None => {
-                                // TODO: report actual error location
-                                self.context.add_error(
-                                    Offset(0)..Offset(0),
-                                    format!("Can't switch over builtin type `{enum_:?}`"),
-                                );
-                                return LoweredExpression::Error;
-                            }
+                            TypeDeclarationKind::Trait { .. } => unreachable!(),
                         }
                     }
-                    Type::Parameter { name, .. } => {
+                    Type::Parameter(type_) => {
                         // TODO: report actual error location
                         self.context.add_error(
                             Offset(0)..Offset(0),
-                            format!("Can't switch over type parameter `{name}`"),
+                            format!("Can't switch over type parameter `{}`", type_.name),
                         );
                         return LoweredExpression::Error;
                     }
+                    Type::Self_ { .. } => todo!(),
                     Type::Error => return LoweredExpression::Error,
                 };
 
@@ -1599,7 +1966,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         enum_,
                         cases,
                     },
-                    return_type.unwrap_or_else(Type::never),
+                    return_type.unwrap_or_else(|| NamedType::never().into()),
                 )
             }
         }
@@ -1609,8 +1976,9 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         &mut self,
         name: impl Into<Option<Box<str>>>,
         kind: ExpressionKind,
-        type_: Type,
+        type_: impl Into<Type>,
     ) -> LoweredExpression {
+        let type_ = type_.into();
         let id = self.push(name, kind, type_.clone());
         LoweredExpression::Expression { id, type_ }
     }
@@ -1631,8 +1999,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     fn push_error(&mut self) -> Id {
         self.push(None, ExpressionKind::Error, Type::Error)
     }
-    fn push(&mut self, name: impl Into<Option<Box<str>>>, kind: ExpressionKind, type_: Type) -> Id {
+    fn push(
+        &mut self,
+        name: impl Into<Option<Box<str>>>,
+        kind: ExpressionKind,
+        type_: impl Into<Type>,
+    ) -> Id {
         let name = name.into();
+        let type_ = type_.into();
         let id = self.context.id_generator.generate();
         if let Some(name) = &name {
             self.local_identifiers
@@ -1692,8 +2066,8 @@ impl<'h> TypeSolver<'h> {
     fn unify(&mut self, argument: &Type, parameter: &Type) -> Result<bool, Box<str>> {
         match (argument, parameter) {
             (Type::Error, _) | (_, Type::Error) => Ok(true),
-            (_, Type::Parameter { name, id }) => {
-                if let Some(mapped) = self.environment.get(id) {
+            (_, Type::Parameter(parameter)) => {
+                if let Some(mapped) = self.environment.get(&parameter.id) {
                     if let Type::Parameter { .. } = mapped {
                         panic!("Type parameters can't depend on each other.")
                     }
@@ -1702,13 +2076,14 @@ impl<'h> TypeSolver<'h> {
                 }
 
                 assert!(
-                    self.type_parameters.iter().any(|it| it.id == *id),
-                    "Unresolved type parameter: `{name}`"
+                    self.type_parameters.iter().any(|it| it.id == parameter.id),
+                    "Unresolved type parameter: `{}`",
+                    parameter.name
                 );
-                match self.environment.entry(*id) {
+                match self.environment.entry(parameter.id) {
                     Entry::Occupied(entry) => {
                         if !Context::is_assignable_to(entry.get(), argument) {
-                            return Err(format!("Type parameter {name} gets resolved to different types: `{}` and `{argument}`", entry.get()).into_boxed_str());
+                            return Err(format!("Type parameter {} gets resolved to different types: `{}` and `{argument}`", parameter.name,entry.get()).into_boxed_str());
                         }
                     }
                     Entry::Vacant(entry) => {
@@ -1717,25 +2092,17 @@ impl<'h> TypeSolver<'h> {
                 }
                 Ok(true)
             }
-            (
-                Type::Named {
-                    name: argument_name,
-                    type_arguments: argument_type_arguments,
-                },
-                Type::Named {
-                    name: parameter_name,
-                    type_arguments: parameter_type_arguments,
-                },
-            ) => {
-                if argument_name != parameter_name
-                    || argument_type_arguments.len() != parameter_type_arguments.len()
+            (Type::Named(argument), Type::Named(parameter)) => {
+                if argument.name != parameter.name
+                    || argument.type_arguments.len() != parameter.type_arguments.len()
                 {
                     return Ok(false);
                 }
 
-                for (argument, parameter) in argument_type_arguments
+                for (argument, parameter) in argument
+                    .type_arguments
                     .iter()
-                    .zip_eq(parameter_type_arguments.iter())
+                    .zip_eq(parameter.type_arguments.iter())
                 {
                     let result = self.unify(argument, parameter)?;
                     if !result {
@@ -1745,6 +2112,7 @@ impl<'h> TypeSolver<'h> {
                 Ok(true)
             }
             (Type::Parameter { .. }, Type::Named { .. }) => Ok(true),
+            (_, _) => todo!(), // TODO: Self type
         }
     }
 
@@ -1759,5 +2127,111 @@ impl<'h> TypeSolver<'h> {
             }
         }
         Ok(self.environment)
+    }
+}
+
+struct TypeLoweringContext<'c, 'a> {
+    context: &'c mut Context<'a>,
+    next_canonical_index: usize,
+    rules: FxHashSet<SolverRule>,
+}
+impl<'c, 'a> TypeLoweringContext<'c, 'a> {
+    fn create(context: &'c mut Context<'a>) -> Self {
+        Self {
+            context,
+            next_canonical_index: 0,
+            rules: FxHashSet::from_iter([SolverRule {
+                goal: SolverGoal {
+                    trait_: Type::Error.to_string().into_boxed_str(),
+                    parameters: [SolverType::Variable(SolverVariable::error())].into(),
+                },
+                subgoals: Box::default(),
+            }]),
+        }
+    }
+
+    fn getNextCanonicalVariable(&mut self) -> ParameterType {
+        let result = canonical_variable(self.next_canonical_index);
+        self.next_canonical_index += 1;
+        result
+    }
+
+    fn hirInlineTypeToSolverTypeAndGoals(
+        &mut self,
+        type_: &Type,
+    ) -> (SolverVariable, Vec<SolverGoal>) {
+        match type_ {
+            Type::Named(type_) => {
+                println!("hirInlineTypeToSolverTypeAndGoals({type_})");
+                // Example:
+                //
+                // hirInlineTypeToSolverTypeAndGoals(Foo[String, Int]) == (
+                //   ?0,
+                //   Foo(?0, ?1, ?2), String(?1), Int(?2),
+                //   [
+                //     Foo($Foo[?1, ?2], ?1, ?2) <- <empty>,
+                //     Foo($Never, ?1, ?2) <- <empty>,
+                //     Foo(?0, ?1, ?2) <- Error(?0),
+                //     ## Generated transitively:
+                //     String($String) <- <empty>,
+                //     String($Never) <- <empty>,
+                //     String(?0) <- Error(?0),
+                //     Int($Int) <- <empty>,
+                //     Int($Never) <- <empty>,
+                //     Int(?0) <- Error(?0),
+                //     Error(?0) <- <empty>,
+                //     Any(?0) <- <empty>,
+                //   ],
+                // )
+
+                let mut solver_parameters = vec![];
+                let mut goals = vec![];
+
+                for type_argument in type_.type_arguments.iter() {
+                    let (type_argument, mut new_goals) =
+                        self.hirInlineTypeToSolverTypeAndGoals(type_argument);
+                    solver_parameters.push(type_argument.into());
+                    goals.append(&mut new_goals);
+                }
+
+                // TODO: move this above the generics
+                // We'll return a substitution that will have to satisfy the trait. For example, given the
+                // trait `Equals`, we'll return `?0` with the goal `Equals(?0)`. The `?0` is this
+                // substitution.
+                let substitution = SolverVariable::new(self.getNextCanonicalVariable());
+                solver_parameters.push(substitution.clone().into());
+                goals.push(SolverGoal {
+                    trait_: type_.name.clone(),
+                    parameters: solver_parameters.into_boxed_slice(),
+                });
+
+                (substitution, goals)
+            }
+            Type::Self_ { base_type } => {
+                // TODO
+                // if (declaration is HirTrait) {
+                //     // We don't need to lower `Self` types in traits to solver types because we only use impls
+                //     // for logical type solving.
+                //     throw "Don't call hirTypeToSolverType for a Self type in a trait"
+                // }
+
+                // If a `Self` type is used inside an impl, it just assumes the solver type of the base
+                // type.
+                //
+                // Whether that solver type is a `SolverVariable` or `SolverValue` depends on whether the
+                // impl is for a trait or type:
+                //
+                // * `impl Int: InfixAmpersand[Self, Int]` has the lowered base type `Int`, so the `Self`
+                //   gets replaced with `Int`, resulting in `InfixAmpersand(Int, Bool)`.
+                // * `impl And: InfixAmpersand[Self, Bool]` has the lowered base type `?0` with the
+                //   additional goal `And(?0)`, so the `Self` gets replaced with `?0`, resulting in
+                //   `InfixAmpersand(?0, Bool) <- And(?0)`.
+                let (base_type, _) =
+                    self.hirInlineTypeToSolverTypeAndGoals(&base_type.clone().into());
+                (base_type, vec![])
+            }
+            Type::Parameter(type_) => (SolverVariable::new(type_.clone()), vec![]),
+            Type::Error => (SolverVariable::error(), vec![]),
+        }
     }
 }

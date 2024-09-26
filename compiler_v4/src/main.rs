@@ -17,6 +17,9 @@
     clippy::too_many_lines
 )]
 
+// Allows macros to refer to this crate as `::candy_compiler_v4`
+extern crate self as candy_compiler_v4;
+
 use ast::CollectAstErrors;
 use ast_to_hir::ast_to_hir;
 use clap::{Parser, ValueHint};

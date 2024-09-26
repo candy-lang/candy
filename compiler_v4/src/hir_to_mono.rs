@@ -1,5 +1,5 @@
 use crate::{
-    hir::{self, Hir, Type},
+    hir::{self, Hir, NamedType, ParameterType, Type},
     id::IdGenerator,
     mono::{self, Mono},
     utils::HashMapExtension,
@@ -54,8 +54,8 @@ impl<'h> Context<'h> {
     }
 
     fn lower_assignment(&mut self, id: hir::Id) -> Box<str> {
-        let (name, assignment) = self.hir.get_assignment(id);
-        let name = name.to_string().into_boxed_str();
+        let assignment = &self.hir.assignments[&id];
+        let name = assignment.name.to_string().into_boxed_str();
         match self.assignments.entry(name.clone()) {
             Entry::Occupied(_) => return name.clone(),
             Entry::Vacant(entry) => entry.insert(None),
@@ -72,10 +72,10 @@ impl<'h> Context<'h> {
     }
 
     fn lower_function(&mut self, id: hir::Id, type_arguments: &[hir::Type]) -> Box<str> {
-        let (name, function) = self.hir.get_function(id);
+        let function = &self.hir.functions[&id];
         let environment = Type::build_environment(&function.type_parameters, type_arguments);
         let name = self.mangle_function(
-            name,
+            &function.name,
             &function
                 .parameters
                 .iter()
@@ -135,53 +135,59 @@ impl<'h> Context<'h> {
         };
 
         let declaration = match type_ {
-            hir::Type::Named {
+            hir::Type::Named(NamedType {
                 name,
                 type_arguments,
-            } => match self.hir.type_declarations.get(name) {
-                Some(hir::TypeDeclaration::Struct {
-                    type_parameters,
-                    fields,
-                }) => {
-                    entry.insert(None);
-                    let environment =
-                        hir::Type::build_environment(&type_parameters, &type_arguments);
-                    let fields = fields
-                        .iter()
-                        .map(|(name, type_)| {
-                            (
-                                name.clone(),
-                                self.lower_type(&type_.substitute(&environment)),
-                            )
-                        })
-                        .collect();
-                    mono::TypeDeclaration::Struct { fields }
-                }
-                Some(hir::TypeDeclaration::Enum {
-                    type_parameters,
-                    variants,
-                }) => {
-                    entry.insert(None);
-                    let environment =
-                        hir::Type::build_environment(&type_parameters, &type_arguments);
-                    let variants = variants
-                        .iter()
-                        .map(|(name, value_type)| mono::EnumVariant {
-                            name: name.clone(),
-                            value_type: value_type
-                                .as_ref()
-                                .map(|it| self.lower_type(&it.substitute(&environment))),
-                        })
-                        .collect();
-                    mono::TypeDeclaration::Enum { variants }
-                }
-                None => {
+            }) => {
+                let Some(declaration) = &self.hir.type_declarations.get(name) else {
                     // Builtin type
                     return mangled_name;
+                };
+                match &declaration.kind {
+                    hir::TypeDeclarationKind::Struct { fields } => {
+                        entry.insert(None);
+                        let environment = hir::Type::build_environment(
+                            &declaration.type_parameters,
+                            &type_arguments,
+                        );
+                        let fields = fields
+                            .iter()
+                            .map(|(name, type_)| {
+                                (
+                                    name.clone(),
+                                    self.lower_type(&type_.substitute(&environment)),
+                                )
+                            })
+                            .collect();
+                        mono::TypeDeclaration::Struct { fields }
+                    }
+                    hir::TypeDeclarationKind::Enum { variants } => {
+                        entry.insert(None);
+                        let environment = hir::Type::build_environment(
+                            &declaration.type_parameters,
+                            &type_arguments,
+                        );
+                        let variants = variants
+                            .iter()
+                            .map(|(name, value_type)| mono::EnumVariant {
+                                name: name.clone(),
+                                value_type: value_type
+                                    .as_ref()
+                                    .map(|it| self.lower_type(&it.substitute(&environment))),
+                            })
+                            .collect();
+                        mono::TypeDeclaration::Enum { variants }
+                    }
+                    hir::TypeDeclarationKind::Trait { .. } => {
+                        panic!("Trait type {name} should have been monomorphized.")
+                    }
                 }
-            },
-            hir::Type::Parameter { name, id } => {
+            }
+            hir::Type::Parameter(ParameterType { name, id }) => {
                 panic!("Type parameter {name} ({id}) should have been monomorphized.")
+            }
+            hir::Type::Self_ { base_type } => {
+                panic!("Self type (base type: {base_type}) should have been monomorphized.")
             }
             hir::Type::Error => unreachable!(),
         };
@@ -195,22 +201,22 @@ impl<'h> Context<'h> {
     }
     fn mangle_type_helper(result: &mut String, type_: &hir::Type) {
         match type_ {
-            hir::Type::Named {
-                name,
-                type_arguments,
-            } => {
-                result.push_str(name);
-                if !type_arguments.is_empty() {
+            hir::Type::Named(type_) => {
+                result.push_str(&type_.name);
+                if !type_.type_arguments.is_empty() {
                     result.push_str("$of$");
-                    for type_ in type_arguments.iter() {
+                    for type_ in type_.type_arguments.iter() {
                         Self::mangle_type_helper(result, type_);
                         result.push('&');
                     }
                     result.push_str("end$");
                 }
             }
-            hir::Type::Parameter { name, id } => {
+            hir::Type::Parameter(ParameterType { name, id }) => {
                 panic!("Type parameter {name} ({id}) should have been monomorphized.")
+            }
+            hir::Type::Self_ { base_type } => {
+                panic!("Self type (base type: {base_type}) should have been monomorphized.")
             }
             hir::Type::Error => result.push_str("Never"),
         }
@@ -412,7 +418,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
     fn lower_id(&mut self, hir_id: hir::Id) -> mono::Id {
         self.id_mapping.get(&hir_id).copied().unwrap_or_else(|| {
             let name = self.context.lower_assignment(hir_id);
-            let (_, assignment) = self.context.hir.get_assignment(hir_id);
+            let assignment = &self.context.hir.assignments[&hir_id];
             self.push(
                 None,
                 None,
