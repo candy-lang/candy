@@ -408,7 +408,7 @@ fn type_parameters<'s>(parser: Parser<'s>) -> Option<(Parser, AstTypeParameters)
         Some(AstError {
             unparsable_input: AstString {
                 string: parser.source()[*start_offset..*parser.offset()].into(),
-                file: parser.file.to_path_buf(),
+                file: parser.file().to_path_buf(),
                 span: start_offset..parser.offset(),
             },
             error: "Type parameter brackets must not be empty.".into(),

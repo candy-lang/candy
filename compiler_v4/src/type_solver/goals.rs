@@ -117,7 +117,7 @@ impl Environment {
     // As we rely even more than Rust on dynamic dispatch and being able to implement traits like
     // `List[Equals]`, we'll definitely have to incorporate something like that into our solver
     // someday.
-    pub fn solve(&self, goal: SolverGoal, conditions: &[SolverGoal]) -> SolverSolution {
+    pub fn solve(&self, goal: &SolverGoal, conditions: &[SolverGoal]) -> SolverSolution {
         // Create virtual types for the types in the rule and implement the right traits for them. In
         // the example above, we'd create virtual `$Virtual0` and `$Virtual1` types and implement the
         // given traits for them, e.g. by adding the rules `Iterable($Virtual1, $Virtual0) <- ∅` and

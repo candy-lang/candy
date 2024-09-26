@@ -250,20 +250,17 @@ fn expression_suffix_call<'s>(
 
     let (parser, type_arguments) = type_arguments(parser).optional(parser);
 
-    let (parser, arguments) = match arguments(parser) {
-        Some((parser, arguments)) => (parser, AstResult::ok(arguments)),
-        None => {
-            if type_arguments.is_none() {
-                return None;
-            }
-            (
-                parser,
-                AstResult::error(
-                    None,
-                    parser.error_at_current_offset("This call is missing arguments."),
-                ),
-            )
-        }
+    let (parser, arguments) = if let Some((parser, arguments)) = arguments(parser) {
+        (parser, AstResult::ok(arguments))
+    } else {
+        type_arguments.as_ref()?;
+        (
+            parser,
+            AstResult::error(
+                None,
+                parser.error_at_current_offset("This call is missing arguments."),
+            ),
+        )
     };
 
     replace_with_or_abort(current, |current| {

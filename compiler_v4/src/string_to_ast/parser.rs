@@ -7,7 +7,7 @@ use std::path::Path;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Parser<'s> {
-    pub file: &'s Path,
+    file: &'s Path,
     source: &'s str,
     offset: Offset,
 }

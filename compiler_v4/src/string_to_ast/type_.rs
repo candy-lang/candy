@@ -53,7 +53,7 @@ pub fn type_arguments<'s>(parser: Parser<'s>) -> Option<(Parser, AstTypeArgument
         Some(AstError {
             unparsable_input: AstString {
                 string: parser.source()[*start_offset..*parser.offset()].into(),
-                file: parser.file.to_path_buf(),
+                file: parser.file().to_path_buf(),
                 span: span.clone(),
             },
             error: "Type argument brackets must not be empty.".into(),

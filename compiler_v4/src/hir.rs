@@ -143,7 +143,7 @@ impl Display for ParameterType {
     }
 }
 impl Type {
-    pub fn nothing() -> Type {
+    pub fn nothing() -> Self {
         NamedType::nothing().into()
     }
 

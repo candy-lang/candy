@@ -1,6 +1,6 @@
 use super::{parser::Parser, whitespace::whitespace};
 
-pub fn list_of<'a, T>(
+pub fn list_of<T>(
     mut parser: Parser,
     mut parse_item: impl FnMut(Parser) -> Option<(Parser, T)>,
 ) -> (Parser, Vec<T>) {
