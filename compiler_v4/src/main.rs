@@ -45,6 +45,7 @@ mod mono;
 mod mono_to_c;
 mod position;
 mod string_to_ast;
+mod type_solver;
 mod utils;
 
 #[derive(Parser, Debug)]
