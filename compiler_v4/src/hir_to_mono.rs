@@ -360,26 +360,27 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
             }
             hir::ExpressionKind::Call {
                 function,
-                type_arguments,
+                substitutions,
                 arguments,
             } => {
-                let function = self.context.lower_function(
-                    *function,
-                    &type_arguments
-                        .iter()
-                        .map(|it| it.substitute(self.environment))
-                        .collect_vec(),
-                );
-                let arguments = self.lower_ids(arguments);
-                self.push(
-                    id,
-                    name,
-                    mono::ExpressionKind::Call {
-                        function,
-                        arguments,
-                    },
-                    &expression.type_,
-                );
+                todo!();
+                // let function = self.context.lower_function(
+                //     *function,
+                //     &type_arguments
+                //         .iter()
+                //         .map(|it| it.substitute(self.environment))
+                //         .collect_vec(),
+                // );
+                // let arguments = self.lower_ids(arguments);
+                // self.push(
+                //     id,
+                //     name,
+                //     mono::ExpressionKind::Call {
+                //         function,
+                //         arguments,
+                //     },
+                //     &expression.type_,
+                // );
             }
             hir::ExpressionKind::Switch {
                 value,

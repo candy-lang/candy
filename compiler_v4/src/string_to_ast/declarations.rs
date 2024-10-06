@@ -15,8 +15,8 @@ use super::{
     word::raw_identifier,
 };
 use crate::ast::{
-    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstImpl,
-    AstParameter, AstString, AstStruct, AstStructField, AstTrait, AstTypeParameter,
+    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstFunctionBody,
+    AstImpl, AstParameter, AstString, AstStruct, AstStructField, AstTrait, AstTypeParameter,
     AstTypeParameters,
 };
 use tracing::instrument;
@@ -290,11 +290,15 @@ pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
 
 #[instrument(level = "trace")]
 fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
-    let parser = fun_keyword(parser)?.and_trailing_whitespace();
+    let fun_keyword_start = parser.offset();
+    let parser = fun_keyword(parser)?;
+    let fun_keyword_span = fun_keyword_start..parser.offset();
+    let parser = parser.and_trailing_whitespace();
 
     let (parser, name) = raw_identifier(parser)
-        .and_trailing_whitespace()
-        .unwrap_or_ast_error_result(parser, "This function is missing a name.");
+        .unwrap_or_ast_error_result(parser, "This function is missing a name.")
+        .and_trailing_whitespace();
+    let display_span = name.value().map_or(fun_keyword_span, |it| it.span.clone());
 
     let (parser, type_parameters) = type_parameters(parser).optional(parser);
 
@@ -320,13 +324,29 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
 
     let (parser, closing_parenthesis_error) = closing_parenthesis(parser)
         .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This function is missing an closing parenthesis.");
+        .unwrap_or_ast_error(parser, "This function is missing a closing parenthesis.");
 
     let (parser, return_type) = type_(parser).optional(parser).and_trailing_whitespace();
 
-    let (parser, opening_curly_brace_error) = opening_curly_brace(parser)
-        .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This function is missing an opening curly brace.");
+    let (parser, body) = function_body(parser).optional(parser);
+
+    Some((
+        parser,
+        AstFunction {
+            display_span,
+            name,
+            type_parameters,
+            opening_parenthesis_error,
+            parameters,
+            closing_parenthesis_error,
+            return_type,
+            body,
+        },
+    ))
+}
+#[instrument(level = "trace")]
+fn function_body<'a>(parser: Parser) -> Option<(Parser, AstFunctionBody)> {
+    let parser = opening_curly_brace(parser)?.and_trailing_whitespace();
 
     let (parser, body) = list_of(parser, statement);
 
@@ -335,14 +355,7 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
 
     Some((
         parser,
-        AstFunction {
-            name,
-            type_parameters,
-            opening_parenthesis_error,
-            parameters,
-            closing_parenthesis_error,
-            return_type,
-            opening_curly_brace_error,
+        AstFunctionBody {
             body,
             closing_curly_brace_error,
         },

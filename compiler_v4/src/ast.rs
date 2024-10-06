@@ -129,13 +129,17 @@ pub struct AstAssignment {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstFunction {
+    pub display_span: Range<Offset>,
     pub name: AstResult<AstString>,
     pub type_parameters: Option<AstTypeParameters>,
     pub opening_parenthesis_error: Option<AstError>,
     pub parameters: Vec<AstParameter>,
     pub closing_parenthesis_error: Option<AstError>,
     pub return_type: Option<AstType>,
-    pub opening_curly_brace_error: Option<AstError>,
+    pub body: Option<AstFunctionBody>,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstFunctionBody {
     pub body: Vec<AstStatement>,
     pub closing_curly_brace_error: Option<AstError>,
 }
@@ -185,6 +189,7 @@ pub struct AstTypeArgument {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AstExpression {
+    // TODO: differentiate values and types
     Identifier(AstIdentifier),
     Int(AstInt),
     Text(AstText),
@@ -429,7 +434,11 @@ impl CollectAstErrors for AstFunction {
         self.parameters.collect_errors_to(errors);
         self.closing_parenthesis_error.collect_errors_to(errors);
         self.return_type.collect_errors_to(errors);
-        self.opening_curly_brace_error.collect_errors_to(errors);
+        self.body.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstFunctionBody {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.body.collect_errors_to(errors);
         self.closing_curly_brace_error.collect_errors_to(errors);
     }

@@ -1,5 +1,5 @@
 use crate::{
-    hir::{ParameterType, TypeParameterId},
+    hir::{NamedType, ParameterType, Type, TypeParameterId},
     id::CountableId,
 };
 use enum_dispatch::enum_dispatch;
@@ -148,6 +148,18 @@ pub trait SolverTypeTrait: Sized {
         mapping: &mut FxHashMap<SolverVariable, SolverVariable>,
     ) -> Self;
 }
+impl TryFrom<Type> for SolverType {
+    type Error = ();
+
+    fn try_from(type_: Type) -> Result<Self, Self::Error> {
+        match type_ {
+            Type::Named(named_type) => SolverValue::try_from(named_type).map(SolverType::Value),
+            Type::Parameter(parameter_type) => Ok(SolverVariable::from(parameter_type).into()),
+            Type::Self_ { .. } => todo!(),
+            Type::Error => Err(()),
+        }
+    }
+}
 impl Display for SolverType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
@@ -160,7 +172,7 @@ impl Display for SolverType {
 /// A type variable that needs to be substituted.
 ///
 /// These map to the type parameters in Candy. In the context of the solver,
-/// they are displayed with a leading question mark: `?name`
+/// they are displayed with a leading question mark: `?name`.
 ///
 /// Examples:
 ///
@@ -207,6 +219,11 @@ impl SolverTypeTrait for SolverVariable {
                 type_: Some(canonical_variable(mapping_len)),
             })
             .clone()
+    }
+}
+impl From<ParameterType> for SolverVariable {
+    fn from(type_: ParameterType) -> Self {
+        Self::new(type_)
     }
 }
 impl Display for SolverVariable {
@@ -264,6 +281,21 @@ impl SolverTypeTrait for SolverValue {
                 .map(|parameter| parameter.canonicalize_internal(mapping))
                 .collect(),
         }
+    }
+}
+impl TryFrom<NamedType> for SolverValue {
+    type Error = ();
+
+    fn try_from(type_: NamedType) -> Result<Self, Self::Error> {
+        Ok(Self {
+            type_: type_.name,
+            parameters: type_
+                .type_arguments
+                .into_vec()
+                .into_iter()
+                .map(SolverType::try_from)
+                .collect::<Result<Box<[SolverType]>, _>>()?,
+        })
     }
 }
 impl Display for SolverValue {

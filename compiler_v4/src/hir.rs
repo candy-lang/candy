@@ -33,12 +33,12 @@ pub struct Hir {
     pub main_function_id: Id,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeDeclaration {
     pub type_parameters: Box<[TypeParameter]>,
     pub kind: TypeDeclarationKind,
 }
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeDeclarationKind {
     Struct {
         fields: Box<[(Box<str>, Type)]>,
@@ -51,7 +51,7 @@ pub enum TypeDeclarationKind {
     },
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Impl {
     pub type_parameters: Box<[TypeParameter]>,
     pub type_: Type,
@@ -191,14 +191,14 @@ impl Display for NamedType {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Assignment {
     pub name: Box<str>,
     pub type_: Type,
     pub body: Body,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Function {
     pub name: Box<str>,
     pub type_parameters: Box<[TypeParameter]>,
@@ -213,12 +213,12 @@ pub struct Parameter {
     pub type_: Type,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BodyOrBuiltin {
     Body(Body),
     Builtin(BuiltinFunction),
 }
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Body {
     pub expressions: Vec<(Id, Option<Box<str>>, Expression)>,
 }
@@ -228,7 +228,7 @@ impl Body {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Expression {
     pub kind: ExpressionKind,
     pub type_: Type,
@@ -246,7 +246,7 @@ impl Expression {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpressionKind {
     Int(i64),
     Text(Box<str>),
@@ -266,7 +266,7 @@ pub enum ExpressionKind {
     Reference(Id),
     Call {
         function: Id,
-        type_arguments: Box<[Type]>,
+        substitutions: FxHashMap<TypeParameterId, Type>,
         arguments: Box<[Id]>,
     },
     Switch {
@@ -276,7 +276,7 @@ pub enum ExpressionKind {
     },
     Error,
 }
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SwitchCase {
     pub variant: Box<str>,
     pub value_id: Option<Id>,

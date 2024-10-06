@@ -1,4 +1,5 @@
 use super::values::{SolverType, SolverTypeTrait, SolverValue, SolverVariable};
+use crate::hir::{Type, TypeParameter};
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
@@ -56,6 +57,20 @@ impl SolverGoal {
         }
     }
 }
+impl TryFrom<TypeParameter> for SolverGoal {
+    type Error = ();
+
+    fn try_from(value: TypeParameter) -> Result<Self, Self::Error> {
+        let Some(box Type::Named(upper_bound)) = &value.upper_bound else {
+            return Err(());
+        };
+
+        Ok(SolverGoal {
+            trait_: upper_bound.name.clone(),
+            parameters: vec![SolverVariable::new(value.type_()).into()].into_boxed_slice(),
+        })
+    }
+}
 impl Display for SolverGoal {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}({})", self.trait_, self.parameters.iter().join(", "))
@@ -72,7 +87,7 @@ impl Display for SolverGoal {
 ///   `Clone` if both `?0` and `?1` implement `Clone`
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SolverRule {
-    // originalImpl: HirTrait | HirType | HirNamedType | HirImpl, // FIX;E
+    // originalImpl: HirTrait | HirType | HirNamedType | HirImpl, // FIXME
     /// * `HirTrait` or `HirType`: originates from the `Any` or an error type, or `T(?T)`
     /// * `HirNamedType`: originates from that trait upper bound
     /// * `HirImpl`: originates from that impl
