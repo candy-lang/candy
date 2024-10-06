@@ -12,7 +12,7 @@ use crate::{
         SliceOfTypeParameter, SwitchCase, TraitFunction, Type, TypeDeclaration,
         TypeDeclarationKind, TypeParameter, TypeParameterId,
     },
-    id::{CountableId, IdGenerator},
+    id::IdGenerator,
     position::Offset,
     type_solver::{
         goals::{Environment, SolverGoal, SolverRule, SolverSolution},
@@ -81,7 +81,6 @@ struct ImplDeclaration<'a> {
     type_: Type,
     self_type: NamedType,
     trait_: Type,
-    solver_rule: Option<SolverRule>,
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
 }
 impl<'a> ImplDeclaration<'a> {
@@ -122,38 +121,6 @@ struct FunctionDeclaration<'a> {
     body: Option<BodyOrBuiltin>,
 }
 impl<'a> FunctionDeclaration<'a> {
-    fn is_assignable_to(&self, other: &Self) -> bool {
-        self.name == other.name
-            && Context::is_assignable_to(&self.return_type, &other.return_type)
-            && self.type_parameters.len() == other.type_parameters.len()
-            && self.parameters.len() == other.parameters.len()
-            && self
-                .type_parameters
-                .iter()
-                .zip_eq(other.type_parameters.iter())
-                .all(|(this, other)| {
-                    if this.name != other.name {
-                        return false;
-                    }
-                    if let Some(this_upper_bound) = &this.upper_bound {
-                        if let Some(other_upper_bound) = &other.upper_bound {
-                            if !Context::is_assignable_to(other_upper_bound, this_upper_bound) {
-                                return false;
-                            }
-                        }
-                    } else if other.upper_bound.is_some() {
-                        return false;
-                    }
-                    true
-                })
-            && self
-                .parameters
-                .iter()
-                .zip_eq(other.parameters.iter())
-                .all(|(this, other)| {
-                    this.name == other.name || Context::is_assignable_to(&other.type_, &this.type_)
-                })
-    }
     fn signature_to_string(&self) -> String {
         format!(
             "{}{}({})",
@@ -637,7 +604,7 @@ impl<'a> Context<'a> {
         };
         let trait_ = self.lower_type(&type_parameters, Some(&self_type), trait_);
 
-        let solver_rule = if let Type::Named(type_) = &type_
+        if let Type::Named(type_) = &type_
             && let Ok(solver_type) = SolverValue::try_from(type_.clone())
             && let Type::Named(trait_) = &trait_
         {
@@ -658,10 +625,7 @@ impl<'a> Context<'a> {
                     .filter_map(|type_parameter| type_parameter.clone().try_into().ok())
                     .collect(),
             };
-            self.environment.rules.push(rule.clone());
-            Some(rule)
-        } else {
-            None
+            self.environment.rules.push(rule);
         };
 
         let functions =
@@ -672,7 +636,6 @@ impl<'a> Context<'a> {
             type_,
             self_type,
             trait_,
-            solver_rule,
             functions,
         });
     }
@@ -2425,7 +2388,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         substitutions,
                     ));
                 } else {
-                    mismatches.push(function)
+                    mismatches.push(function);
                 }
             }
             if matches.is_empty() {
@@ -2660,7 +2623,7 @@ impl<'h> TypeSolver<'h> {
             (Type::Self_ { base_type }, _) => {
                 self.unify(&Type::Named(base_type.clone()), parameter)
             }
-            (_, Type::Self_ { base_type }) => self.unify(
+            (_, Type::Self_ { base_type: _ }) => self.unify(
                 argument,
                 &ParameterType {
                     id: TypeParameterId::SELF_TYPE,

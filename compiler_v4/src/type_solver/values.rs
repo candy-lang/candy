@@ -93,7 +93,7 @@ impl SolverType {
 
                 // To unify all types, we have a queue of substitutions that we try to bring into a
                 // common solution space one by one.
-                let mut solution_space = FxHashMap::<SolverVariable, SolverType>::default();
+                let mut solution_space = FxHashMap::<SolverVariable, Self>::default();
                 let mut queue = self_value
                     .parameters
                     .iter()
@@ -160,17 +160,18 @@ impl TryFrom<Type> for SolverType {
         }
     }
 }
+#[allow(clippy::fallible_impl_from)]
 impl From<SolverType> for Type {
     fn from(type_: SolverType) -> Self {
         match type_ {
-            SolverType::Variable(variable) => Type::Parameter(variable.type_.unwrap()),
-            SolverType::Value(value) => Type::Named(NamedType {
+            SolverType::Variable(variable) => Self::Parameter(variable.type_.unwrap()),
+            SolverType::Value(value) => Self::Named(NamedType {
                 name: value.type_,
                 type_arguments: value
                     .parameters
                     .into_vec()
                     .into_iter()
-                    .map(Type::from)
+                    .map(Self::from)
                     .collect(),
             }),
         }
