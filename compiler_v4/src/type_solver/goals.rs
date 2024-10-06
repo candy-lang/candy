@@ -173,12 +173,7 @@ impl Environment {
             });
 
         let new_rules = self.rules.iter().cloned().chain(virtual_rules).collect();
-        let solution = Solver::new(new_rules).solve(&goal.substitute_all(&canonical_to_virtual));
-        println!(
-            "Solving\n{goal}\nunder\n{}\nresulted in\n{solution}",
-            conditions.iter().join("\n")
-        );
-        solution
+        Solver::new(new_rules).solve(&goal.substitute_all(&canonical_to_virtual))
     }
 }
 impl Display for Environment {

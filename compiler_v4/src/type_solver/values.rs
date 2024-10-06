@@ -160,6 +160,22 @@ impl TryFrom<Type> for SolverType {
         }
     }
 }
+impl From<SolverType> for Type {
+    fn from(type_: SolverType) -> Self {
+        match type_ {
+            SolverType::Variable(variable) => Type::Parameter(variable.type_.unwrap()),
+            SolverType::Value(value) => Type::Named(NamedType {
+                name: value.type_,
+                type_arguments: value
+                    .parameters
+                    .into_vec()
+                    .into_iter()
+                    .map(Type::from)
+                    .collect(),
+            }),
+        }
+    }
+}
 impl Display for SolverType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {

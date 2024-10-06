@@ -1,7 +1,9 @@
 use crate::{
+    ast_to_hir::TypeSolver,
     hir::{self, Hir, NamedType, ParameterType, Type, TypeParameterId},
-    id::IdGenerator,
+    id::{CountableId, IdGenerator},
     mono::{self, Mono},
+    type_solver::goals::SolverRule,
     utils::HashMapExtension,
 };
 use itertools::Itertools;
@@ -29,7 +31,8 @@ impl<'h> Context<'h> {
             assignment_initialization_order: vec![],
             functions: FxHashMap::default(),
         };
-        let main_function = context.lower_function(hir.main_function_id, &FxHashMap::default());
+        let main_function =
+            context.lower_function(hir.main_function_id, None, &FxHashMap::default());
         Mono {
             type_declarations: context
                 .type_declarations
@@ -74,25 +77,56 @@ impl<'h> Context<'h> {
     fn lower_function(
         &mut self,
         id: hir::Id,
+        used_rule: Option<&SolverRule>,
         substitutions: &FxHashMap<TypeParameterId, Type>,
     ) -> Box<str> {
-        let (signature, body) = &self
-            .hir
-            .functions
-            .get(&id)
-            .or_else(|| self.hir.impls.iter().find_map(|it| it.functions.get(&id)))
-            .map(|it| (&it.signature, &it.body))
-            .or_else(|| {
-                self.hir
-                    .type_declarations
-                    .values()
-                    .find_map(|it| match &it.kind {
-                        hir::TypeDeclarationKind::Trait { functions } => functions.get(&id),
-                        _ => None,
-                    })
-                    .map(|it| (&it.signature, it.body.as_ref().unwrap()))
-            })
-            .unwrap();
+        let (signature, body) = self.hir.get_function(id);
+        let (signature, body) = if let Some(used_rule) = used_rule {
+            let (_, function) = self
+                .hir
+                .impls
+                .iter()
+                .filter(|impl_| {
+                    matches!(
+                        &impl_.trait_,
+                        hir::Type::Named(hir::NamedType { name, .. })
+                        if name == &used_rule.goal.trait_
+                    )
+                })
+                .flat_map(|impl_| impl_.functions.iter())
+                .find(|(_, function)| {
+                    function.signature.name == signature.name
+                        && function.signature.type_parameters.len()
+                            == signature.type_parameters.len()
+                        && function
+                            .signature
+                            .type_parameters
+                            .iter()
+                            .zip(signature.type_parameters.iter())
+                            .all(|(function, signature)| {
+                                function.upper_bound.as_ref().map(|it| it.as_ref().clone())
+                                    == signature
+                                        .upper_bound
+                                        .as_ref()
+                                        .map(|it| it.substitute(substitutions))
+                            })
+                        && function.signature.parameters.len() == signature.parameters.len()
+                        && function
+                            .signature
+                            .parameters
+                            .iter()
+                            .zip(signature.parameters.iter())
+                            .all(|(function, signature)| {
+                                function.type_ == signature.type_.substitute(substitutions)
+                            })
+                        && function.signature.return_type
+                            == signature.return_type.substitute(substitutions)
+                })
+                .unwrap();
+            (&function.signature, &function.body)
+        } else {
+            (signature, body.unwrap())
+        };
         let name = self.mangle_function(
             &signature.name,
             &signature
@@ -379,10 +413,15 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
             }
             hir::ExpressionKind::Call {
                 function,
+                used_rule,
                 substitutions,
                 arguments,
             } => {
-                let function = self.context.lower_function(*function, substitutions);
+                let function = self.context.lower_function(
+                    *function,
+                    used_rule.as_ref(),
+                    &self.merge_substitutions(substitutions),
+                );
                 let arguments = self.lower_ids(arguments);
                 self.push(
                     id,
@@ -439,6 +478,46 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 &assignment.type_,
             )
         })
+    }
+
+    fn merge_substitutions(
+        &self,
+        inner: &FxHashMap<TypeParameterId, Type>,
+    ) -> FxHashMap<TypeParameterId, Type> {
+        inner
+            .iter()
+            .map(|(key, value)| (*key, self.merge_substitution(value)))
+            .collect()
+    }
+    fn merge_substitution(&self, type_: &hir::Type) -> Type {
+        match type_ {
+            hir::Type::Named(NamedType {
+                name,
+                type_arguments,
+            }) => {
+                if type_arguments.is_empty()
+                    && name.starts_with("$_")
+                    && let Ok(type_parameter_id) = name[2..].parse::<usize>()
+                {
+                    self.environment[&TypeParameterId::from_usize(type_parameter_id)].clone()
+                } else {
+                    hir::Type::Named(NamedType {
+                        name: name.clone(),
+                        type_arguments: type_arguments
+                            .iter()
+                            .map(|it| self.merge_substitution(it))
+                            .collect(),
+                    })
+                }
+            }
+            hir::Type::Parameter(ParameterType { name, id }) => {
+                hir::Type::Parameter(ParameterType {
+                    name: name.clone(),
+                    id: *id,
+                })
+            }
+            hir::Type::Self_ { .. } | hir::Type::Error => unreachable!(),
+        }
     }
 
     fn push(

@@ -1519,6 +1519,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             None,
                             ExpressionKind::Call {
                                 function: BuiltinFunction::TextConcat.id(),
+                                used_rule: None,
                                 substitutions: FxHashMap::default(),
                                 arguments: [lhs, rhs].into(),
                             },
@@ -2351,69 +2352,77 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
         // Solve traits
         let mut matches = {
-            let (matches, mismatches) = matches.into_iter().partition::<Vec<_>, _>(
-                |(_, function, trait_, substitutions)| {
-                    let Some(trait_) = trait_ else {
-                        return true;
-                    };
+            let old_matches = matches;
+            let mut matches = vec![];
+            let mut mismatches = vec![];
+            for (id, function, trait_, substitutions) in old_matches {
+                let Some(trait_) = trait_ else {
+                    matches.push((id, function, None, substitutions));
+                    continue;
+                };
 
-                    let self_goal =
-                        substitutions
-                            .get(&TypeParameterId::SELF_TYPE)
-                            .map(|self_type| {
-                                trait_.solver_goal.substitute_all(&FxHashMap::from_iter([(
-                                    SolverVariable::self_(),
-                                    self_type.clone().try_into().unwrap(),
-                                )]))
-                            });
+                let self_goal = substitutions
+                    .get(&TypeParameterId::SELF_TYPE)
+                    .map(|self_type| {
+                        trait_.solver_goal.substitute_all(&FxHashMap::from_iter([(
+                            SolverVariable::self_(),
+                            self_type.clone().try_into().unwrap(),
+                        )]))
+                    });
 
-                    let substitutions = substitutions
-                        .iter()
-                        .filter_map(|(type_parameter_id, type_)| try {
-                            (
-                                if *type_parameter_id == TypeParameterId::SELF_TYPE {
-                                    SolverVariable::self_()
-                                } else {
-                                    self.context
-                                        .get_type_parameter(*type_parameter_id)
-                                        .type_()
-                                        .into()
-                                },
-                                type_.clone().try_into().ok()?,
-                            )
-                        })
-                        .collect();
+                let solver_substitutions = substitutions
+                    .iter()
+                    .filter_map(|(type_parameter_id, type_)| try {
+                        (
+                            if *type_parameter_id == TypeParameterId::SELF_TYPE {
+                                SolverVariable::self_()
+                            } else {
+                                self.context
+                                    .get_type_parameter(*type_parameter_id)
+                                    .type_()
+                                    .into()
+                            },
+                            type_.clone().try_into().ok()?,
+                        )
+                    })
+                    .collect();
 
-                    self_goal
-                        .iter()
-                        .chain(trait_.solver_subgoals.iter())
-                        .all(|subgoal| {
-                            let solution = self.context.environment.solve(
-                                &subgoal.substitute_all(&substitutions),
-                                &self
-                                    .type_parameters
-                                    .iter()
-                                    .filter_map(|it| it.clone().try_into().ok())
-                                    .collect::<Box<[SolverGoal]>>(),
-                            );
-                            match solution {
-                                SolverSolution::Unique(_) => true,
-                                SolverSolution::Ambiguous => {
-                                    // TODO: Add syntax to disambiguate trait function call on parameter types.
-                                    self.context.add_error(
-                                        name.span.clone(),
-                                        format!(
-                                            "Function is reachable via different impls:\n{}",
-                                            function.signature_to_string(),
-                                        ),
-                                    );
-                                    false
-                                }
-                                SolverSolution::Impossible => false,
+                let used_rule = self_goal
+                    .iter()
+                    .chain(trait_.solver_subgoals.iter())
+                    .map(|subgoal| {
+                        let solution = self.context.environment.solve(
+                            &subgoal.substitute_all(&solver_substitutions),
+                            &self
+                                .type_parameters
+                                .iter()
+                                .filter_map(|it| it.clone().try_into().ok())
+                                .collect::<Box<[SolverGoal]>>(),
+                        );
+                        match solution {
+                            SolverSolution::Unique(solution) => Some(solution.used_rule),
+                            SolverSolution::Ambiguous => {
+                                // TODO: Add syntax to disambiguate trait function call on parameter types.
+                                self.context.add_error(
+                                    name.span.clone(),
+                                    format!(
+                                        "Function is reachable via different impls:\n{}",
+                                        function.signature_to_string(),
+                                    ),
+                                );
+                                None
                             }
-                        })
-                },
-            );
+                            SolverSolution::Impossible => None,
+                        }
+                    })
+                    .collect::<Option<Vec<_>>>();
+                if let Some(mut used_rule) = used_rule {
+                    used_rule.truncate(1);
+                    matches.push((id, function, Some(used_rule.pop().unwrap()), substitutions));
+                } else {
+                    mismatches.push(function)
+                }
+            }
             if matches.is_empty() {
                 // TODO: hide this error when there's an ambiguous solution
                 self.context.add_error(
@@ -2426,7 +2435,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         ),
                         mismatches
                             .iter()
-                            .map(|(_, it, _, _)| format!("\n• {}", it.signature_to_string()))
+                            .map(|it| format!("\n• {}", it.signature_to_string()))
                             .join(""),
                     ),
                 );
@@ -2451,12 +2460,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             matches
         };
 
-        let (function, signature, _, substitutions) = matches.pop().unwrap();
+        let (function, signature, used_rule, substitutions) = matches.pop().unwrap();
         let return_type = signature.return_type.substitute(&substitutions);
         self.push_lowered(
             None,
             ExpressionKind::Call {
                 function,
+                used_rule,
                 substitutions,
                 arguments: arguments.iter().map(|(id, _)| *id).collect(),
             },
@@ -2498,6 +2508,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             None,
             ExpressionKind::Call {
                 function: BuiltinFunction::Panic.id(),
+                used_rule: None,
                 substitutions: FxHashMap::default(),
                 arguments: vec![message].into_boxed_slice(),
             },
@@ -2578,20 +2589,20 @@ enum LoweredExpression {
 //     Error,
 // }
 
-struct TypeSolver<'h> {
+pub struct TypeSolver<'h> {
     type_parameters: &'h [TypeParameter],
     substitutions: FxHashMap<TypeParameterId, Type>,
 }
 impl<'h> TypeSolver<'h> {
     #[must_use]
-    fn new(type_parameters: &'h [TypeParameter]) -> Self {
+    pub fn new(type_parameters: &'h [TypeParameter]) -> Self {
         Self {
             type_parameters,
             substitutions: FxHashMap::default(),
         }
     }
 
-    fn unify(&mut self, argument: &Type, parameter: &Type) -> Result<bool, Box<str>> {
+    pub fn unify(&mut self, argument: &Type, parameter: &Type) -> Result<bool, Box<str>> {
         match (argument, parameter) {
             (Type::Error, _) | (_, Type::Error) => Ok(true),
             (_, Type::Parameter(parameter)) => {
@@ -2655,7 +2666,7 @@ impl<'h> TypeSolver<'h> {
         }
     }
 
-    fn finish(self) -> Result<FxHashMap<TypeParameterId, Type>, Box<str>> {
+    pub fn finish(self) -> Result<FxHashMap<TypeParameterId, Type>, Box<str>> {
         for type_parameter in self.type_parameters {
             if !self.substitutions.contains_key(&type_parameter.id) {
                 return Err(format!(

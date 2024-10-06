@@ -2,6 +2,7 @@ use crate::{
     id::CountableId,
     impl_countable_id,
     to_text::{TextBuilder, ToText},
+    type_solver::goals::SolverRule,
 };
 use derive_more::{Deref, From};
 use extension_trait::extension_trait;
@@ -25,6 +26,7 @@ impl ToText for Id {
     }
 }
 
+// TODO: remove in favor of TypeParameter(String)
 #[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeParameterId(usize);
 impl_countable_id!(TypeParameterId);
@@ -44,6 +46,24 @@ pub struct Hir {
     pub assignments: FxHashMap<Id, Assignment>,
     pub functions: FxHashMap<Id, Function>,
     pub main_function_id: Id,
+}
+impl Hir {
+    pub fn get_function(&self, id: Id) -> (&FunctionSignature, Option<&BodyOrBuiltin>) {
+        self.functions
+            .get(&id)
+            .or_else(|| self.impls.iter().find_map(|it| it.functions.get(&id)))
+            .map(|it| (&it.signature, Some(&it.body)))
+            .or_else(|| {
+                self.type_declarations
+                    .values()
+                    .find_map(|it| match &it.kind {
+                        TypeDeclarationKind::Trait { functions } => functions.get(&id),
+                        _ => None,
+                    })
+                    .map(|it| (&it.signature, it.body.as_ref()))
+            })
+            .unwrap()
+    }
 }
 impl ToText for Hir {
     fn build_text(&self, builder: &mut TextBuilder) {
@@ -324,7 +344,7 @@ impl Type {
                 type_arguments: type_arguments.iter().map(|it| it.substitute(environment)).collect(),
             }),
             Self::Parameter (ParameterType{ name, id }) => environment.get(id).unwrap_or_else(|| panic!("Missing substitution for type parameter {name} (environment: {environment:?})")).clone(),
-            Self::Self_ { base_type } => Self::Self_ { base_type: base_type.clone() },
+            Self::Self_ { base_type } => environment.get(&TypeParameterId::SELF_TYPE).cloned().unwrap_or_else(|| Self::Self_ { base_type: base_type.clone() }),
             Self::Error => Self::Error,
         }
     }
@@ -486,6 +506,8 @@ pub enum ExpressionKind {
     Reference(Id),
     Call {
         function: Id,
+        // TODO: only store goal
+        used_rule: Option<SolverRule>,
         substitutions: FxHashMap<TypeParameterId, Type>,
         arguments: Box<[Id]>,
     },
@@ -522,6 +544,7 @@ impl ToText for ExpressionKind {
             Self::Reference(id) => builder.push(format!("${id}")),
             Self::Call {
                 function,
+                used_rule: _,
                 substitutions,
                 arguments,
             } => {
