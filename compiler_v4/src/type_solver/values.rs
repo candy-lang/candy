@@ -13,7 +13,7 @@ use std::{
 pub fn canonical_variable(n: usize) -> ParameterType {
     ParameterType {
         name: format!("canonical${n}").into_boxed_str(),
-        id: TypeParameterId::from_usize(usize::MAX - n),
+        id: TypeParameterId::from_usize(usize::MAX - n - 1),
     }
 }
 
@@ -184,6 +184,15 @@ pub struct SolverVariable {
     pub type_: Option<ParameterType>,
 }
 impl SolverVariable {
+    #[must_use]
+    pub fn self_() -> Self {
+        Self {
+            type_: Some(ParameterType {
+                name: "Self".into(),
+                id: TypeParameterId::SELF_TYPE,
+            }),
+        }
+    }
     #[must_use]
     pub const fn new(type_: ParameterType) -> Self {
         Self { type_: Some(type_) }

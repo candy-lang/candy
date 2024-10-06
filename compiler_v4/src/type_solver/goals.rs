@@ -24,6 +24,8 @@ fn solver_value_for_types(types: Box<[SolverType]>) -> SolverValue {
 /// * `Any(?T)`: the fact that `?T` implements `Any`
 /// * `Clone(?T)`: the fact that `?T` implements `Clone`
 /// * `Iterable(?T, ?L)`: the fact that `?L` implements `Iterable<?T>`
+// TODO: separate fields for type and parameters
+// TODO: rename goal, rule, etc. to Candy-specific terms
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SolverGoal {
     pub trait_: Box<str>,
@@ -65,7 +67,7 @@ impl TryFrom<TypeParameter> for SolverGoal {
             return Err(());
         };
 
-        Ok(SolverGoal {
+        Ok(Self {
             trait_: upper_bound.name.clone(),
             parameters: vec![SolverVariable::new(value.type_()).into()].into_boxed_slice(),
         })
@@ -171,7 +173,12 @@ impl Environment {
             });
 
         let new_rules = self.rules.iter().cloned().chain(virtual_rules).collect();
-        Solver::new(new_rules).solve(&goal.substitute_all(&canonical_to_virtual))
+        let solution = Solver::new(new_rules).solve(&goal.substitute_all(&canonical_to_virtual));
+        println!(
+            "Solving\n{goal}\nunder\n{}\nresulted in\n{solution}",
+            conditions.iter().join("\n")
+        );
+        solution
     }
 }
 impl Display for Environment {

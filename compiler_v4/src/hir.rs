@@ -28,6 +28,9 @@ impl ToText for Id {
 #[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TypeParameterId(usize);
 impl_countable_id!(TypeParameterId);
+impl TypeParameterId {
+    pub const SELF_TYPE: Self = Self(usize::MAX);
+}
 impl Display for TypeParameterId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "_{}", self.0)

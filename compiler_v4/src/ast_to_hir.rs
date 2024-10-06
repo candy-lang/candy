@@ -12,7 +12,7 @@ use crate::{
         SliceOfTypeParameter, SwitchCase, TraitFunction, Type, TypeDeclaration,
         TypeDeclarationKind, TypeParameter, TypeParameterId,
     },
-    id::IdGenerator,
+    id::{CountableId, IdGenerator},
     position::Offset,
     type_solver::{
         goals::{Environment, SolverGoal, SolverRule, SolverSolution},
@@ -53,9 +53,11 @@ struct Context<'a> {
     errors: Vec<CompilerError>,
     hir: Hir,
 }
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct TraitDeclaration<'a> {
     type_parameters: Box<[TypeParameter]>,
+    solver_goal: SolverGoal,
+    solver_subgoals: Box<[SolverGoal]>,
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
 }
 impl<'a> TraitDeclaration<'a> {
@@ -142,15 +144,14 @@ impl<'a> FunctionDeclaration<'a> {
                     } else if other.upper_bound.is_some() {
                         return false;
                     }
-                    return true;
+                    true
                 })
             && self
                 .parameters
                 .iter()
                 .zip_eq(other.parameters.iter())
                 .all(|(this, other)| {
-                    return this.name == other.name
-                        || Context::is_assignable_to(&other.type_, &this.type_);
+                    this.name == other.name || Context::is_assignable_to(&other.type_, &this.type_)
                 })
     }
     fn signature_to_string(&self) -> String {
@@ -572,6 +573,16 @@ impl<'a> Context<'a> {
 
         let type_parameters =
             self.lower_type_parameters(&[], None, trait_.type_parameters.as_ref());
+
+        let solver_goal = SolverGoal {
+            trait_: name.string.clone(),
+            parameters: vec![SolverVariable::self_().into()].into_boxed_slice(),
+        };
+        let solver_subgoals = type_parameters
+            .iter()
+            .filter_map(|type_parameter| type_parameter.clone().try_into().ok())
+            .collect();
+
         let self_type = NamedType {
             name: name.string.clone(),
             type_arguments: type_parameters.type_(),
@@ -596,6 +607,8 @@ impl<'a> Context<'a> {
             Entry::Vacant(entry) => {
                 entry.insert(TraitDeclaration {
                     type_parameters,
+                    solver_goal,
+                    solver_subgoals,
                     functions,
                 });
             }
@@ -1034,15 +1047,16 @@ impl<'a> Context<'a> {
 
         function.body = Some(BodyOrBuiltin::Body(hir_body));
     }
-    fn get_function(&self, id: Id) -> (&FunctionDeclaration<'a>, Option<&SolverRule>) {
+    fn get_function(&self, id: Id) -> (&FunctionDeclaration<'a>, Option<&TraitDeclaration<'a>>) {
         self.functions
             .get(&id)
             .map(|function| (function, None))
             .or_else(|| {
-                self.impls.iter().find_map(|it| {
-                    it.solver_rule.as_ref().and_then(|rule| {
-                        it.functions.get(&id).map(|function| (function, Some(rule)))
-                    })
+                self.traits.iter().find_map(|(_, trait_)| {
+                    trait_
+                        .functions
+                        .get(&id)
+                        .map(|function| (function, Some(trait_)))
                 })
             })
             .unwrap()
@@ -1089,7 +1103,7 @@ impl<'a> Context<'a> {
     fn get_all_functions_matching_name(&mut self, name: &str) -> Vec<Id> {
         self.functions
             .iter()
-            .chain(self.impls.iter().flat_map(|it| &it.functions))
+            .chain(self.traits.iter().flat_map(|(_, trait_)| &trait_.functions))
             .filter(|(_, function)| &*function.name == name)
             .map(|(id, _)| *id)
             .collect()
@@ -2186,8 +2200,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             .get_all_functions_matching_name(&name.string)
             .iter()
             .map(|id| {
-                let (function, solver_rule) = self.context.get_function(*id);
-                (*id, function.clone(), solver_rule.cloned())
+                let (function, trait_) = self.context.get_function(*id);
+                (*id, function.clone(), trait_.cloned())
             })
             .collect_vec();
 
@@ -2287,7 +2301,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             for (argument_type, parameter) in
                 argument_types.iter().zip_eq(function.parameters.iter())
             {
-                match type_solver.unify(argument_type, &parameter.type_) {
+                match type_solver.unify(&Self::canonicalize_type(argument_type), &parameter.type_) {
                     Ok(true) => {}
                     Ok(false) => {
                         mismatches.push((id, function, None));
@@ -2301,7 +2315,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             }
 
             match type_solver.finish() {
-                Ok(environment) => matches.push((id, function, solver_rule, environment)),
+                Ok(substitutions) => matches.push((id, function, solver_rule, substitutions)),
                 Err(error) => mismatches.push((id, function, Some(error))),
             }
         }
@@ -2335,51 +2349,69 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             return LoweredExpression::Error;
         }
 
+        // Solve traits
         let mut matches = {
             let (matches, mismatches) = matches.into_iter().partition::<Vec<_>, _>(
-                |(_, function, solver_rule, substitutions)| {
-                    let Some(solver_rule) = solver_rule else {
+                |(_, function, trait_, substitutions)| {
+                    let Some(trait_) = trait_ else {
                         return true;
                     };
+
+                    let self_goal =
+                        substitutions
+                            .get(&TypeParameterId::SELF_TYPE)
+                            .map(|self_type| {
+                                trait_.solver_goal.substitute_all(&FxHashMap::from_iter([(
+                                    SolverVariable::self_(),
+                                    self_type.clone().try_into().unwrap(),
+                                )]))
+                            });
 
                     let substitutions = substitutions
                         .iter()
                         .filter_map(|(type_parameter_id, type_)| try {
                             (
-                                self.context
-                                    .get_type_parameter(*type_parameter_id)
-                                    .type_()
-                                    .into(),
+                                if *type_parameter_id == TypeParameterId::SELF_TYPE {
+                                    SolverVariable::self_()
+                                } else {
+                                    self.context
+                                        .get_type_parameter(*type_parameter_id)
+                                        .type_()
+                                        .into()
+                                },
                                 type_.clone().try_into().ok()?,
                             )
                         })
                         .collect();
 
-                    solver_rule.subgoals.iter().all(|subgoal| {
-                        let solution = self.context.environment.solve(
-                            &subgoal.substitute_all(&substitutions),
-                            &function
-                                .type_parameters
-                                .iter()
-                                .filter_map(|it| it.clone().try_into().ok())
-                                .collect::<Box<[SolverGoal]>>(),
-                        );
-                        match solution {
-                            SolverSolution::Unique(_) => true,
-                            SolverSolution::Ambiguous => {
-                                // TODO: Add syntax to disambiguate trait function call on parameter types.
-                                self.context.add_error(
-                                    name.span.clone(),
-                                    format!(
-                                        "Function is reachable via different impls:\n{}",
-                                        function.signature_to_string(),
-                                    ),
-                                );
-                                false
+                    self_goal
+                        .iter()
+                        .chain(trait_.solver_subgoals.iter())
+                        .all(|subgoal| {
+                            let solution = self.context.environment.solve(
+                                &subgoal.substitute_all(&substitutions),
+                                &self
+                                    .type_parameters
+                                    .iter()
+                                    .filter_map(|it| it.clone().try_into().ok())
+                                    .collect::<Box<[SolverGoal]>>(),
+                            );
+                            match solution {
+                                SolverSolution::Unique(_) => true,
+                                SolverSolution::Ambiguous => {
+                                    // TODO: Add syntax to disambiguate trait function call on parameter types.
+                                    self.context.add_error(
+                                        name.span.clone(),
+                                        format!(
+                                            "Function is reachable via different impls:\n{}",
+                                            function.signature_to_string(),
+                                        ),
+                                    );
+                                    false
+                                }
+                                SolverSolution::Impossible => false,
                             }
-                            SolverSolution::Impossible => false,
-                        }
-                    })
+                        })
                 },
             );
             if matches.is_empty() {
@@ -2389,13 +2421,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     format!(
                         "No function matches this signature:\n  {}\nThese are candidate functions:{}",
                         FunctionDeclaration::call_signature_to_string(
-                            matches.first().unwrap().1.name.as_ref(),
+                            name.string.as_ref(),
                             argument_types.as_ref()
                         ),
                         mismatches
                             .iter()
-                            .map(|(_, it, _, _)| it.signature_to_string())
-                            .join("\n"),
+                            .map(|(_, it, _, _)| format!("\n• {}", it.signature_to_string()))
+                            .join(""),
                     ),
                 );
                 return LoweredExpression::Error;
@@ -2405,7 +2437,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     format!(
                         "Multiple matching function found for:\n  {}\nThese are candidate functions:{}",
                         FunctionDeclaration::call_signature_to_string(
-                            matches.first().unwrap().1.name.as_ref(),
+                            name.string.as_ref(),
                             argument_types.as_ref()
                         ),
                         matches
@@ -2430,6 +2462,30 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             },
             return_type,
         )
+    }
+    fn canonicalize_type(type_: &Type) -> Type {
+        match type_ {
+            Type::Named(named_type) => Self::canonicalize_named_type(named_type).into(),
+            Type::Parameter(parameter_type) => NamedType {
+                name: format!("${}", parameter_type.id).into_boxed_str(),
+                type_arguments: Box::default(),
+            }
+            .into(),
+            Type::Self_ { base_type } => Type::Self_ {
+                base_type: Self::canonicalize_named_type(base_type),
+            },
+            Type::Error => Type::Error,
+        }
+    }
+    fn canonicalize_named_type(type_: &NamedType) -> NamedType {
+        NamedType {
+            name: type_.name.clone(),
+            type_arguments: type_
+                .type_arguments
+                .iter()
+                .map(Self::canonicalize_type)
+                .collect(),
+        }
     }
 
     fn push_panic(&mut self, message: impl Into<Box<str>>) {
@@ -2524,14 +2580,14 @@ enum LoweredExpression {
 
 struct TypeSolver<'h> {
     type_parameters: &'h [TypeParameter],
-    environment: FxHashMap<TypeParameterId, Type>,
+    substitutions: FxHashMap<TypeParameterId, Type>,
 }
 impl<'h> TypeSolver<'h> {
     #[must_use]
     fn new(type_parameters: &'h [TypeParameter]) -> Self {
         Self {
             type_parameters,
-            environment: FxHashMap::default(),
+            substitutions: FxHashMap::default(),
         }
     }
 
@@ -2539,7 +2595,7 @@ impl<'h> TypeSolver<'h> {
         match (argument, parameter) {
             (Type::Error, _) | (_, Type::Error) => Ok(true),
             (_, Type::Parameter(parameter)) => {
-                if let Some(mapped) = self.environment.get(&parameter.id) {
+                if let Some(mapped) = self.substitutions.get(&parameter.id) {
                     if let Type::Parameter { .. } = mapped {
                         panic!("Type parameters can't depend on each other.")
                     }
@@ -2548,11 +2604,12 @@ impl<'h> TypeSolver<'h> {
                 }
 
                 assert!(
-                    self.type_parameters.iter().any(|it| it.id == parameter.id),
+                    parameter.id == TypeParameterId::SELF_TYPE
+                        || self.type_parameters.iter().any(|it| it.id == parameter.id),
                     "Unresolved type parameter: `{}`",
                     parameter.name
                 );
-                match self.environment.entry(parameter.id) {
+                match self.substitutions.entry(parameter.id) {
                     Entry::Occupied(entry) => {
                         if !Context::is_assignable_to(entry.get(), argument) {
                             return Err(format!("Type parameter {} gets resolved to different types: `{}` and `{argument}`", parameter.name,entry.get()).into_boxed_str());
@@ -2584,13 +2641,23 @@ impl<'h> TypeSolver<'h> {
                 Ok(true)
             }
             (Type::Parameter { .. }, Type::Named { .. }) => Ok(true),
-            (_, _) => todo!(), // TODO: Self type
+            (Type::Self_ { base_type }, _) => {
+                self.unify(&Type::Named(base_type.clone()), parameter)
+            }
+            (_, Type::Self_ { base_type }) => self.unify(
+                argument,
+                &ParameterType {
+                    id: TypeParameterId::SELF_TYPE,
+                    name: "Self".into(),
+                }
+                .into(),
+            ),
         }
     }
 
     fn finish(self) -> Result<FxHashMap<TypeParameterId, Type>, Box<str>> {
         for type_parameter in self.type_parameters {
-            if !self.environment.contains_key(&type_parameter.id) {
+            if !self.substitutions.contains_key(&type_parameter.id) {
                 return Err(format!(
                     "The type parameter `{}` can't be resolved to a specific type.",
                     &type_parameter.name
@@ -2598,6 +2665,6 @@ impl<'h> TypeSolver<'h> {
                 .into_boxed_str());
             }
         }
-        Ok(self.environment)
+        Ok(self.substitutions)
     }
 }
