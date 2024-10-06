@@ -106,6 +106,9 @@ fn check(options: CheckOptions) -> ProgramResult {
 
 #[derive(Parser, Debug)]
 struct CompileOptions {
+    #[arg(long)]
+    debug_print_hir: bool,
+
     /// The file or package to compile to C.
     #[arg(value_hint = ValueHint::FilePath)]
     path: PathBuf,
@@ -123,6 +126,10 @@ fn compile(options: CompileOptions) -> ProgramResult {
             error!("{}", error.to_string_with_location(&source));
         }
         return Err(Exit::CodeContainsErrors);
+    }
+
+    if options.debug_print_hir {
+        println!("Hir:\n{}", hir.to_text(true));
     }
 
     let mono = hir_to_mono(&hir);
