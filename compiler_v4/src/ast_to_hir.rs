@@ -1519,7 +1519,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             None,
                             ExpressionKind::Call {
                                 function: BuiltinFunction::TextConcat.id(),
-                                used_rule: None,
+                                used_goal: None,
                                 substitutions: FxHashMap::default(),
                                 arguments: [lhs, rhs].into(),
                             },
@@ -2418,7 +2418,12 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     .collect::<Option<Vec<_>>>();
                 if let Some(mut used_rule) = used_rule {
                     used_rule.truncate(1);
-                    matches.push((id, function, Some(used_rule.pop().unwrap()), substitutions));
+                    matches.push((
+                        id,
+                        function,
+                        Some(used_rule.pop().unwrap().goal),
+                        substitutions,
+                    ));
                 } else {
                     mismatches.push(function)
                 }
@@ -2460,13 +2465,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             matches
         };
 
-        let (function, signature, used_rule, substitutions) = matches.pop().unwrap();
+        let (function, signature, used_goal, substitutions) = matches.pop().unwrap();
         let return_type = signature.return_type.substitute(&substitutions);
         self.push_lowered(
             None,
             ExpressionKind::Call {
                 function,
-                used_rule,
+                used_goal,
                 substitutions,
                 arguments: arguments.iter().map(|(id, _)| *id).collect(),
             },
@@ -2508,7 +2513,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             None,
             ExpressionKind::Call {
                 function: BuiltinFunction::Panic.id(),
-                used_rule: None,
+                used_goal: None,
                 substitutions: FxHashMap::default(),
                 arguments: vec![message].into_boxed_slice(),
             },

@@ -1,9 +1,8 @@
 use crate::{
-    ast_to_hir::TypeSolver,
     hir::{self, Hir, NamedType, ParameterType, Type, TypeParameterId},
     id::{CountableId, IdGenerator},
     mono::{self, Mono},
-    type_solver::goals::SolverRule,
+    type_solver::goals::SolverGoal,
     utils::HashMapExtension,
 };
 use itertools::Itertools;
@@ -77,11 +76,11 @@ impl<'h> Context<'h> {
     fn lower_function(
         &mut self,
         id: hir::Id,
-        used_rule: Option<&SolverRule>,
+        used_goal: Option<&SolverGoal>,
         substitutions: &FxHashMap<TypeParameterId, Type>,
     ) -> Box<str> {
         let (signature, body) = self.hir.get_function(id);
-        let (signature, body) = if let Some(used_rule) = used_rule {
+        let (signature, body) = if let Some(used_goal) = used_goal {
             let (_, function) = self
                 .hir
                 .impls
@@ -90,7 +89,7 @@ impl<'h> Context<'h> {
                     matches!(
                         &impl_.trait_,
                         hir::Type::Named(hir::NamedType { name, .. })
-                        if name == &used_rule.goal.trait_
+                        if name == &used_goal.trait_
                     )
                 })
                 .flat_map(|impl_| impl_.functions.iter())
@@ -413,13 +412,13 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
             }
             hir::ExpressionKind::Call {
                 function,
-                used_rule,
+                used_goal,
                 substitutions,
                 arguments,
             } => {
                 let function = self.context.lower_function(
                     *function,
-                    used_rule.as_ref(),
+                    used_goal.as_ref(),
                     &self.merge_substitutions(substitutions),
                 );
                 let arguments = self.lower_ids(arguments);

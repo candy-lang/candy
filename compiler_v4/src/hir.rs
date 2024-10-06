@@ -2,7 +2,7 @@ use crate::{
     id::CountableId,
     impl_countable_id,
     to_text::{TextBuilder, ToText},
-    type_solver::goals::SolverRule,
+    type_solver::goals::SolverGoal,
 };
 use derive_more::{Deref, From};
 use extension_trait::extension_trait;
@@ -506,8 +506,7 @@ pub enum ExpressionKind {
     Reference(Id),
     Call {
         function: Id,
-        // TODO: only store goal
-        used_rule: Option<SolverRule>,
+        used_goal: Option<SolverGoal>,
         substitutions: FxHashMap<TypeParameterId, Type>,
         arguments: Box<[Id]>,
     },
@@ -544,7 +543,7 @@ impl ToText for ExpressionKind {
             Self::Reference(id) => builder.push(format!("${id}")),
             Self::Call {
                 function,
-                used_rule: _,
+                used_goal: _,
                 substitutions,
                 arguments,
             } => {
