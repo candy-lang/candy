@@ -1,5 +1,5 @@
 use crate::{
-    hir::{self, Hir, NamedType, ParameterType, Type},
+    hir::{self, Hir, NamedType, ParameterType, Type, TypeParameterId},
     id::IdGenerator,
     mono::{self, Mono},
     utils::HashMapExtension,
@@ -29,7 +29,7 @@ impl<'h> Context<'h> {
             assignment_initialization_order: vec![],
             functions: FxHashMap::default(),
         };
-        let main_function = context.lower_function(hir.main_function_id, &[]);
+        let main_function = context.lower_function(hir.main_function_id, &FxHashMap::default());
         Mono {
             type_declarations: context
                 .type_declarations
@@ -71,15 +71,34 @@ impl<'h> Context<'h> {
         name.clone()
     }
 
-    fn lower_function(&mut self, id: hir::Id, type_arguments: &[hir::Type]) -> Box<str> {
-        let function = &self.hir.functions[&id];
-        let environment = Type::build_environment(&function.type_parameters, type_arguments);
+    fn lower_function(
+        &mut self,
+        id: hir::Id,
+        substitutions: &FxHashMap<TypeParameterId, Type>,
+    ) -> Box<str> {
+        let (signature, body) = &self
+            .hir
+            .functions
+            .get(&id)
+            .or_else(|| self.hir.impls.iter().find_map(|it| it.functions.get(&id)))
+            .map(|it| (&it.signature, &it.body))
+            .or_else(|| {
+                self.hir
+                    .type_declarations
+                    .values()
+                    .find_map(|it| match &it.kind {
+                        hir::TypeDeclarationKind::Trait { functions } => functions.get(&id),
+                        _ => None,
+                    })
+                    .map(|it| (&it.signature, it.body.as_ref().unwrap()))
+            })
+            .unwrap();
         let name = self.mangle_function(
-            &function.name,
-            &function
+            &signature.name,
+            &signature
                 .parameters
                 .iter()
-                .map(|it| it.type_.substitute(&environment))
+                .map(|it| it.type_.substitute(substitutions))
                 .collect_vec(),
         );
         match self.functions.entry(name.clone()) {
@@ -87,22 +106,22 @@ impl<'h> Context<'h> {
             Entry::Vacant(entry) => entry.insert(None),
         };
 
-        let (parameters, body) = match &function.body {
+        let (parameters, body) = match body {
             hir::BodyOrBuiltin::Body(body) => {
-                let (parameters, body) = BodyBuilder::build(self, &environment, |builder| {
-                    builder.add_parameters(&function.parameters);
+                let (parameters, body) = BodyBuilder::build(self, substitutions, |builder| {
+                    builder.add_parameters(&signature.parameters);
                     builder.lower_expressions(&body.expressions);
                 });
                 (parameters, mono::BodyOrBuiltin::Body(body))
             }
             hir::BodyOrBuiltin::Builtin(builtin_function) => {
-                let (parameters, _) = BodyBuilder::build(self, &environment, |builder| {
-                    builder.add_parameters(&function.parameters);
+                let (parameters, _) = BodyBuilder::build(self, substitutions, |builder| {
+                    builder.add_parameters(&signature.parameters);
                 });
                 (parameters, mono::BodyOrBuiltin::Builtin(*builtin_function))
             }
         };
-        let return_type = function.return_type.substitute(&environment);
+        let return_type = signature.return_type.substitute(substitutions);
         let function = mono::Function {
             parameters,
             return_type: self.lower_type(&return_type),
@@ -148,7 +167,7 @@ impl<'h> Context<'h> {
                         entry.insert(None);
                         let environment = hir::Type::build_environment(
                             &declaration.type_parameters,
-                            &type_arguments,
+                            type_arguments,
                         );
                         let fields = fields
                             .iter()
@@ -165,7 +184,7 @@ impl<'h> Context<'h> {
                         entry.insert(None);
                         let environment = hir::Type::build_environment(
                             &declaration.type_parameters,
-                            &type_arguments,
+                            type_arguments,
                         );
                         let variants = variants
                             .iter()
@@ -195,7 +214,7 @@ impl<'h> Context<'h> {
         mangled_name
     }
     fn mangle_type(type_: &hir::Type) -> Box<str> {
-        let mut result = "".to_string();
+        let mut result = String::new();
         Self::mangle_type_helper(&mut result, type_);
         result.into_boxed_str()
     }
@@ -363,24 +382,17 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 substitutions,
                 arguments,
             } => {
-                todo!();
-                // let function = self.context.lower_function(
-                //     *function,
-                //     &type_arguments
-                //         .iter()
-                //         .map(|it| it.substitute(self.environment))
-                //         .collect_vec(),
-                // );
-                // let arguments = self.lower_ids(arguments);
-                // self.push(
-                //     id,
-                //     name,
-                //     mono::ExpressionKind::Call {
-                //         function,
-                //         arguments,
-                //     },
-                //     &expression.type_,
-                // );
+                let function = self.context.lower_function(*function, substitutions);
+                let arguments = self.lower_ids(arguments);
+                self.push(
+                    id,
+                    name,
+                    mono::ExpressionKind::Call {
+                        function,
+                        arguments,
+                    },
+                    &expression.type_,
+                );
             }
             hir::ExpressionKind::Switch {
                 value,

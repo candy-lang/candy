@@ -8,7 +8,8 @@ use crate::{
     error::CompilerError,
     hir::{
         Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
-        Hir, Id, NamedType, Parameter, ParameterType, SwitchCase, Type, TypeDeclaration,
+        FunctionSignature, Hir, Id, Impl, NamedType, Parameter, ParameterType,
+        SliceOfTypeParameter, SwitchCase, TraitFunction, Type, TypeDeclaration,
         TypeDeclarationKind, TypeParameter, TypeParameterId,
     },
     id::IdGenerator,
@@ -25,7 +26,7 @@ use petgraph::{
     graph::{DiGraph, NodeIndex},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{collections::hash_map::Entry, iter, ops::Range, path::Path};
+use std::{collections::hash_map::Entry, iter, mem, ops::Range, path::Path};
 use strum::VariantArray;
 
 pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
@@ -57,13 +58,44 @@ struct TraitDeclaration<'a> {
     type_parameters: Box<[TypeParameter]>,
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
 }
+impl<'a> TraitDeclaration<'a> {
+    #[must_use]
+    fn into_type_declaration(self) -> TypeDeclaration {
+        TypeDeclaration {
+            type_parameters: self.type_parameters,
+            kind: TypeDeclarationKind::Trait {
+                functions: self
+                    .functions
+                    .into_iter()
+                    .map(|(id, function)| (id, function.into_trait_function()))
+                    .collect(),
+            },
+        }
+    }
+}
 #[derive(Clone, Debug)]
 struct ImplDeclaration<'a> {
     type_parameters: Box<[TypeParameter]>,
     type_: Type,
+    self_type: NamedType,
     trait_: Type,
     solver_rule: Option<SolverRule>,
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
+}
+impl<'a> ImplDeclaration<'a> {
+    #[must_use]
+    fn into_impl(self) -> Impl {
+        Impl {
+            type_parameters: self.type_parameters,
+            type_: self.type_,
+            trait_: self.trait_,
+            functions: self
+                .functions
+                .into_iter()
+                .map(|(id, function)| (id, function.into_function()))
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -145,13 +177,28 @@ impl<'a> FunctionDeclaration<'a> {
     }
 
     #[must_use]
-    fn into_function(self) -> Function {
+    fn into_trait_function(mut self) -> TraitFunction {
+        let body = mem::take(&mut self.body);
+        TraitFunction {
+            signature: self.into_function_signature(),
+            body,
+        }
+    }
+    #[must_use]
+    fn into_function(mut self) -> Function {
+        let body = mem::take(&mut self.body).unwrap();
         Function {
+            signature: self.into_function_signature(),
+            body,
+        }
+    }
+    #[must_use]
+    fn into_function_signature(self) -> FunctionSignature {
+        FunctionSignature {
             name: self.name,
             type_parameters: self.type_parameters,
             parameters: self.parameters,
             return_type: self.return_type,
-            body: self.body.unwrap(),
         }
     }
 }
@@ -199,6 +246,17 @@ impl<'a> Context<'a> {
             );
         }
 
+        for (name, trait_) in self.traits {
+            self.hir
+                .type_declarations
+                .force_insert(name, trait_.into_type_declaration());
+        }
+        self.hir.impls = self
+            .impls
+            .into_iter()
+            .map(ImplDeclaration::into_impl)
+            .collect();
+
         let mut assignments = FxHashMap::default();
         let mut functions = FxHashMap::default();
         for (name, named) in self.global_identifiers {
@@ -217,8 +275,13 @@ impl<'a> Context<'a> {
                 }
                 Named::Functions(ids) => {
                     for id in ids {
-                        functions
-                            .force_insert(id, self.functions.remove(&id).unwrap().into_function());
+                        functions.force_insert(
+                            id,
+                            self.functions
+                                .remove(&id)
+                                .unwrap_or_else(|| panic!("Missing {id}"))
+                                .into_function(),
+                        );
                     }
                 }
             };
@@ -339,7 +402,9 @@ impl<'a> Context<'a> {
                     }
                 }
                 AstDeclaration::Function(function) => {
-                    if let Some((id, function)) = self.lower_function_signature(&[], function) {
+                    if let Some((id, function)) =
+                        self.lower_top_level_function_signature(&[], None, function)
+                    {
                         self.functions.force_insert(id, function);
                         functions_to_lower.push(id);
                     }
@@ -371,11 +436,16 @@ impl<'a> Context<'a> {
         //     println!("no solution");
         // }
 
-        for trait_ in self.traits.keys().cloned().collect_vec() {
-            for (id, mut function) in self.traits[&trait_].functions.clone() {
-                self.lower_function(&mut function);
+        for trait_name in self.traits.keys().cloned().collect_vec() {
+            let trait_ = &self.traits[&trait_name];
+            let self_type = NamedType {
+                name: trait_name.clone(),
+                type_arguments: trait_.type_parameters.type_(),
+            };
+            for (id, mut function) in trait_.functions.clone() {
+                self.lower_function(Some(&self_type), &mut function, true);
                 self.traits
-                    .get_mut(&trait_)
+                    .get_mut(&trait_name)
                     .unwrap()
                     .functions
                     .insert(id, function)
@@ -383,8 +453,10 @@ impl<'a> Context<'a> {
             }
         }
         for index in 0..self.impls.len() {
-            for (id, mut function) in self.impls[index].functions.clone() {
-                self.lower_function(&mut function);
+            let impl_ = &self.impls[index];
+            let self_type = impl_.self_type.clone();
+            for (id, mut function) in impl_.functions.clone() {
+                self.lower_function(Some(&self_type), &mut function, false);
                 self.impls[index].functions.insert(id, function).unwrap();
             }
         }
@@ -393,7 +465,7 @@ impl<'a> Context<'a> {
         }
         for id in functions_to_lower {
             let mut function = self.functions.get(&id).unwrap().clone();
-            self.lower_function(&mut function);
+            self.lower_function(None, &mut function, false);
             self.functions.insert(id, function).unwrap();
         }
     }
@@ -403,7 +475,12 @@ impl<'a> Context<'a> {
             return;
         };
 
-        let type_parameters = self.lower_type_parameters(&[], struct_type.type_parameters.as_ref());
+        let type_parameters =
+            self.lower_type_parameters(&[], None, struct_type.type_parameters.as_ref());
+        let self_type = NamedType {
+            name: name.string.clone(),
+            type_arguments: type_parameters.type_(),
+        };
 
         let fields = struct_type
             .fields
@@ -411,7 +488,8 @@ impl<'a> Context<'a> {
             .filter_map(|field| {
                 let name = field.name.value()?;
 
-                let type_ = self.lower_type(&type_parameters, field.type_.value());
+                let type_ =
+                    self.lower_type(&type_parameters, Some(&self_type), field.type_.value());
                 Some((name.string.clone(), type_))
             })
             .collect();
@@ -443,7 +521,12 @@ impl<'a> Context<'a> {
             return;
         };
 
-        let type_parameters = self.lower_type_parameters(&[], enum_type.type_parameters.as_ref());
+        let type_parameters =
+            self.lower_type_parameters(&[], None, enum_type.type_parameters.as_ref());
+        let self_type = NamedType {
+            name: name.string.clone(),
+            type_arguments: type_parameters.type_(),
+        };
 
         let variants = enum_type
             .variants
@@ -454,7 +537,7 @@ impl<'a> Context<'a> {
                 let type_ = variant
                     .type_
                     .as_ref()
-                    .map(|it| self.lower_type(&type_parameters, it.value()));
+                    .map(|it| self.lower_type(&type_parameters, Some(&self_type), it.value()));
                 Some((name.string.clone(), type_))
             })
             .collect();
@@ -487,9 +570,14 @@ impl<'a> Context<'a> {
             return;
         };
 
-        let type_parameters = self.lower_type_parameters(&[], trait_.type_parameters.as_ref());
-
-        let functions = self.lower_function_signatures(&type_parameters, &trait_.functions);
+        let type_parameters =
+            self.lower_type_parameters(&[], None, trait_.type_parameters.as_ref());
+        let self_type = NamedType {
+            name: name.string.clone(),
+            type_arguments: type_parameters.type_(),
+        };
+        let functions =
+            self.lower_function_signatures(&type_parameters, Some(&self_type), &trait_.functions);
 
         if self.hir.type_declarations.contains_key(&name.string) {
             self.add_error(
@@ -514,17 +602,27 @@ impl<'a> Context<'a> {
         };
     }
     fn lower_impl(&mut self, impl_: &'a AstImpl) {
-        let type_parameters = self.lower_type_parameters(&[], impl_.type_parameters.as_ref());
+        let type_parameters = self.lower_type_parameters(&[], None, impl_.type_parameters.as_ref());
 
-        let Some(type_) = impl_.type_.value() else {
+        let Some(ast_type) = impl_.type_.value() else {
             return;
         };
-        let type_ = self.lower_type(&type_parameters, type_);
+        let type_ = self.lower_type(&type_parameters, None, ast_type);
+        let Type::Named(self_type) = type_.clone() else {
+            self.add_error(
+                ast_type
+                    .name
+                    .value()
+                    .map_or_else(|| Offset(0)..Offset(0), |it| it.span.clone()),
+                "Expected a named type",
+            );
+            return;
+        };
 
         let Some(trait_) = impl_.trait_.value() else {
             return;
         };
-        let trait_ = self.lower_type(&type_parameters, trait_);
+        let trait_ = self.lower_type(&type_parameters, Some(&self_type), trait_);
 
         let solver_rule = if let Type::Named(type_) = &type_
             && let Ok(solver_type) = SolverValue::try_from(type_.clone())
@@ -538,7 +636,7 @@ impl<'a> Context<'a> {
                     parameters: trait_declaration
                         .type_parameters
                         .iter()
-                        .map(|it| SolverVariable::new(it.type_().clone()).into())
+                        .map(|it| SolverVariable::new(it.type_()).into())
                         .chain([solver_type.into()])
                         .collect(),
                 },
@@ -553,11 +651,13 @@ impl<'a> Context<'a> {
             None
         };
 
-        let functions = self.lower_function_signatures(&type_parameters, &impl_.functions);
+        let functions =
+            self.lower_function_signatures(&type_parameters, Some(&self_type), &impl_.functions);
 
         self.impls.push(ImplDeclaration {
             type_parameters,
             type_,
+            self_type,
             trait_,
             solver_rule,
             functions,
@@ -567,6 +667,7 @@ impl<'a> Context<'a> {
     fn lower_type_parameters(
         &mut self,
         outer_type_parameters: &[TypeParameter],
+        self_type: Option<&NamedType>,
         type_parameters: Option<&AstTypeParameters>,
     ) -> Box<[TypeParameter]> {
         type_parameters.map_or_else(Box::default, |it| {
@@ -575,11 +676,10 @@ impl<'a> Context<'a> {
                 .filter_map(|it| {
                     let name = it.name.value()?;
                     let id = self.type_parameter_id_generator.generate();
-                    let upper_bound = it
-                        .upper_bound
-                        .as_ref()
-                        .and_then(|it| it.value())
-                        .map(|it| Box::new(self.lower_type(outer_type_parameters, it)));
+                    let upper_bound =
+                        it.upper_bound.as_ref().and_then(|it| it.value()).map(|it| {
+                            Box::new(self.lower_type(outer_type_parameters, self_type, it))
+                        });
                     Some(TypeParameter {
                         id,
                         name: name.string.clone(),
@@ -592,6 +692,7 @@ impl<'a> Context<'a> {
     fn lower_type(
         &mut self,
         type_parameters: &[TypeParameter],
+        self_type: Option<&NamedType>,
         type_: impl Into<Option<&AstType>>,
     ) -> Type {
         let type_: Option<&AstType> = type_.into();
@@ -602,6 +703,21 @@ impl<'a> Context<'a> {
         let Some(name) = type_.name.value() else {
             return Type::Error;
         };
+
+        if &*name.string == "Self" {
+            return self_type.map_or_else(
+                || {
+                    self.add_error(
+                        name.span.clone(),
+                        "`Self` can only be used in traits and impls",
+                    );
+                    Type::Error
+                },
+                |self_type| Type::Self_ {
+                    base_type: self_type.clone(),
+                },
+            );
+        }
 
         if let Some((name, id)) = Self::resolve_type_parameter(type_parameters, &name.string) {
             if let Some(type_arguments) = &type_.type_arguments {
@@ -619,7 +735,7 @@ impl<'a> Context<'a> {
             .map_or_else(Box::default, |it| {
                 it.arguments
                     .iter()
-                    .map(|it| self.lower_type(type_parameters, &it.type_))
+                    .map(|it| self.lower_type(type_parameters, self_type, &it.type_))
                     .collect::<Box<_>>()
             });
 
@@ -722,7 +838,7 @@ impl<'a> Context<'a> {
         let type_ = assignment
             .type_
             .as_ref()
-            .map_or(Type::Error, |it| self.lower_type(&[], it.value()));
+            .map_or(Type::Error, |it| self.lower_type(&[], None, it.value()));
 
         match self.global_identifiers.entry(name.string.clone()) {
             Entry::Occupied(mut entry) => {
@@ -731,8 +847,8 @@ impl<'a> Context<'a> {
                     span:
                     name.span.clone(),
                     message: match entry.get_mut() {
-                Named::Functions(_) => "A top-level assignment can't have the same name as a top-level function.".to_string(),
-                Named::Assignment(_) => "Top-level assignments can't have the same name.".to_string(),
+                        Named::Functions(_) => "A top-level assignment can't have the same name as a top-level function.".to_string(),
+                        Named::Assignment(_) => "Top-level assignments can't have the same name.".to_string(),
                     },
                 });
                 return None;
@@ -761,13 +877,14 @@ impl<'a> Context<'a> {
         let type_ = declaration.type_.clone();
         let graph_index = declaration.graph_index;
 
-        let (hir_body, global_assignment_dependencies) = BodyBuilder::build(self, &[], |builder| {
-            if let Some(value) = value.value() {
-                builder.lower_expression(value, Some(&type_));
-            } else {
-                builder.push_error();
-            }
-        });
+        let (hir_body, global_assignment_dependencies) =
+            BodyBuilder::build(self, &[], None, |builder| {
+                if let Some(value) = value.value() {
+                    builder.lower_expression(value, Some(&type_));
+                } else {
+                    builder.push_error();
+                }
+            });
 
         for dependency_id in global_assignment_dependencies {
             let dependency = self.assignments.get(&dependency_id).unwrap();
@@ -781,36 +898,25 @@ impl<'a> Context<'a> {
     fn lower_function_signatures(
         &mut self,
         outer_type_parameters: &[TypeParameter],
+        self_type: Option<&NamedType>,
         functions: &'a [AstFunction],
     ) -> FxHashMap<Id, FunctionDeclaration<'a>> {
         functions
             .iter()
-            .filter_map(|function| self.lower_function_signature(outer_type_parameters, function))
+            .filter_map(|function| {
+                self.lower_function_signature(outer_type_parameters, self_type, function)
+            })
             .collect()
     }
-    fn lower_function_signature(
+    fn lower_top_level_function_signature(
         &mut self,
         outer_type_parameters: &[TypeParameter],
+        self_type: Option<&NamedType>,
         function: &'a AstFunction,
     ) -> Option<(Id, FunctionDeclaration<'a>)> {
-        let name = function.name.value()?;
-
-        let id = self.id_generator.generate();
-
-        let type_parameters =
-            self.lower_type_parameters(outer_type_parameters, function.type_parameters.as_ref());
-        let all_type_parameters = outer_type_parameters
-            .iter()
-            .chain(type_parameters.iter())
-            .cloned()
-            .collect::<Box<_>>();
-
-        let parameters = self.lower_parameters(&all_type_parameters, &function.parameters);
-        let return_type = function.return_type.as_ref().map_or_else(
-            || NamedType::nothing().into(),
-            |it| self.lower_type(&all_type_parameters, it),
-        );
-        match self.global_identifiers.entry(name.string.clone()) {
+        let (id, function) =
+            self.lower_function_signature(outer_type_parameters, self_type, function)?;
+        match self.global_identifiers.entry(function.name.clone()) {
             Entry::Occupied(mut entry) => match entry.get_mut() {
                 Named::Functions(functions) => {
                     // TODO: check for invalid overloads
@@ -818,7 +924,7 @@ impl<'a> Context<'a> {
                 }
                 Named::Assignment(_) => {
                     self.add_error(
-                        name.span.clone(),
+                        function.ast.unwrap().display_span.clone(),
                         "A top-level function can't have the same name as a top-level assignment.",
                     );
                     return None;
@@ -828,6 +934,35 @@ impl<'a> Context<'a> {
                 entry.insert(Named::Functions(vec![id]));
             }
         }
+        Some((id, function))
+    }
+    fn lower_function_signature(
+        &mut self,
+        outer_type_parameters: &[TypeParameter],
+        self_type: Option<&NamedType>,
+        function: &'a AstFunction,
+    ) -> Option<(Id, FunctionDeclaration<'a>)> {
+        let name = function.name.value()?;
+
+        let id = self.id_generator.generate();
+
+        let type_parameters = self.lower_type_parameters(
+            outer_type_parameters,
+            self_type,
+            function.type_parameters.as_ref(),
+        );
+        let all_type_parameters = outer_type_parameters
+            .iter()
+            .chain(type_parameters.iter())
+            .cloned()
+            .collect::<Box<_>>();
+
+        let parameters =
+            self.lower_parameters(&all_type_parameters, self_type, &function.parameters);
+        let return_type = function.return_type.as_ref().map_or_else(
+            || NamedType::nothing().into(),
+            |it| self.lower_type(&all_type_parameters, self_type, it),
+        );
         Some((
             id,
             FunctionDeclaration {
@@ -843,6 +978,7 @@ impl<'a> Context<'a> {
     fn lower_parameters(
         &mut self,
         type_parameters: &[TypeParameter],
+        self_type: Option<&NamedType>,
         parameters: &'a [AstParameter],
     ) -> Box<[Parameter]> {
         let mut parameter_names = FxHashSet::default();
@@ -858,7 +994,7 @@ impl<'a> Context<'a> {
                     return None;
                 }
 
-                let type_ = self.lower_type(type_parameters, parameter.type_.value());
+                let type_ = self.lower_type(type_parameters, self_type, parameter.type_.value());
 
                 let id = self.id_generator.generate();
                 Parameter {
@@ -869,22 +1005,32 @@ impl<'a> Context<'a> {
             })
             .collect()
     }
-    fn lower_function(&mut self, function: &mut FunctionDeclaration<'a>) {
-        let (hir_body, _) = BodyBuilder::build(self, &function.type_parameters, |builder| {
-            for parameter in function.parameters.iter() {
-                builder.push_parameter(parameter.clone());
-            }
+    fn lower_function(
+        &mut self,
+        self_type: Option<&NamedType>,
+        function: &mut FunctionDeclaration<'a>,
+        body_is_optional: bool,
+    ) {
+        if body_is_optional && function.ast.unwrap().body.is_none() {
+            return;
+        }
 
-            if let Some(body) = function.ast.unwrap().body.as_ref() {
-                builder.lower_statements(&body.body, Some(&function.return_type));
-            } else {
-                builder.context.add_error(
-                    function.ast.unwrap().display_span.clone(),
-                    "No function body provided",
-                );
-                builder.push_panic("No function body provided");
-            }
-        });
+        let (hir_body, _) =
+            BodyBuilder::build(self, &function.type_parameters, self_type, |builder| {
+                for parameter in function.parameters.iter() {
+                    builder.push_parameter(parameter.clone());
+                }
+
+                if let Some(body) = function.ast.unwrap().body.as_ref() {
+                    builder.lower_statements(&body.body, Some(&function.return_type));
+                } else {
+                    builder.context.add_error(
+                        function.ast.unwrap().display_span.clone(),
+                        "No function body provided",
+                    );
+                    builder.push_panic("No function body provided");
+                }
+            });
 
         function.body = Some(BodyOrBuiltin::Body(hir_body));
     }
@@ -892,16 +1038,14 @@ impl<'a> Context<'a> {
         self.functions
             .get(&id)
             .map(|function| (function, None))
-            .unwrap_or_else(|| {
-                self.impls
-                    .iter()
-                    .find_map(|it| {
-                        it.solver_rule.as_ref().and_then(|rule| {
-                            it.functions.get(&id).map(|function| (function, Some(rule)))
-                        })
+            .or_else(|| {
+                self.impls.iter().find_map(|it| {
+                    it.solver_rule.as_ref().and_then(|rule| {
+                        it.functions.get(&id).map(|function| (function, Some(rule)))
                     })
-                    .unwrap()
+                })
             })
+            .unwrap()
     }
     fn get_type_parameter(&self, id: TypeParameterId) -> TypeParameter {
         self.traits
@@ -1193,6 +1337,7 @@ struct BodyBuilder<'c, 'a> {
     context: &'c mut Context<'a>,
     global_assignment_dependencies: FxHashSet<Id>,
     type_parameters: &'c [TypeParameter],
+    self_type: Option<&'c NamedType>,
     local_identifiers: Vec<(Box<str>, Id, Type)>,
     body: Body,
 }
@@ -1201,12 +1346,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     fn build(
         context: &'c mut Context<'a>,
         type_parameters: &'c [TypeParameter],
+        self_type: Option<&'c NamedType>,
         fun: impl FnOnce(&mut BodyBuilder),
     ) -> (Body, FxHashSet<Id>) {
         let mut builder = Self {
             context,
             global_assignment_dependencies: FxHashSet::default(),
             type_parameters,
+            self_type,
             local_identifiers: vec![],
             body: Body::default(),
         };
@@ -1215,12 +1362,17 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     }
     #[must_use]
     fn build_inner(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
-        BodyBuilder::build(self.context, self.type_parameters, |builder| {
-            builder.local_identifiers = self.local_identifiers.clone();
-            fun(builder);
-            self.global_assignment_dependencies
-                .extend(&builder.global_assignment_dependencies);
-        })
+        BodyBuilder::build(
+            self.context,
+            self.type_parameters,
+            self.self_type,
+            |builder| {
+                builder.local_identifiers = self.local_identifiers.clone();
+                fun(builder);
+                self.global_assignment_dependencies
+                    .extend(&builder.global_assignment_dependencies);
+            },
+        )
         .0
     }
 
@@ -1243,10 +1395,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         continue;
                     };
 
-                    let type_ = assignment
-                        .type_
-                        .as_ref()
-                        .map(|it| self.context.lower_type(self.type_parameters, it.value()));
+                    let type_ = assignment.type_.as_ref().map(|it| {
+                        self.context
+                            .lower_type(self.type_parameters, self.self_type, it.value())
+                    });
 
                     let (id, type_) = if let Some(value) = assignment.value.value() {
                         self.lower_expression(value, type_.as_ref())
@@ -1446,7 +1598,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         }
 
                         match self.lower_identifier(identifier) {
-                            LoweredExpression::Expression { id, type_ } => todo!(),
+                            LoweredExpression::Expression { .. } => todo!("support lambdas"),
                             LoweredExpression::NamedTypeReference(type_) => {
                                 match self.context.hir.type_declarations.get(&type_) {
                                     Some(TypeDeclaration {
@@ -1478,7 +1630,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                                 ExpressionKind::CreateStruct {
                                                     struct_: type_.clone(),
                                                     fields: fields
-                                                        .into_iter()
+                                                        .iter()
                                                         .map(|(id, _)| *id)
                                                         .collect(),
                                                 },
@@ -1487,8 +1639,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         })
                                     }
                                     Some(TypeDeclaration {
-                                        type_parameters,
                                         kind: TypeDeclarationKind::Enum { .. },
+                                        ..
                                     }) => {
                                         // TODO: report actual error location
                                         self.context.add_error(
@@ -1498,8 +1650,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         LoweredExpression::Error
                                     }
                                     Some(TypeDeclaration {
-                                        type_parameters,
                                         kind: TypeDeclarationKind::Trait { .. },
+                                        ..
                                     }) => unreachable!(),
                                     None => {
                                         // TODO: report actual error location
@@ -1555,7 +1707,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                     self,
                                     call,
                                     &call.arguments,
-                                    Some(&parameter_types.as_slice()),
+                                    Some(parameter_types.as_slice()),
                                 );
                                 arguments.map_or(LoweredExpression::Error, |arguments| {
                                     self.push_lowered(
@@ -1982,17 +2134,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     fn lower_identifier(&mut self, identifier: &AstString) -> LoweredExpression {
         let name = &identifier.string;
         if let Some((id, type_)) = self.lookup_local_identifier(identifier) {
-            LoweredExpression::Expression {
-                id,
-                type_: type_.clone(),
-            }
+            self.push_lowered(name.clone(), ExpressionKind::Reference(id), type_.clone())
         } else if let Some(named) = self.context.global_identifiers.get(name) {
             match named {
                 Named::Assignment(id) => {
                     let id = *id;
                     self.global_assignment_dependencies.insert(id);
                     let type_ = self.context.assignments.get(&id).unwrap().type_.clone();
-                    LoweredExpression::Expression { id, type_ }
+                    self.push_lowered(name.clone(), ExpressionKind::Reference(id), type_)
                 }
                 Named::Functions(_) => {
                     todo!("support function references");
@@ -2021,7 +2170,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             (
                 it.arguments
                     .iter()
-                    .map(|it| self.context.lower_type(self.type_parameters, &it.type_))
+                    .map(|it| {
+                        self.context
+                            .lower_type(self.type_parameters, self.self_type, &it.type_)
+                    })
                     .collect::<Box<_>>(),
                 it.span.clone(),
             )

@@ -1,6 +1,7 @@
 #![feature(
     anonymous_lifetime_in_impl_trait,
     box_patterns,
+    if_let_guard,
     iter_repeat_n,
     let_chains,
     option_take_if,
@@ -33,6 +34,7 @@ use std::{
     process,
     time::{Duration, Instant},
 };
+use to_text::ToText;
 use tracing::{debug, error, info, warn, Level, Metadata};
 use tracing_subscriber::{
     filter, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt, Layer,
@@ -48,6 +50,7 @@ mod mono;
 mod mono_to_c;
 mod position;
 mod string_to_ast;
+mod to_text;
 mod type_solver;
 mod utils;
 
