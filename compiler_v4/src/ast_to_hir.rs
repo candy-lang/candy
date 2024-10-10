@@ -651,6 +651,17 @@ impl<'a> Context<'a> {
                 .iter()
                 .filter_map(|it| {
                     let name = it.name.value()?;
+                    if outer_type_parameters
+                        .iter()
+                        .any(|it| it.name == name.string)
+                    {
+                        self.add_error(
+                            name.span.clone(),
+                            format!("Duplicate type parameter name: `{}`", name.string),
+                        );
+                        return None;
+                    }
+
                     let id = self.type_parameter_id_generator.generate();
                     let upper_bound =
                         it.upper_bound.as_ref().and_then(|it| it.value()).map(|it| {
