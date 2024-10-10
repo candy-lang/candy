@@ -2240,8 +2240,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             )
         });
 
-        // TODO: resolve local identifiers as well if not calling using instance syntax
-        // TODO: resolve types for constructor
+        // TODO(lambdas): resolve local identifiers as well if not calling using instance syntax
         let matches = self
             .context
             .get_all_functions_matching_name(&name.string)
@@ -2251,6 +2250,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 (*id, function.clone(), trait_.cloned())
             })
             .collect_vec();
+        if matches.is_empty() {
+            self.context
+                .add_error(name.span.clone(), "Function not found");
+            return LoweredExpression::Error;
+        }
 
         // Check type parameter count
         let matches = if let Some((type_arguments, type_arguments_span)) = &type_arguments {
