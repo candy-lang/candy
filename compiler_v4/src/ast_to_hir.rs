@@ -9,7 +9,7 @@ use crate::{
     hir::{
         Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
         FunctionSignature, Hir, Id, Impl, NamedType, Parameter, ParameterType,
-        SliceOfTypeParameter, SwitchCase, TraitFunction, Type, TypeDeclaration,
+        SliceOfTypeParameter, SwitchCase, TraitDefinition, TraitFunction, Type, TypeDeclaration,
         TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
@@ -61,16 +61,14 @@ struct TraitDeclaration<'a> {
 }
 impl<'a> TraitDeclaration<'a> {
     #[must_use]
-    fn into_type_declaration(self) -> TypeDeclaration {
-        TypeDeclaration {
+    fn into_definition(self) -> TraitDefinition {
+        TraitDefinition {
             type_parameters: self.type_parameters,
-            kind: TypeDeclarationKind::Trait {
-                functions: self
-                    .functions
-                    .into_iter()
-                    .map(|(id, function)| (id, function.into_trait_function()))
-                    .collect(),
-            },
+            functions: self
+                .functions
+                .into_iter()
+                .map(|(id, function)| (id, function.into_trait_function()))
+                .collect(),
         }
     }
 }
@@ -212,11 +210,11 @@ impl<'a> Context<'a> {
             );
         }
 
-        for (name, trait_) in self.traits {
-            self.hir
-                .type_declarations
-                .force_insert(name, trait_.into_type_declaration());
-        }
+        self.hir.traits = self
+            .traits
+            .into_iter()
+            .map(|(name, trait_)| (name, trait_.into_definition()))
+            .collect();
         self.hir.impls = self
             .impls
             .into_iter()
@@ -1602,10 +1600,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         );
                                         LoweredExpression::Error
                                     }
-                                    Some(TypeDeclaration {
-                                        kind: TypeDeclarationKind::Trait { .. },
-                                        ..
-                                    }) => unreachable!(),
                                     None => {
                                         // TODO: report actual error location
                                         self.context.add_error(
@@ -1924,7 +1918,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                     LoweredExpression::Error
                                 }
                             }
-                            TypeDeclarationKind::Trait { .. } => unreachable!(),
                         }
                     }
                     LoweredExpression::TypeParameterReference(type_parameter) => {
@@ -1981,7 +1974,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                     .collect::<FxHashMap<_, _>>(),
                                 variants.clone(),
                             ),
-                            TypeDeclarationKind::Trait { .. } => unreachable!(),
                         }
                     }
                     Type::Parameter(type_) => {

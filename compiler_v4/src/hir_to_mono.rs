@@ -230,9 +230,6 @@ impl<'h> Context<'h> {
                             .collect();
                         mono::TypeDeclaration::Enum { variants }
                     }
-                    hir::TypeDeclarationKind::Trait { .. } => {
-                        panic!("Trait type {name} should have been monomorphized.")
-                    }
                 }
             }
             hir::Type::Parameter(parameter_type) => {

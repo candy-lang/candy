@@ -29,6 +29,7 @@ impl ToText for Id {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Hir {
     pub type_declarations: FxHashMap<Box<str>, TypeDeclaration>,
+    pub traits: FxHashMap<Box<str>, TraitDefinition>,
     pub impls: Box<[Impl]>,
     pub assignments: FxHashMap<Id, Assignment>,
     pub functions: FxHashMap<Id, Function>,
@@ -41,12 +42,9 @@ impl Hir {
             .or_else(|| self.impls.iter().find_map(|it| it.functions.get(&id)))
             .map(|it| (&it.signature, Some(&it.body)))
             .or_else(|| {
-                self.type_declarations
+                self.traits
                     .values()
-                    .find_map(|it| match &it.kind {
-                        TypeDeclarationKind::Trait { functions } => functions.get(&id),
-                        _ => None,
-                    })
+                    .find_map(|it| it.functions.get(&id))
                     .map(|it| (&it.signature, it.body.as_ref()))
             })
             .unwrap()
@@ -94,19 +92,11 @@ impl ToText for Hir {
                     }
                     builder.push("}");
                 }
-                TypeDeclarationKind::Trait { functions } => {
-                    builder.push(format!("trait {name}"));
-                    declaration.type_parameters.build_text(builder);
-                    builder.push(" {");
-                    builder.push_children_custom_multiline(
-                        functions
-                            .iter()
-                            .sorted_by_key(|(_, it)| it.signature.name.clone()),
-                        |builder, (id, function)| (*id, *function).build_text(builder),
-                    );
-                    builder.push("}");
-                }
             }
+            builder.push_newline();
+        }
+        for (name, definition) in &self.traits {
+            (name.as_ref(), definition).build_text(builder);
             builder.push_newline();
         }
         for impl_ in self.impls.iter() {
@@ -148,9 +138,28 @@ pub enum TypeDeclarationKind {
     Enum {
         variants: Box<[(Box<str>, Option<Type>)]>,
     },
-    Trait {
-        functions: FxHashMap<Id, TraitFunction>,
-    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TraitDefinition {
+    pub type_parameters: Box<[TypeParameter]>,
+    pub functions: FxHashMap<Id, TraitFunction>,
+}
+impl ToText for (&str, &TraitDefinition) {
+    fn build_text(&self, builder: &mut TextBuilder) {
+        let (name, definition) = self;
+        builder.push(format!("trait {name}"));
+        definition.type_parameters.build_text(builder);
+        builder.push(" {");
+        builder.push_children_custom_multiline(
+            definition
+                .functions
+                .iter()
+                .sorted_by_key(|(_, it)| it.signature.name.clone()),
+            |builder, (id, function)| (*id, *function).build_text(builder),
+        );
+        builder.push("}");
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
