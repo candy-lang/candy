@@ -9,8 +9,8 @@ use crate::{
     hir::{
         Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
         FunctionSignature, Hir, Id, Impl, NamedType, Parameter, ParameterType,
-        SliceOfTypeParameter, SwitchCase, TraitDefinition, TraitFunction, Type, TypeDeclaration,
-        TypeDeclarationKind, TypeParameter,
+        SliceOfTypeParameter, SwitchCase, Trait, TraitDefinition, TraitFunction, Type,
+        TypeDeclaration, TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
     position::Offset,
@@ -77,7 +77,7 @@ struct ImplDeclaration<'a> {
     type_parameters: Box<[TypeParameter]>,
     type_: Type,
     self_type: NamedType,
-    trait_: Type,
+    trait_: Trait,
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
 }
 impl<'a> ImplDeclaration<'a> {
@@ -351,7 +351,7 @@ impl<'a> Context<'a> {
             let AstDeclaration::Trait(trait_) = declaration else {
                 continue;
             };
-            self.lower_trait(trait_);
+            self.lower_trait_definition(trait_);
         }
         for declaration in self.ast {
             match declaration {
@@ -528,7 +528,7 @@ impl<'a> Context<'a> {
         };
     }
 
-    fn lower_trait(&mut self, trait_: &'a AstTrait) {
+    fn lower_trait_definition(&mut self, trait_: &'a AstTrait) {
         let Some(name) = trait_.name.value() else {
             return;
         };
@@ -576,6 +576,115 @@ impl<'a> Context<'a> {
             }
         };
     }
+    fn lower_trait(
+        &mut self,
+        type_parameters: &[TypeParameter],
+        self_type: Option<&NamedType>,
+        type_: impl Into<Option<&AstType>>,
+    ) -> Trait {
+        let type_: Option<&AstType> = type_.into();
+        let Some(type_) = type_ else {
+            return Trait::Error;
+        };
+
+        let Some(name) = type_.name.value() else {
+            return Trait::Error;
+        };
+
+        if &*name.string == "Self" {
+            self.add_error(name.span.clone(), "`Self` is not a trait.");
+            return Trait::Error;
+        }
+
+        if let Some(type_parameter) = type_parameters.iter().find(|it| it.name == name.string) {
+            self.add_error(
+                name.span.clone(),
+                format!("`{}` is a type parameter, not a trait.", name.string),
+            );
+            return Trait::Error;
+        }
+
+        let type_arguments = type_
+            .type_arguments
+            .as_ref()
+            .map_or_else(Box::default, |it| {
+                it.arguments
+                    .iter()
+                    .map(|it| self.lower_type(type_parameters, self_type, &it.type_))
+                    .collect::<Box<_>>()
+            });
+
+        if &*name.string == "Int" {
+            self.add_error(name.span.clone(), "Int is a type, not a trait.");
+            return Trait::Error;
+        }
+        if &*name.string == "Text" {
+            self.add_error(name.span.clone(), "Text is a type, not a trait.");
+            return Trait::Error;
+        }
+
+        let type_parameters = match self.ast.iter().find_map(|it| match it {
+            AstDeclaration::Trait(AstTrait {
+                name: it_name,
+                type_parameters,
+                ..
+            }) if it_name.value().map(|it| &it.string) == Some(&name.string) => {
+                Some(Ok(type_parameters
+                    .as_ref()
+                    .map_or::<&[AstTypeParameter], _>(&[], |it| &it.parameters)))
+            }
+            AstDeclaration::Struct(AstStruct { name: it_name, .. })
+            | AstDeclaration::Enum(AstEnum { name: it_name, .. })
+                if it_name.value().map(|it| &it.string) == Some(&name.string) =>
+            {
+                self.add_error(name.span.clone(), "Types can't be used as traits.");
+                Some(Err(()))
+            }
+            _ => None,
+        }) {
+            Some(Ok(type_parameters)) => type_parameters,
+            Some(Err(())) => return Trait::Error,
+            None => {
+                self.add_error(name.span.clone(), format!("Unknown trait: `{}`", **name));
+                return Trait::Error;
+            }
+        };
+
+        let type_arguments: Box<[Type]> = if type_arguments.len() == type_parameters.len() {
+            type_arguments
+        } else {
+            self.add_error(
+                type_.type_arguments.as_ref().unwrap().span.clone(),
+                format!(
+                    "Expected {} type {}, got {}.",
+                    type_parameters.len(),
+                    if type_parameters.len() == 1 {
+                        "argument"
+                    } else {
+                        "arguments"
+                    },
+                    type_arguments.len(),
+                ),
+            );
+            if type_arguments.len() < type_parameters.len() {
+                let missing_count = type_parameters.len() - type_arguments.len();
+                type_arguments
+                    .into_vec()
+                    .into_iter()
+                    .chain(iter::repeat_n(Type::Error, missing_count))
+                    .collect()
+            } else {
+                let mut type_arguments = type_arguments.into_vec();
+                type_arguments.truncate(type_parameters.len());
+                type_arguments.into_boxed_slice()
+            }
+        };
+
+        Trait::Trait {
+            name: name.string.clone(),
+            type_arguments,
+        }
+    }
     fn lower_impl(&mut self, impl_: &'a AstImpl) {
         let type_parameters = self.lower_type_parameters(&[], None, impl_.type_parameters.as_ref());
 
@@ -589,7 +698,7 @@ impl<'a> Context<'a> {
                     .name
                     .value()
                     .map_or_else(|| Offset(0)..Offset(0), |it| it.span.clone()),
-                "Expected a named type",
+                "Expected a named type.",
             );
             return;
         };
@@ -597,17 +706,19 @@ impl<'a> Context<'a> {
         let Some(trait_) = impl_.trait_.value() else {
             return;
         };
-        let trait_ = self.lower_type(&type_parameters, Some(&self_type), trait_);
+        let trait_ = self.lower_trait(&type_parameters, Some(&self_type), trait_);
 
         if let Type::Named(type_) = &type_
             && let Ok(solver_type) = SolverValue::try_from(type_.clone())
-            && let Type::Named(trait_) = &trait_
+            && let Trait::Trait {
+                name: trait_name, ..
+            } = &trait_
         {
-            let trait_declaration = &self.traits[&trait_.name];
+            let trait_declaration = &self.traits[trait_name];
 
             let rule = SolverRule {
                 goal: SolverGoal {
-                    trait_: trait_.name.clone(),
+                    trait_: trait_name.clone(),
                     parameters: trait_declaration
                         .type_parameters
                         .iter()
@@ -659,7 +770,7 @@ impl<'a> Context<'a> {
 
                     let upper_bound =
                         it.upper_bound.as_ref().and_then(|it| it.value()).map(|it| {
-                            Box::new(self.lower_type(outer_type_parameters, self_type, it))
+                            Box::new(self.lower_trait(outer_type_parameters, self_type, it))
                         });
                     Some(TypeParameter {
                         name: name.string.clone(),
@@ -738,7 +849,7 @@ impl<'a> Context<'a> {
             return NamedType::text().into();
         }
 
-        let Some(type_parameters) = self.ast.iter().find_map(|it| match it {
+        let type_parameters = match self.ast.iter().find_map(|it| match it {
             AstDeclaration::Struct(AstStruct {
                 name: it_name,
                 type_parameters,
@@ -748,20 +859,25 @@ impl<'a> Context<'a> {
                 name: it_name,
                 type_parameters,
                 ..
-            })
-            | AstDeclaration::Trait(AstTrait {
-                name: it_name,
-                type_parameters,
-                ..
-            }) if it_name.value().map(|it| &it.string) == Some(&name.string) => Some(
-                type_parameters
+            }) if it_name.value().map(|it| &it.string) == Some(&name.string) => {
+                Some(Ok(type_parameters
                     .as_ref()
-                    .map_or::<&[AstTypeParameter], _>(&[], |it| &it.parameters),
-            ),
+                    .map_or::<&[AstTypeParameter], _>(&[], |it| &it.parameters)))
+            }
+            AstDeclaration::Trait(AstTrait { name: it_name, .. })
+                if it_name.value().map(|it| &it.string) == Some(&name.string) =>
+            {
+                self.add_error(name.span.clone(), "Traits can't be used as types");
+                Some(Err(()))
+            }
             _ => None,
-        }) else {
-            self.add_error(name.span.clone(), format!("Unknown type: `{}`", **name));
-            return Type::Error;
+        }) {
+            Some(Ok(type_parameters)) => type_parameters,
+            Some(Err(())) => return Type::Error,
+            None => {
+                self.add_error(name.span.clone(), format!("Unknown type: `{}`", **name));
+                return Type::Error;
+            }
         };
 
         let type_arguments: Box<[Type]> = if type_arguments.len() == type_parameters.len() {

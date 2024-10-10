@@ -1,10 +1,11 @@
 use super::values::{SolverType, SolverTypeTrait, SolverValue, SolverVariable};
-use crate::hir::{Type, TypeParameter};
+use crate::hir::{Trait, Type, TypeParameter};
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
     collections::{hash_map::Entry, VecDeque},
     fmt::{self, Display, Formatter},
+    iter,
 };
 
 fn solver_value_for_types(types: Box<[SolverType]>) -> SolverValue {
@@ -63,13 +64,22 @@ impl TryFrom<TypeParameter> for SolverGoal {
     type Error = ();
 
     fn try_from(value: TypeParameter) -> Result<Self, Self::Error> {
-        let Some(box Type::Named(upper_bound)) = &value.upper_bound else {
+        let Some(box Trait::Trait {
+            name,
+            type_arguments,
+        }) = &value.upper_bound
+        else {
             return Err(());
         };
 
+        // FIXME
         Ok(Self {
-            trait_: upper_bound.name.clone(),
-            parameters: vec![SolverVariable::new(value.type_()).into()].into_boxed_slice(),
+            trait_: name.clone(),
+            parameters: type_arguments
+                .iter()
+                .map(|it| SolverType::try_from(it.clone()).unwrap())
+                .chain(iter::once(SolverVariable::new(value.type_()).into()))
+                .collect(),
         })
     }
 }

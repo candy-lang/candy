@@ -161,6 +161,47 @@ impl ToText for (&str, &TraitDefinition) {
         builder.push("}");
     }
 }
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum Trait {
+    Trait {
+        name: Box<str>,
+        type_arguments: Box<[Type]>,
+    },
+    Error,
+}
+impl Trait {
+    #[must_use]
+    pub fn substitute(&self, environment: &FxHashMap<ParameterType, Type>) -> Self {
+        match self {
+            Self::Trait {
+                name,
+                type_arguments,
+            } => Self::Trait {
+                name: name.clone(),
+                type_arguments: type_arguments
+                    .iter()
+                    .map(|it| it.substitute(environment))
+                    .collect(),
+            },
+            Self::Error => Self::Error,
+        }
+    }
+}
+impl Display for Trait {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match &self {
+            Self::Trait {
+                name,
+                type_arguments,
+            } => NamedType {
+                name: name.clone(),
+                type_arguments: type_arguments.clone(),
+            }
+            .fmt(f),
+            Self::Error => write!(f, "<error>"),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TraitFunction {
@@ -187,7 +228,7 @@ impl ToText for (&Id, &TraitFunction) {
 pub struct Impl {
     pub type_parameters: Box<[TypeParameter]>,
     pub type_: Type,
-    pub trait_: Type,
+    pub trait_: Trait,
     pub functions: FxHashMap<Id, Function>,
 }
 impl ToText for Impl {
@@ -210,7 +251,7 @@ impl ToText for Impl {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TypeParameter {
     pub name: Box<str>,
-    pub upper_bound: Option<Box<Type>>,
+    pub upper_bound: Option<Box<Trait>>,
 }
 impl TypeParameter {
     #[must_use]
@@ -345,7 +386,7 @@ impl Type {
     ) -> FxHashMap<ParameterType, Self> {
         type_parameters
             .iter()
-            .map(|it| it.type_())
+            .map(TypeParameter::type_)
             .zip_eq(type_arguments.iter().cloned())
             .collect()
     }
@@ -637,7 +678,7 @@ impl BuiltinFunction {
     pub fn signature(self) -> BuiltinFunctionSignature {
         match self {
             Self::IntAdd => BuiltinFunctionSignature {
-                name: "add".into(),
+                name: "builtinAdd".into(),
                 type_parameters: Box::default(),
                 parameters: [
                     ("a".into(), NamedType::int().into()),
@@ -647,7 +688,7 @@ impl BuiltinFunction {
                 return_type: NamedType::int().into(),
             },
             Self::IntCompareTo => BuiltinFunctionSignature {
-                name: "compareTo".into(),
+                name: "builtinCompareTo".into(),
                 type_parameters: Box::default(),
                 parameters: [
                     ("a".into(), NamedType::int().into()),
@@ -657,7 +698,7 @@ impl BuiltinFunction {
                 return_type: NamedType::ordering().into(),
             },
             Self::IntSubtract => BuiltinFunctionSignature {
-                name: "subtract".into(),
+                name: "builtinSubtract".into(),
                 type_parameters: Box::default(),
                 parameters: [
                     ("a".into(), NamedType::int().into()),
@@ -667,25 +708,25 @@ impl BuiltinFunction {
                 return_type: NamedType::int().into(),
             },
             Self::IntToText => BuiltinFunctionSignature {
-                name: "toText".into(),
+                name: "builtinToText".into(),
                 type_parameters: Box::default(),
                 parameters: [("int".into(), NamedType::int().into())].into(),
                 return_type: NamedType::text().into(),
             },
             Self::Panic => BuiltinFunctionSignature {
-                name: "panic".into(),
+                name: "builtinPanic".into(),
                 type_parameters: Box::default(),
                 parameters: [("message".into(), NamedType::text().into())].into(),
                 return_type: NamedType::never().into(),
             },
             Self::Print => BuiltinFunctionSignature {
-                name: "print".into(),
+                name: "builtinPrint".into(),
                 type_parameters: Box::default(),
                 parameters: [("message".into(), NamedType::text().into())].into(),
                 return_type: NamedType::nothing().into(),
             },
             Self::TextConcat => BuiltinFunctionSignature {
-                name: "concat".into(),
+                name: "builtinConcat".into(),
                 type_parameters: Box::default(),
                 parameters: [
                     ("a".into(), NamedType::text().into()),

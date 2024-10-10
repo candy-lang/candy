@@ -88,7 +88,7 @@ impl<'h> Context<'h> {
                 .filter(|impl_| {
                     matches!(
                         &impl_.trait_,
-                        hir::Type::Named(hir::NamedType { name, .. })
+                        hir::Trait::Trait { name, .. }
                         if name == &used_goal.trait_
                     )
                 })
