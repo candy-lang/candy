@@ -1,6 +1,6 @@
 use crate::{
-    hir::{self, Hir, NamedType, ParameterType, Type, TypeParameterId},
-    id::{CountableId, IdGenerator},
+    hir::{self, Hir, NamedType, ParameterType, Type},
+    id::IdGenerator,
     mono::{self, Mono},
     type_solver::goals::SolverGoal,
     utils::HashMapExtension,
@@ -77,7 +77,7 @@ impl<'h> Context<'h> {
         &mut self,
         id: hir::Id,
         used_goal: Option<&SolverGoal>,
-        substitutions: &FxHashMap<TypeParameterId, Type>,
+        substitutions: &FxHashMap<ParameterType, Type>,
     ) -> Box<str> {
         let (signature, body) = self.hir.get_function(id);
         let (signature, body) = if let Some(used_goal) = used_goal {
@@ -235,8 +235,8 @@ impl<'h> Context<'h> {
                     }
                 }
             }
-            hir::Type::Parameter(ParameterType { name, id }) => {
-                panic!("Type parameter {name} ({id}) should have been monomorphized.")
+            hir::Type::Parameter(parameter_type) => {
+                panic!("Type parameter `{parameter_type}` should have been monomorphized.")
             }
             hir::Type::Self_ { base_type } => {
                 panic!("Self type (base type: {base_type}) should have been monomorphized.")
@@ -264,8 +264,8 @@ impl<'h> Context<'h> {
                     result.push_str("end$");
                 }
             }
-            hir::Type::Parameter(ParameterType { name, id }) => {
-                panic!("Type parameter {name} ({id}) should have been monomorphized.")
+            hir::Type::Parameter(parameter_type) => {
+                panic!("Type parameter `{parameter_type}` should have been monomorphized.")
             }
             hir::Type::Self_ { base_type } => {
                 panic!("Self type (base type: {base_type}) should have been monomorphized.")
@@ -276,7 +276,7 @@ impl<'h> Context<'h> {
 }
 struct BodyBuilder<'c, 'h> {
     context: &'c mut Context<'h>,
-    environment: &'c FxHashMap<hir::TypeParameterId, hir::Type>,
+    environment: &'c FxHashMap<hir::ParameterType, hir::Type>,
     parameters: Vec<mono::Parameter>,
     body: mono::Body,
     id_generator: IdGenerator<mono::Id>,
@@ -286,7 +286,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
     #[must_use]
     fn build(
         context: &'c mut Context<'h>,
-        environment: &'c FxHashMap<hir::TypeParameterId, hir::Type>,
+        environment: &'c FxHashMap<hir::ParameterType, hir::Type>,
         fun: impl FnOnce(&mut BodyBuilder),
     ) -> (Box<[mono::Parameter]>, mono::Body) {
         let mut builder = Self {
@@ -481,11 +481,11 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
 
     fn merge_substitutions(
         &self,
-        inner: &FxHashMap<TypeParameterId, Type>,
-    ) -> FxHashMap<TypeParameterId, Type> {
+        inner: &FxHashMap<ParameterType, Type>,
+    ) -> FxHashMap<ParameterType, Type> {
         inner
             .iter()
-            .map(|(key, value)| (*key, self.merge_substitution(value)))
+            .map(|(key, value)| (key.clone(), self.merge_substitution(value)))
             .collect()
     }
     fn merge_substitution(&self, type_: &hir::Type) -> Type {
@@ -494,11 +494,14 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 name,
                 type_arguments,
             }) => {
+                // TODO: Is the `type_arguments.is_empty()` check necessary?
                 if type_arguments.is_empty()
-                    && name.starts_with("$_")
-                    && let Ok(type_parameter_id) = name[2..].parse::<usize>()
+                    && let Some(type_parameter_name) = name.strip_prefix('$')
                 {
-                    self.environment[&TypeParameterId::from_usize(type_parameter_id)].clone()
+                    self.environment[&ParameterType {
+                        name: type_parameter_name.into(),
+                    }]
+                        .clone()
                 } else {
                     hir::Type::Named(NamedType {
                         name: name.clone(),
@@ -509,12 +512,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                     })
                 }
             }
-            hir::Type::Parameter(ParameterType { name, id }) => {
-                hir::Type::Parameter(ParameterType {
-                    name: name.clone(),
-                    id: *id,
-                })
-            }
+            hir::Type::Parameter(parameter_type) => parameter_type.clone().into(),
             hir::Type::Self_ { .. } | hir::Type::Error => unreachable!(),
         }
     }

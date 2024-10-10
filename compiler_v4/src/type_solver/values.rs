@@ -1,7 +1,4 @@
-use crate::{
-    hir::{NamedType, ParameterType, Type, TypeParameterId},
-    id::CountableId,
-};
+use crate::hir::{NamedType, ParameterType, Type};
 use enum_dispatch::enum_dispatch;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
@@ -13,7 +10,6 @@ use std::{
 pub fn canonical_variable(n: usize) -> ParameterType {
     ParameterType {
         name: format!("canonical${n}").into_boxed_str(),
-        id: TypeParameterId::from_usize(usize::MAX - n - 1),
     }
 }
 
@@ -204,10 +200,7 @@ impl SolverVariable {
     #[must_use]
     pub fn self_() -> Self {
         Self {
-            type_: Some(ParameterType {
-                name: "Self".into(),
-                id: TypeParameterId::SELF_TYPE,
-            }),
+            type_: Some(ParameterType::self_type()),
         }
     }
     #[must_use]

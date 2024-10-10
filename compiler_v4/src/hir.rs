@@ -26,19 +26,6 @@ impl ToText for Id {
     }
 }
 
-// TODO: remove in favor of TypeParameter(String)
-#[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TypeParameterId(usize);
-impl_countable_id!(TypeParameterId);
-impl TypeParameterId {
-    pub const SELF_TYPE: Self = Self(usize::MAX);
-}
-impl Display for TypeParameterId {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "_{}", self.0)
-    }
-}
-
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Hir {
     pub type_declarations: FxHashMap<Box<str>, TypeDeclaration>,
@@ -213,7 +200,6 @@ impl ToText for Impl {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TypeParameter {
-    pub id: TypeParameterId,
     pub name: Box<str>,
     pub upper_bound: Option<Box<Type>>,
 }
@@ -222,8 +208,12 @@ impl TypeParameter {
     pub fn type_(&self) -> ParameterType {
         ParameterType {
             name: self.name.clone(),
-            id: self.id,
         }
+    }
+}
+impl Display for TypeParameter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
 #[extension_trait]
@@ -246,7 +236,7 @@ impl ToText for [TypeParameter] {
 }
 impl ToText for TypeParameter {
     fn build_text(&self, builder: &mut TextBuilder) {
-        builder.push(format!("{}@{}", self.id, self.name));
+        builder.push(format!("{}", self.name));
         if let Some(upper_bound) = self.upper_bound.as_ref() {
             builder.push(format!(": {upper_bound}"));
         }
@@ -313,7 +303,21 @@ impl NamedType {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ParameterType {
     pub name: Box<str>,
-    pub id: TypeParameterId,
+}
+impl ParameterType {
+    const SELF_TYPE_NAME: &'static str = "Self";
+
+    #[must_use]
+    pub fn self_type() -> Self {
+        Self {
+            name: Self::SELF_TYPE_NAME.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn is_self_type(&self) -> bool {
+        self.name.as_ref() == Self::SELF_TYPE_NAME
+    }
 }
 impl Display for ParameterType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -329,22 +333,22 @@ impl Type {
     pub fn build_environment(
         type_parameters: &[TypeParameter],
         type_arguments: &[Self],
-    ) -> FxHashMap<TypeParameterId, Self> {
+    ) -> FxHashMap<ParameterType, Self> {
         type_parameters
             .iter()
-            .map(|it| it.id)
+            .map(|it| it.type_())
             .zip_eq(type_arguments.iter().cloned())
             .collect()
     }
     #[must_use]
-    pub fn substitute(&self, environment: &FxHashMap<TypeParameterId, Self>) -> Self {
+    pub fn substitute(&self, environment: &FxHashMap<ParameterType, Self>) -> Self {
         match self {
             Self::Named(NamedType { name, type_arguments }) => Self::Named(NamedType {
                 name: name.clone(),
                 type_arguments: type_arguments.iter().map(|it| it.substitute(environment)).collect(),
             }),
-            Self::Parameter (ParameterType{ name, id }) => environment.get(id).unwrap_or_else(|| panic!("Missing substitution for type parameter {name} (environment: {environment:?})")).clone(),
-            Self::Self_ { base_type } => environment.get(&TypeParameterId::SELF_TYPE).cloned().unwrap_or_else(|| Self::Self_ { base_type: base_type.clone() }),
+            Self::Parameter (type_) => environment.get(type_).unwrap_or_else(|| panic!("Missing substitution for type parameter {type_} (environment: {environment:?})")).clone(),
+            Self::Self_ { base_type } => environment.get(&ParameterType::self_type()).cloned().unwrap_or_else(|| Self::Self_ { base_type: base_type.clone() }),
             Self::Error => Self::Error,
         }
     }
@@ -353,7 +357,7 @@ impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self {
             Self::Named(type_) => write!(f, "{type_}"),
-            Self::Parameter(ParameterType { name, id: _ }) => write!(f, "{name}"),
+            Self::Parameter(ParameterType { name }) => write!(f, "{name}"),
             Self::Self_ { base_type } => write!(f, "Self<{base_type}>"),
             Self::Error => write!(f, "<error>"),
         }
@@ -507,7 +511,7 @@ pub enum ExpressionKind {
     Call {
         function: Id,
         used_goal: Option<SolverGoal>,
-        substitutions: FxHashMap<TypeParameterId, Type>,
+        substitutions: FxHashMap<ParameterType, Type>,
         arguments: Box<[Id]>,
     },
     Switch {

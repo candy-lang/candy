@@ -10,7 +10,7 @@ use crate::{
         Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
         FunctionSignature, Hir, Id, Impl, NamedType, Parameter, ParameterType,
         SliceOfTypeParameter, SwitchCase, TraitFunction, Type, TypeDeclaration,
-        TypeDeclarationKind, TypeParameter, TypeParameterId,
+        TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
     position::Offset,
@@ -41,7 +41,6 @@ struct Context<'a> {
     path: &'a Path,
     ast: &'a Ast,
     id_generator: IdGenerator<Id>,
-    type_parameter_id_generator: IdGenerator<TypeParameterId>,
     // TODO: merge structs and enums into this map, but split in final HIR
     traits: FxHashMap<Box<str>, TraitDeclaration<'a>>,
     impls: Vec<ImplDeclaration<'a>>,
@@ -177,7 +176,6 @@ impl<'a> Context<'a> {
             path,
             ast,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
-            type_parameter_id_generator: IdGenerator::default(),
             traits: FxHashMap::default(),
             impls: vec![],
             // Placeholder until `lower_declarations(…)` runs:
@@ -317,7 +315,6 @@ impl<'a> Context<'a> {
                 .into_vec()
                 .into_iter()
                 .map(|name| TypeParameter {
-                    id: self.type_parameter_id_generator.generate(),
                     name,
                     upper_bound: None,
                 })
@@ -662,13 +659,11 @@ impl<'a> Context<'a> {
                         return None;
                     }
 
-                    let id = self.type_parameter_id_generator.generate();
                     let upper_bound =
                         it.upper_bound.as_ref().and_then(|it| it.value()).map(|it| {
                             Box::new(self.lower_type(outer_type_parameters, self_type, it))
                         });
                     Some(TypeParameter {
-                        id,
                         name: name.string.clone(),
                         upper_bound,
                     })
@@ -706,14 +701,14 @@ impl<'a> Context<'a> {
             );
         }
 
-        if let Some((name, id)) = Self::resolve_type_parameter(type_parameters, &name.string) {
+        if let Some(type_parameter) = type_parameters.iter().find(|it| it.name == name.string) {
             if let Some(type_arguments) = &type_.type_arguments {
                 self.add_error(
                     type_arguments.span.clone(),
                     "Type parameters can't have type arguments",
                 );
             }
-            return ParameterType { name, id }.into();
+            return type_parameter.type_().into();
         }
 
         let type_arguments = type_
@@ -806,15 +801,6 @@ impl<'a> Context<'a> {
             type_arguments,
         }
         .into()
-    }
-    fn resolve_type_parameter(
-        type_parameters: &[TypeParameter],
-        name: &str,
-    ) -> Option<(Box<str>, TypeParameterId)> {
-        type_parameters
-            .iter()
-            .find(|it| &*it.name == name)
-            .map(|it| (it.name.clone(), it.id))
     }
 
     fn lower_assignment_signature(&mut self, assignment: &'a AstAssignment) -> Option<Id> {
@@ -1035,27 +1021,6 @@ impl<'a> Context<'a> {
             })
             .unwrap()
     }
-    fn get_type_parameter(&self, id: TypeParameterId) -> TypeParameter {
-        self.traits
-            .values()
-            .flat_map(|trait_| trait_.type_parameters.iter())
-            .chain(self.impls.iter().flat_map(|it| it.type_parameters.iter()))
-            .chain(
-                self.traits
-                    .values()
-                    .flat_map(|trait_| trait_.functions.values())
-                    .chain(
-                        self.impls
-                            .iter()
-                            .flat_map(|trait_| trait_.functions.values()),
-                    )
-                    .chain(self.functions.values())
-                    .flat_map(|function| function.type_parameters.iter()),
-            )
-            .find(|it| it.id == id)
-            .unwrap()
-            .clone()
-    }
 
     fn is_assignable_to(from: &Type, to: &Type) -> bool {
         match (from, to) {
@@ -1068,7 +1033,7 @@ impl<'a> Context<'a> {
                         .zip_eq(to.type_arguments.iter())
                         .all(|(from, to)| Self::is_assignable_to(from, to))
             }
-            (Type::Parameter(from), Type::Parameter(to)) => from.id == to.id,
+            (Type::Parameter(from), Type::Parameter(to)) => from == to,
             // TODO: Self type
             _ => false,
         }
@@ -1565,9 +1530,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     {
                         let receiver = self.lower_expression(&navigation.receiver, None);
                         let arguments = lower_arguments(self, call, &call.arguments, None).unwrap();
-                        let arguments = [receiver]
-                            .into_iter()
-                            .chain(arguments.to_vec().into_iter())
+                        let arguments = iter::once(receiver)
+                            .chain(arguments.into_vec())
                             .collect_vec();
                         return self.lower_call(key, call.type_arguments.as_ref(), &arguments);
                     }
@@ -1654,11 +1618,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                     }
                                 }
                             }
-                            LoweredExpression::TypeParameterReference { name, .. } => {
+                            LoweredExpression::TypeParameterReference(type_) => {
                                 // TODO: report actual error location
                                 self.context.add_error(
                                     Offset(0)..Offset(0),
-                                    format!("Can't instantiate type parameter {name} directly."),
+                                    format!("Can't instantiate type parameter {type_} directly."),
                                 );
                                 LoweredExpression::Error
                             }
@@ -1963,11 +1927,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             TypeDeclarationKind::Trait { .. } => unreachable!(),
                         }
                     }
-                    LoweredExpression::TypeParameterReference { name, .. } => {
+                    LoweredExpression::TypeParameterReference(type_parameter) => {
                         self.context.add_error(
                             key.span.clone(),
                             format!(
-                                "Parameter type `{name:?}` doesn't have a field `{}`",
+                                "Parameter type `{type_parameter:?}` doesn't have a field `{}`",
                                 key.string,
                             ),
                         );
@@ -2012,7 +1976,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 declaration
                                     .type_parameters
                                     .iter()
-                                    .map(|it| it.id)
+                                    .map(TypeParameter::type_)
                                     .zip_eq(type_.type_arguments.iter().cloned())
                                     .collect::<FxHashMap<_, _>>(),
                                 variants.clone(),
@@ -2136,9 +2100,9 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     todo!("support function references");
                 }
             }
-        } else if let Some((name, id)) = Context::resolve_type_parameter(self.type_parameters, name)
+        } else if let Some(type_parameter) = self.type_parameters.iter().find(|it| it.name == *name)
         {
-            LoweredExpression::TypeParameterReference { name, id }
+            LoweredExpression::TypeParameterReference(type_parameter.type_())
         } else if self.context.hir.type_declarations.get(name).is_some() {
             LoweredExpression::NamedTypeReference(name.clone())
         } else {
@@ -2254,14 +2218,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     .iter()
                     .zip_eq(function.type_parameters.iter())
                 {
-                    match type_solver.unify(
-                        type_argument,
-                        &ParameterType {
-                            name: type_parameter.name.clone(),
-                            id: type_parameter.id,
-                        }
-                        .into(),
-                    ) {
+                    match type_solver.unify(type_argument, &type_parameter.type_().into()) {
                         Ok(true) => {}
                         Ok(false) => unreachable!(),
                         Err(reason) => {
@@ -2336,7 +2293,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 };
 
                 let self_goal = substitutions
-                    .get(&TypeParameterId::SELF_TYPE)
+                    .get(&ParameterType::self_type())
                     .map(|self_type| {
                         trait_.solver_goal.substitute_all(&FxHashMap::from_iter([(
                             SolverVariable::self_(),
@@ -2346,16 +2303,9 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
                 let solver_substitutions = substitutions
                     .iter()
-                    .filter_map(|(type_parameter_id, type_)| try {
+                    .filter_map(|(parameter_type, type_)| try {
                         (
-                            if *type_parameter_id == TypeParameterId::SELF_TYPE {
-                                SolverVariable::self_()
-                            } else {
-                                self.context
-                                    .get_type_parameter(*type_parameter_id)
-                                    .type_()
-                                    .into()
-                            },
+                            SolverVariable::new(parameter_type.clone()),
                             type_.clone().try_into().ok()?,
                         )
                     })
@@ -2456,7 +2406,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         match type_ {
             Type::Named(named_type) => Self::canonicalize_named_type(named_type).into(),
             Type::Parameter(parameter_type) => NamedType {
-                name: format!("${}", parameter_type.id).into_boxed_str(),
+                name: format!("${parameter_type}").into_boxed_str(),
                 type_arguments: Box::default(),
             }
             .into(),
@@ -2555,7 +2505,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 enum LoweredExpression {
     Expression { id: Id, type_: Type },
     NamedTypeReference(Box<str>),
-    TypeParameterReference { name: Box<str>, id: TypeParameterId },
+    TypeParameterReference(ParameterType),
     EnumVariantReference { enum_: Type, variant: Box<str> },
     Error,
 }
@@ -2570,7 +2520,7 @@ enum LoweredExpression {
 
 pub struct TypeSolver<'h> {
     type_parameters: &'h [TypeParameter],
-    substitutions: FxHashMap<TypeParameterId, Type>,
+    substitutions: FxHashMap<ParameterType, Type>,
 }
 impl<'h> TypeSolver<'h> {
     #[must_use]
@@ -2585,7 +2535,7 @@ impl<'h> TypeSolver<'h> {
         match (argument, parameter) {
             (Type::Error, _) | (_, Type::Error) => Ok(true),
             (_, Type::Parameter(parameter)) => {
-                if let Some(mapped) = self.substitutions.get(&parameter.id) {
+                if let Some(mapped) = self.substitutions.get(parameter) {
                     if let Type::Parameter { .. } = mapped {
                         panic!("Type parameters can't depend on each other.")
                     }
@@ -2594,12 +2544,15 @@ impl<'h> TypeSolver<'h> {
                 }
 
                 assert!(
-                    parameter.id == TypeParameterId::SELF_TYPE
-                        || self.type_parameters.iter().any(|it| it.id == parameter.id),
+                    parameter.is_self_type()
+                        || self
+                            .type_parameters
+                            .iter()
+                            .any(|it| it.name == parameter.name),
                     "Unresolved type parameter: `{}`",
                     parameter.name
                 );
-                match self.substitutions.entry(parameter.id) {
+                match self.substitutions.entry(parameter.clone()) {
                     Entry::Occupied(entry) => {
                         if !Context::is_assignable_to(entry.get(), argument) {
                             return Err(format!("Type parameter {} gets resolved to different types: `{}` and `{argument}`", parameter.name,entry.get()).into_boxed_str());
@@ -2634,23 +2587,18 @@ impl<'h> TypeSolver<'h> {
             (Type::Self_ { base_type }, _) => {
                 self.unify(&Type::Named(base_type.clone()), parameter)
             }
-            (_, Type::Self_ { base_type: _ }) => self.unify(
-                argument,
-                &ParameterType {
-                    id: TypeParameterId::SELF_TYPE,
-                    name: "Self".into(),
-                }
-                .into(),
-            ),
+            (_, Type::Self_ { base_type: _ }) => {
+                self.unify(argument, &ParameterType::self_type().into())
+            }
         }
     }
 
-    pub fn finish(self) -> Result<FxHashMap<TypeParameterId, Type>, Box<str>> {
+    pub fn finish(self) -> Result<FxHashMap<ParameterType, Type>, Box<str>> {
         for type_parameter in self.type_parameters {
-            if !self.substitutions.contains_key(&type_parameter.id) {
+            let type_ = type_parameter.type_();
+            if !self.substitutions.contains_key(&type_) {
                 return Err(format!(
-                    "The type parameter `{}` can't be resolved to a specific type.",
-                    &type_parameter.name
+                    "The type parameter `{type_}` can't be resolved to a specific type.",
                 )
                 .into_boxed_str());
             }
