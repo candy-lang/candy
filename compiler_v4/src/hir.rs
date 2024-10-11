@@ -594,7 +594,7 @@ impl ToText for ExpressionKind {
                     builder.push(format!("({value})"));
                 }
             }
-            Self::Reference(id) => builder.push(format!("${id}")),
+            Self::Reference(id) => id.build_text(builder),
             Self::Call {
                 function,
                 used_goal: _,
