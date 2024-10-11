@@ -56,15 +56,10 @@ impl SolverType {
                     // Being equal to itself is no bound, so no substitution `?A = ?A` is necessary.
                     return Some(FxHashMap::default());
                 }
-                let entry = if let Some(self_type) = &self_variable.type_
-                    && let Some(other_type) = &other_variable.type_
-                    && self_type.name < other_type.name
-                {
+                let entry = if self_variable.type_.name < other_variable.type_.name {
                     (self_variable.clone(), other.clone())
-                } else if self_variable.type_.is_some() {
-                    (other_variable.clone(), self.clone())
                 } else {
-                    (self_variable.clone(), other.clone())
+                    (other_variable.clone(), self.clone())
                 };
                 Some(FxHashMap::from_iter([entry]))
             }
@@ -160,7 +155,7 @@ impl TryFrom<Type> for SolverType {
 impl From<SolverType> for Type {
     fn from(type_: SolverType) -> Self {
         match type_ {
-            SolverType::Variable(variable) => Self::Parameter(variable.type_.unwrap()),
+            SolverType::Variable(variable) => Self::Parameter(variable.type_),
             SolverType::Value(value) => Self::Named(NamedType {
                 name: value.type_,
                 type_arguments: value
@@ -193,23 +188,18 @@ impl Display for SolverType {
 /// * `?0`
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SolverVariable {
-    /// None stands for an error type.
-    pub type_: Option<ParameterType>,
+    pub type_: ParameterType,
 }
 impl SolverVariable {
     #[must_use]
     pub fn self_() -> Self {
         Self {
-            type_: Some(ParameterType::self_type()),
+            type_: ParameterType::self_type(),
         }
     }
     #[must_use]
     pub const fn new(type_: ParameterType) -> Self {
-        Self { type_: Some(type_) }
-    }
-    #[must_use]
-    pub const fn error() -> Self {
-        Self { type_: None }
+        Self { type_ }
     }
 }
 impl SolverTypeTrait for SolverVariable {
@@ -235,7 +225,7 @@ impl SolverTypeTrait for SolverVariable {
         mapping
             .entry(self.clone())
             .or_insert_with(|| Self {
-                type_: Some(canonical_variable(mapping_len)),
+                type_: canonical_variable(mapping_len),
             })
             .clone()
     }
@@ -247,13 +237,7 @@ impl From<ParameterType> for SolverVariable {
 }
 impl Display for SolverVariable {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "?{}",
-            self.type_
-                .as_ref()
-                .map_or_else(|| "<error>".to_string(), ToString::to_string)
-        )
+        write!(f, "?{}", self.type_)
     }
 }
 

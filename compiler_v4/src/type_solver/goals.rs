@@ -167,8 +167,7 @@ impl Environment {
                 (
                     key.clone(),
                     SolverType::Value(SolverValue {
-                        type_: format!("$Virtual${}", value.type_.as_ref().unwrap().name)
-                            .into_boxed_str(),
+                        type_: format!("$Virtual${}", value.type_.name).into_boxed_str(),
                         parameters: Box::default(),
                     }),
                 )

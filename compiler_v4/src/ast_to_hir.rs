@@ -16,7 +16,7 @@ use crate::{
     position::Offset,
     type_solver::{
         goals::{Environment, SolverGoal, SolverRule, SolverSolution},
-        values::{SolverType, SolverValue, SolverVariable},
+        values::{SolverValue, SolverVariable},
     },
     utils::HashMapExtension,
 };
@@ -1373,24 +1373,6 @@ impl<'a> Context<'a> {
     //         SolverSolution::Ambiguous | SolverSolution::Impossible => None,
     //     }
     // }
-
-    /// Turns a concrete [Type] (i.e., no trait) into a [`SolverType`].
-    fn type_to_solver_type(type_: &Type) -> SolverType {
-        match type_ {
-            Type::Named(type_) => SolverValue {
-                type_: type_.name.clone(),
-                parameters: type_
-                    .type_arguments
-                    .iter()
-                    .map(Self::type_to_solver_type)
-                    .collect(),
-            }
-            .into(),
-            Type::Self_ { .. } => todo!(),
-            Type::Parameter(type_) => SolverVariable::new(type_.clone()).into(),
-            Type::Error => SolverVariable::error().into(),
-        }
-    }
 
     fn add_error(&mut self, span: Range<Offset>, message: impl Into<String>) {
         self.errors.push(CompilerError {
