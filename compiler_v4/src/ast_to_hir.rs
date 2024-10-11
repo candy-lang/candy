@@ -2251,8 +2251,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             })
             .collect_vec();
         if matches.is_empty() {
-            self.context
-                .add_error(name.span.clone(), "Function not found");
+            self.context.add_error(
+                name.span.clone(),
+                format!("Function `{}` not found", name.string),
+            );
             return LoweredExpression::Error;
         }
 
