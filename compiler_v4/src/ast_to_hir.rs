@@ -2244,10 +2244,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         let matches = self
             .context
             .get_all_functions_matching_name(&name.string)
-            .iter()
+            .into_iter()
             .map(|id| {
-                let (function, trait_) = self.context.get_function(*id);
-                (*id, function.clone(), trait_.cloned())
+                let (function, trait_) = self.context.get_function(id);
+                (id, function.clone(), trait_.cloned())
             })
             .collect_vec();
         if matches.is_empty() {
