@@ -7,8 +7,8 @@ use crate::{
     },
     error::CompilerError,
     hir::{
-        Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind, Function,
-        FunctionSignature, Hir, Id, Impl, NamedType, Parameter, ParameterType,
+        self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind,
+        Function, FunctionSignature, Hir, Id, Impl, NamedType, Parameter, ParameterType,
         SliceOfTypeParameter, SwitchCase, Trait, TraitDefinition, TraitFunction, Type,
         TypeDeclaration, TypeDeclarationKind, TypeParameter,
     },
@@ -77,7 +77,7 @@ struct ImplDeclaration<'a> {
     type_parameters: Box<[TypeParameter]>,
     type_: Type,
     self_type: NamedType,
-    trait_: Trait,
+    trait_: hir::Result<Trait>,
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
 }
 impl<'a> ImplDeclaration<'a> {
@@ -581,19 +581,19 @@ impl<'a> Context<'a> {
         type_parameters: &[TypeParameter],
         self_type: Option<&NamedType>,
         type_: impl Into<Option<&AstType>>,
-    ) -> Trait {
+    ) -> hir::Result<Trait> {
         let type_: Option<&AstType> = type_.into();
         let Some(type_) = type_ else {
-            return Trait::Error;
+            return hir::Err;
         };
 
         let Some(name) = type_.name.value() else {
-            return Trait::Error;
+            return hir::Err;
         };
 
         if &*name.string == "Self" {
             self.add_error(name.span.clone(), "`Self` is not a trait.");
-            return Trait::Error;
+            return hir::Err;
         }
 
         if let Some(type_parameter) = type_parameters.iter().find(|it| it.name == name.string) {
@@ -601,7 +601,7 @@ impl<'a> Context<'a> {
                 name.span.clone(),
                 format!("`{}` is a type parameter, not a trait.", name.string),
             );
-            return Trait::Error;
+            return hir::Err;
         }
 
         let type_arguments = type_
@@ -616,11 +616,11 @@ impl<'a> Context<'a> {
 
         if &*name.string == "Int" {
             self.add_error(name.span.clone(), "Int is a type, not a trait.");
-            return Trait::Error;
+            return hir::Err;
         }
         if &*name.string == "Text" {
             self.add_error(name.span.clone(), "Text is a type, not a trait.");
-            return Trait::Error;
+            return hir::Err;
         }
 
         let type_parameters = match self.ast.iter().find_map(|it| match it {
@@ -643,10 +643,10 @@ impl<'a> Context<'a> {
             _ => None,
         }) {
             Some(Ok(type_parameters)) => type_parameters,
-            Some(Err(())) => return Trait::Error,
+            Some(Err(())) => return hir::Err,
             None => {
                 self.add_error(name.span.clone(), format!("Unknown trait: `{}`", **name));
-                return Trait::Error;
+                return hir::Err;
             }
         };
 
@@ -680,10 +680,10 @@ impl<'a> Context<'a> {
             }
         };
 
-        Trait::Trait {
+        hir::Ok(Trait {
             name: name.string.clone(),
             type_arguments,
-        }
+        })
     }
     fn lower_impl(&mut self, impl_: &'a AstImpl) {
         let type_parameters = self.lower_type_parameters(&[], None, impl_.type_parameters.as_ref());
@@ -710,9 +710,9 @@ impl<'a> Context<'a> {
 
         if let Type::Named(type_) = &type_
             && let Ok(solver_type) = SolverValue::try_from(type_.clone())
-            && let Trait::Trait {
+            && let hir::Ok(Trait {
                 name: trait_name, ..
-            } = &trait_
+            }) = &trait_
         {
             let trait_declaration = &self.traits[trait_name];
 

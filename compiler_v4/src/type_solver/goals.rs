@@ -1,5 +1,5 @@
 use super::values::{SolverType, SolverTypeTrait, SolverValue, SolverVariable};
-use crate::hir::{Trait, Type, TypeParameter};
+use crate::hir::{self, Trait, TypeParameter};
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::{
@@ -64,10 +64,10 @@ impl TryFrom<TypeParameter> for SolverGoal {
     type Error = ();
 
     fn try_from(value: TypeParameter) -> Result<Self, Self::Error> {
-        let Some(box Trait::Trait {
+        let Some(box hir::Ok(Trait {
             name,
             type_arguments,
-        }) = &value.upper_bound
+        })) = &value.upper_bound
         else {
             return Err(());
         };

@@ -1,3 +1,4 @@
+pub use crate::hir::Result::{Err, Ok};
 use crate::{
     id::CountableId,
     impl_countable_id,
@@ -10,6 +11,36 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use std::fmt::{self, Display, Formatter};
 use strum::VariantArray;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum Result<T> {
+    Ok(T),
+    Err,
+}
+impl<T> Result<T> {
+    #[must_use]
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Result<U> {
+        match self {
+            Self::Ok(value) => Result::Ok(f(value)),
+            Self::Err => Result::Err,
+        }
+    }
+    #[must_use]
+    pub const fn as_ref(&self) -> Result<&T> {
+        match *self {
+            Self::Ok(ref value) => Result::Ok(value),
+            Self::Err => Result::Err,
+        }
+    }
+}
+impl<T: Display> Display for Result<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ok(value) => write!(f, "{value}"),
+            Self::Err => write!(f, "<error>"),
+        }
+    }
+}
 
 // TODO: split assignment/function and expression IDs
 #[derive(Clone, Copy, Debug, Default, Deref, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -162,44 +193,30 @@ impl ToText for (&str, &TraitDefinition) {
     }
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Trait {
-    Trait {
-        name: Box<str>,
-        type_arguments: Box<[Type]>,
-    },
-    Error,
+pub struct Trait {
+    pub name: Box<str>,
+    pub type_arguments: Box<[Type]>,
 }
 impl Trait {
     #[must_use]
     pub fn substitute(&self, environment: &FxHashMap<ParameterType, Type>) -> Self {
-        match self {
-            Self::Trait {
-                name,
-                type_arguments,
-            } => Self::Trait {
-                name: name.clone(),
-                type_arguments: type_arguments
-                    .iter()
-                    .map(|it| it.substitute(environment))
-                    .collect(),
-            },
-            Self::Error => Self::Error,
+        Self {
+            name: self.name.clone(),
+            type_arguments: self
+                .type_arguments
+                .iter()
+                .map(|it| it.substitute(environment))
+                .collect(),
         }
     }
 }
 impl Display for Trait {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match &self {
-            Self::Trait {
-                name,
-                type_arguments,
-            } => NamedType {
-                name: name.clone(),
-                type_arguments: type_arguments.clone(),
-            }
-            .fmt(f),
-            Self::Error => write!(f, "<error>"),
+        NamedType {
+            name: self.name.clone(),
+            type_arguments: self.type_arguments.clone(),
         }
+        .fmt(f)
     }
 }
 
@@ -228,7 +245,7 @@ impl ToText for (&Id, &TraitFunction) {
 pub struct Impl {
     pub type_parameters: Box<[TypeParameter]>,
     pub type_: Type,
-    pub trait_: Trait,
+    pub trait_: Result<Trait>,
     pub functions: FxHashMap<Id, Function>,
 }
 impl ToText for Impl {
@@ -251,7 +268,7 @@ impl ToText for Impl {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TypeParameter {
     pub name: Box<str>,
-    pub upper_bound: Option<Box<Trait>>,
+    pub upper_bound: Option<Box<Result<Trait>>>,
 }
 impl TypeParameter {
     #[must_use]
@@ -419,7 +436,7 @@ impl Display for NamedType {
         if !self.type_arguments.is_empty() {
             write!(f, "[{}]", self.type_arguments.iter().join(", "))?;
         }
-        Ok(())
+        std::result::Result::Ok(())
     }
 }
 

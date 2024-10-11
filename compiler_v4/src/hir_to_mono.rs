@@ -88,7 +88,7 @@ impl<'h> Context<'h> {
                 .filter(|impl_| {
                     matches!(
                         &impl_.trait_,
-                        hir::Trait::Trait { name, .. }
+                        hir::Result::Ok(hir::Trait { name, .. })
                         if name == &used_goal.trait_
                     )
                 })
@@ -104,10 +104,9 @@ impl<'h> Context<'h> {
                             .zip(signature.type_parameters.iter())
                             .all(|(function, signature)| {
                                 function.upper_bound.as_ref().map(|it| it.as_ref().clone())
-                                    == signature
-                                        .upper_bound
-                                        .as_ref()
-                                        .map(|it| it.substitute(substitutions))
+                                    == signature.upper_bound.as_ref().map(|it| {
+                                        it.as_ref().as_ref().map(|it| it.substitute(substitutions))
+                                    })
                             })
                         && function.signature.parameters.len() == signature.parameters.len()
                         && function
