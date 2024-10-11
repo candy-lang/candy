@@ -268,7 +268,7 @@ impl ToText for Impl {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct TypeParameter {
     pub name: Box<str>,
-    pub upper_bound: Option<Box<Result<Trait>>>,
+    pub upper_bound: Option<Result<Trait>>,
 }
 impl TypeParameter {
     #[must_use]

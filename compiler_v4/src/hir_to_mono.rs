@@ -103,9 +103,9 @@ impl<'h> Context<'h> {
                             .iter()
                             .zip(signature.type_parameters.iter())
                             .all(|(function, signature)| {
-                                function.upper_bound.as_ref().map(|it| it.as_ref().clone())
+                                function.upper_bound.clone()
                                     == signature.upper_bound.as_ref().map(|it| {
-                                        it.as_ref().as_ref().map(|it| it.substitute(substitutions))
+                                        it.as_ref().map(|it| it.substitute(substitutions))
                                     })
                             })
                         && function.signature.parameters.len() == signature.parameters.len()

@@ -64,7 +64,7 @@ impl TryFrom<TypeParameter> for SolverGoal {
     type Error = ();
 
     fn try_from(value: TypeParameter) -> Result<Self, Self::Error> {
-        let Some(box hir::Ok(Trait {
+        let Some(hir::Ok(Trait {
             name,
             type_arguments,
         })) = &value.upper_bound

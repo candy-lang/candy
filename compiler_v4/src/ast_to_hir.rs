@@ -596,7 +596,7 @@ impl<'a> Context<'a> {
             return hir::Err;
         }
 
-        if let Some(type_parameter) = type_parameters.iter().find(|it| it.name == name.string) {
+        if type_parameters.iter().any(|it| it.name == name.string) {
             self.add_error(
                 name.span.clone(),
                 format!("`{}` is a type parameter, not a trait.", name.string),
@@ -768,10 +768,11 @@ impl<'a> Context<'a> {
                         return None;
                     }
 
-                    let upper_bound =
-                        it.upper_bound.as_ref().and_then(|it| it.value()).map(|it| {
-                            Box::new(self.lower_trait(outer_type_parameters, self_type, it))
-                        });
+                    let upper_bound = it
+                        .upper_bound
+                        .as_ref()
+                        .and_then(|it| it.value())
+                        .map(|it| self.lower_trait(outer_type_parameters, self_type, it));
                     Some(TypeParameter {
                         name: name.string.clone(),
                         upper_bound,
