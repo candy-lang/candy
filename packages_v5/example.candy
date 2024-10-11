@@ -1,39 +1,87 @@
-# Types
 struct Nothing {}
 enum Never {}
+
+# struct List[T] {}
+# impl[T: Equal] List[T]: Equal {
+#   # fun equals(self: Self, other: Self) Bool {}
+# }
+
+trait ToText {
+  fun toText(self: Self) Text
+}
+
+# Operators
+trait OperatorPlus[T] {
+  # TODO: add associated type for return type
+  fun plus(self: Self, other: T) Self
+}
+
+trait Equal {
+  fun equals(self: Self, other: Self) Bool
+}
+
+trait Compare {
+  fun compareTo(self: Self, other: Self) Ordering
+}
+enum Ordering { less, equal, greater }
+impl Ordering: ToText {
+  fun toText(self: Ordering) Text {
+    switch self {
+      less => "less",
+      equal => "equal",
+      greater => "greater",
+    }
+  }
+}
+# TODO: `impl[T: Compare] T: Equal {}`
+
+trait Add {
+  fun add(self: Self, other: Self) Self
+}
+trait Subtract {
+  fun subtract(self: Self, other: Self) Self
+}
+# TODO: `impl[T: Add] T: OperatorPlus[T] {}`, etc.
+
+impl Int: ToText {
+  fun toText(self: Int) Text {
+    self.builtinToText()
+  }
+}
+impl Int: Compare {
+  fun compareTo(self: Int, other: Int) Ordering {
+    self.builtinCompareTo(other)
+  }
+}
+impl Int: Add {
+  fun add(self: Int, other: Int) Int {
+    self.builtinAdd(other)
+  }
+}
+impl Int: Subtract {
+  fun subtract(self: Int, other: Int) Int {
+    self.builtinSubtract(other)
+  }
+}
+
+fun print[T: ToText](t: T) {
+  builtinPrint(t.toText())
+}
 
 struct MyStruct {
   name: Text,
   color: Int,
 }
-# struct UInt {
-#   value: Int,
-# } where value.isNonNegative()
-# struct Date {
-#   year: Int,
-#   month: Int,
-#   day: Int,
-# } where {
-#   needs(month.isBetween(1, 12))
-#   needs(day.isBetween(1, 31))
-# }
 
 enum Bool { true, false }
 let true: Bool = Bool.true
 let false: Bool = Bool.false
-fun toText(bool: Bool) Text {
-  switch bool {
-    true => "true",
-    false => "false",
-  }
-}
-
-enum Ordering { less, equal, greater }
-fun toText(ordering: Ordering) Text {
-  switch ordering {
-    less => "less",
-    equal => "equal",
-    greater => "greater",
+impl Bool: ToText {
+  fun toText(self: Bool) Text {
+    switch self {
+      true => "true",
+      false => "false",
+    }
   }
 }
 
@@ -56,7 +104,7 @@ let structExpression: MyStruct = MyStruct("Banana", 12345)
 
 # Assignments
 let valueWithExplicitType: Int = 42
-# let someFunction(x: Int) -> Int = { x }
+let valueWithoutExplicitType = 42
 
 # Uniform Function Call Syntax
 # Functions can also be overloaded
@@ -77,6 +125,16 @@ fun isLessThan(a: Int, b: Int) Bool {
     greater => false,
   }
 }
+
+# fun twar() Int {
+#  foo
+#     bar
+#       fds
+#  % True: foo
+#      fff
+#    False: blub
+#}
+
 fun fibonacci(n: Int) Int {
   switch isLessThan(n, 2) {
     true => n,
@@ -102,9 +160,10 @@ fun main() Int {
 #  print("The answer is {theAnswerText}!")
 #
 #  theAnswer
-  print("fibonacci(20) = {toText(fibonacci(20))}")
-  print(Ordering.less.toText())
-  print(true.toText())
+  print("fibonacci(20) = {fibonacci(20).toText()}")
+  print(Ordering.less)
+  print(true)
+  print(false)
   0
 }
 
