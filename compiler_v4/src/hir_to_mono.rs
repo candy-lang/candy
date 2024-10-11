@@ -121,7 +121,7 @@ impl<'h> Context<'h> {
                         && function.signature.return_type
                             == signature.return_type.substitute(substitutions)
                 })
-                .unwrap();
+                .unwrap_or_else(|| panic!("Function not found for used goal: {used_goal}"));
             (&function.signature, &function.body)
         } else {
             (signature, body.unwrap())
