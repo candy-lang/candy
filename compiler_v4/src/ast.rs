@@ -72,9 +72,18 @@ pub enum AstDeclaration {
 pub struct AstStruct {
     pub name: AstResult<AstString>,
     pub type_parameters: Option<AstTypeParameters>,
-    pub opening_curly_brace_error: Option<AstError>,
-    pub fields: Vec<AstStructField>,
-    pub closing_curly_brace_error: Option<AstError>,
+    pub kind: AstStructKind,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum AstStructKind {
+    Builtin {
+        builtin_keyword_error: Option<AstError>,
+    },
+    UserDefined {
+        opening_curly_brace_error: Option<AstError>,
+        fields: Vec<AstStructField>,
+        closing_curly_brace_error: Option<AstError>,
+    },
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstStructField {
@@ -369,9 +378,27 @@ impl CollectAstErrors for AstStruct {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.name.collect_errors_to(errors);
         self.type_parameters.collect_errors_to(errors);
-        self.opening_curly_brace_error.collect_errors_to(errors);
-        self.fields.collect_errors_to(errors);
-        self.closing_curly_brace_error.collect_errors_to(errors);
+        self.kind.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstStructKind {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        match self {
+            AstStructKind::Builtin {
+                builtin_keyword_error,
+            } => {
+                builtin_keyword_error.collect_errors_to(errors);
+            }
+            AstStructKind::UserDefined {
+                opening_curly_brace_error,
+                fields,
+                closing_curly_brace_error,
+            } => {
+                opening_curly_brace_error.collect_errors_to(errors);
+                fields.collect_errors_to(errors);
+                closing_curly_brace_error.collect_errors_to(errors);
+            }
+        }
     }
 }
 impl CollectAstErrors for AstStructField {

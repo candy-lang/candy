@@ -43,6 +43,7 @@ trait Subtract {
 }
 # TODO: `impl[T: Add] T: OperatorPlus[T] {}`, etc.
 
+struct Int = builtin
 impl Int: ToText {
   fun toText(self: Int) Text {
     self.builtinToText()
@@ -64,6 +65,7 @@ impl Int: Subtract {
   }
 }
 
+struct Text = builtin
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
 }

@@ -64,35 +64,33 @@ impl<'h> Context<'h> {
     }
 
     fn lower_type_declarations(&mut self) {
-        self.push(
-            "\
-            struct Int {
-                uint64_t value;
-            };
-            typedef struct Int Int;",
-        );
-        self.push(
-            "\
-            struct Text {
-                char* value;
-            };
-            typedef struct Text Text;",
-        );
-
         for (name, declaration) in &self.mono.type_declarations {
+            self.push(format!("struct {name} {{\n"));
             match declaration {
+                TypeDeclaration::Builtin {
+                    name,
+                    type_arguments,
+                } => {
+                    match name.as_ref() {
+                        "Int" => {
+                            assert!(type_arguments.is_empty());
+                            self.push("uint64_t value;\n")
+                        }
+                        "Text" => {
+                            assert!(type_arguments.is_empty());
+                            self.push("char* value;\n")
+                        }
+                        _ => panic!("Unknown builtin type: {name}"),
+                    }
+                    self.push("};\n");
+                }
                 TypeDeclaration::Struct { fields } => {
-                    self.push(format!("struct {name} {{"));
                     for (name, type_) in fields.iter() {
                         self.push(format!("{type_}* {name}; "));
                     }
                     self.push("};\n");
-
-                    self.push(format!("typedef struct {name} {name};\n"));
                 }
                 TypeDeclaration::Enum { variants } => {
-                    self.push(format!("struct {name} {{\n"));
-
                     if !variants.is_empty() {
                         self.push("enum {");
                         for variant in variants.iter() {
@@ -108,10 +106,9 @@ impl<'h> Context<'h> {
                         }
                     }
                     self.push("} value;\n};\n");
-
-                    self.push(format!("typedef struct {name} {name};\n"));
                 }
             }
+            self.push(format!("typedef struct {name} {name};\n"));
         }
     }
 

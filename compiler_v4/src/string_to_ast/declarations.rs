@@ -2,9 +2,9 @@ use super::{
     expression::{expression, statement},
     list::list_of,
     literal::{
-        closing_bracket, closing_curly_brace, closing_parenthesis, colon, comma, enum_keyword,
-        equals_sign, fun_keyword, impl_keyword, let_keyword, opening_bracket, opening_curly_brace,
-        opening_parenthesis, struct_keyword, trait_keyword,
+        builtin_keyword, closing_bracket, closing_curly_brace, closing_parenthesis, colon, comma,
+        enum_keyword, equals_sign, fun_keyword, impl_keyword, let_keyword, opening_bracket,
+        opening_curly_brace, opening_parenthesis, struct_keyword, trait_keyword,
     },
     parser::{OptionOfParser, OptionOfParserWithResult, OptionOfParserWithValue, Parser},
     type_::type_,
@@ -16,8 +16,8 @@ use super::{
 };
 use crate::ast::{
     AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstFunctionBody,
-    AstImpl, AstParameter, AstString, AstStruct, AstStructField, AstTrait, AstTypeParameter,
-    AstTypeParameters,
+    AstImpl, AstParameter, AstString, AstStruct, AstStructField, AstStructKind, AstTrait,
+    AstTypeParameter, AstTypeParameters,
 };
 use tracing::instrument;
 
@@ -43,6 +43,35 @@ fn struct_<'a>(parser: Parser) -> Option<(Parser, AstStruct)> {
         .optional(parser)
         .and_trailing_whitespace();
 
+    let (parser, kind) =
+        struct_kind_builtin(parser).unwrap_or_else(|| struct_kind_user_defined(parser));
+
+    Some((
+        parser,
+        AstStruct {
+            name,
+            type_parameters,
+            kind,
+        },
+    ))
+}
+#[instrument(level = "trace")]
+fn struct_kind_builtin<'a>(parser: Parser) -> Option<(Parser, AstStructKind)> {
+    let parser = equals_sign(parser)?.and_trailing_whitespace();
+
+    let (parser, builtin_keyword_error) = builtin_keyword(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This struct is missing the builtin keyword.");
+
+    Some((
+        parser,
+        AstStructKind::Builtin {
+            builtin_keyword_error,
+        },
+    ))
+}
+#[instrument(level = "trace")]
+fn struct_kind_user_defined<'a>(parser: Parser) -> (Parser, AstStructKind) {
     let (mut parser, opening_curly_brace_error) = opening_curly_brace(parser)
         .and_trailing_whitespace()
         .unwrap_or_ast_error(parser, "This struct is missing an opening curly brace.");
@@ -65,16 +94,14 @@ fn struct_<'a>(parser: Parser) -> Option<(Parser, AstStruct)> {
     let (parser, closing_curly_brace_error) = closing_curly_brace(parser)
         .unwrap_or_ast_error(parser, "This struct is missing a closing curly brace.");
 
-    Some((
+    (
         parser,
-        AstStruct {
-            name,
-            type_parameters,
+        AstStructKind::UserDefined {
             opening_curly_brace_error,
             fields,
             closing_curly_brace_error,
         },
-    ))
+    )
 }
 #[instrument(level = "trace")]
 fn struct_field<'a>(parser: Parser) -> Option<(Parser, AstStructField, Option<Parser>)> {

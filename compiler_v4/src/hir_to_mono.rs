@@ -201,16 +201,26 @@ impl<'h> Context<'h> {
                             &declaration.type_parameters,
                             type_arguments,
                         );
-                        let fields = fields
-                            .iter()
-                            .map(|(name, type_)| {
-                                (
-                                    name.clone(),
-                                    self.lower_type(&type_.substitute(&environment)),
-                                )
-                            })
-                            .collect();
-                        mono::TypeDeclaration::Struct { fields }
+                        if let Some(fields) = fields.as_ref() {
+                            let fields = fields
+                                .iter()
+                                .map(|(name, type_)| {
+                                    (
+                                        name.clone(),
+                                        self.lower_type(&type_.substitute(&environment)),
+                                    )
+                                })
+                                .collect();
+                            mono::TypeDeclaration::Struct { fields }
+                        } else {
+                            mono::TypeDeclaration::Builtin {
+                                name: name.clone(),
+                                type_arguments: type_arguments
+                                    .iter()
+                                    .map(|it| self.lower_type(it))
+                                    .collect(),
+                            }
+                        }
                     }
                     hir::TypeDeclarationKind::Enum { variants } => {
                         entry.insert(None);

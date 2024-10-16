@@ -2,8 +2,8 @@ use crate::{
     ast::{
         Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
         AstFunction, AstImpl, AstParameter, AstResult, AstStatement, AstString, AstStruct,
-        AstSwitch, AstTextPart, AstTrait, AstType, AstTypeArguments, AstTypeParameter,
-        AstTypeParameters,
+        AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType, AstTypeArguments,
+        AstTypeParameter, AstTypeParameters,
     },
     error::CompilerError,
     hir::{
@@ -445,17 +445,24 @@ impl<'a> Context<'a> {
             type_arguments: type_parameters.type_(),
         };
 
-        let fields = struct_type
-            .fields
-            .iter()
-            .filter_map(|field| {
-                let name = field.name.value()?;
+        let fields = match &struct_type.kind {
+            AstStructKind::Builtin { .. } => None,
+            AstStructKind::UserDefined { fields, .. } => Some(
+                fields
+                    .iter()
+                    .filter_map(|field| {
+                        let name = field.name.value()?;
 
-                let type_ =
-                    self.lower_type(&type_parameters, Some(&self_type), field.type_.value());
-                Some((name.string.clone(), type_))
-            })
-            .collect();
+                        let type_ = self.lower_type(
+                            &type_parameters,
+                            Some(&self_type),
+                            field.type_.value(),
+                        );
+                        Some((name.string.clone(), type_))
+                    })
+                    .collect(),
+            ),
+        };
 
         if self.traits.contains_key(&name.string) {
             self.add_error(
@@ -613,15 +620,6 @@ impl<'a> Context<'a> {
                     .map(|it| self.lower_type(type_parameters, self_type, &it.type_))
                     .collect::<Box<_>>()
             });
-
-        if &*name.string == "Int" {
-            self.add_error(name.span.clone(), "Int is a type, not a trait.");
-            return hir::Err;
-        }
-        if &*name.string == "Text" {
-            self.add_error(name.span.clone(), "Text is a type, not a trait.");
-            return hir::Err;
-        }
 
         let type_parameters = match self.ast.iter().find_map(|it| match it {
             AstDeclaration::Trait(AstTrait {
@@ -830,25 +828,6 @@ impl<'a> Context<'a> {
                     .map(|it| self.lower_type(type_parameters, self_type, &it.type_))
                     .collect::<Box<_>>()
             });
-
-        if &*name.string == "Int" {
-            if !type_arguments.is_empty() {
-                self.add_error(
-                    type_.type_arguments.as_ref().unwrap().span.clone(),
-                    "Int does not take type arguments",
-                );
-            }
-            return NamedType::int().into();
-        }
-        if &*name.string == "Text" {
-            if !type_arguments.is_empty() {
-                self.add_error(
-                    type_.type_arguments.as_ref().unwrap().span.clone(),
-                    "Text does not take type arguments",
-                );
-            }
-            return NamedType::text().into();
-        }
 
         let type_parameters = match self.ast.iter().find_map(|it| match it {
             AstDeclaration::Struct(AstStruct {
@@ -1659,6 +1638,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                             todo!("Use type solver");
                                         }
 
+                                        let Some(fields) = fields else {
+                                            self.context.add_error(
+                                                Offset(0)..Offset(0),
+                                                format!("Can't instantiate builtin type {type_} directly"),
+                                            );
+                                            return LoweredExpression::Error;
+                                        };
+
                                         let fields = lower_arguments(
                                             self,
                                             call,
@@ -1852,7 +1839,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             let type_ = &self.context.hir.type_declarations.get(&named_type.name);
                             if let Some(TypeDeclaration {
                                 type_parameters,
-                                kind: TypeDeclarationKind::Struct { fields },
+                                kind:
+                                    TypeDeclarationKind::Struct {
+                                        fields: Some(fields),
+                                    },
                             }) = type_
                                 && let Some((_, field_type)) =
                                     fields.iter().find(|(name, _)| name == &key.string)

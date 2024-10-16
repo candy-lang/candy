@@ -92,17 +92,21 @@ impl ToText for Hir {
                 TypeDeclarationKind::Struct { fields } => {
                     builder.push(format!("struct {name}"));
                     declaration.type_parameters.build_text(builder);
-                    builder.push(" {");
-                    builder.push_children_custom_multiline(
-                        fields.iter(),
-                        |builder, (name, type_)| {
-                            builder.push(format!("{name}: {type_},"));
-                        },
-                    );
-                    if !fields.is_empty() {
-                        builder.push_newline();
+                    if let Some(fields) = fields {
+                        builder.push(" {");
+                        builder.push_children_custom_multiline(
+                            fields.iter(),
+                            |builder, (name, type_)| {
+                                builder.push(format!("{name}: {type_},"));
+                            },
+                        );
+                        if !fields.is_empty() {
+                            builder.push_newline();
+                        }
+                        builder.push("}");
+                    } else {
+                        builder.push(" = builtin");
                     }
-                    builder.push("}");
                 }
                 TypeDeclarationKind::Enum { variants } => {
                     builder.push(format!("enum {name}"));
@@ -164,7 +168,8 @@ pub struct TypeDeclaration {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeDeclarationKind {
     Struct {
-        fields: Box<[(Box<str>, Type)]>,
+        /// `None` if the struct is a builtin.
+        fields: Option<Box<[(Box<str>, Type)]>>,
     },
     Enum {
         variants: Box<[(Box<str>, Option<Type>)]>,
