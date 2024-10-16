@@ -2427,7 +2427,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 self.context.add_error(
                                     name.span.clone(),
                                     format!(
-                                        "Function is reachable via different impls:\n{}",
+                                        "Function is reachable via multiple impls:\n{}",
                                         function.signature_to_string(),
                                     ),
                                 );
