@@ -46,22 +46,22 @@ trait Subtract {
 struct Int = builtin
 impl Int: ToText {
   fun toText(self: Int) Text {
-    self.builtinToText()
+    self.builtinIntToText()
   }
 }
 impl Int: Compare {
   fun compareTo(self: Int, other: Int) Ordering {
-    self.builtinCompareTo(other)
+    self.builtinIntCompareTo(other)
   }
 }
 impl Int: Add {
   fun add(self: Int, other: Int) Int {
-    self.builtinAdd(other)
+    self.builtinIntAdd(other)
   }
 }
 impl Int: Subtract {
   fun subtract(self: Int, other: Int) Int {
-    self.builtinSubtract(other)
+    self.builtinIntSubtract(other)
   }
 }
 
@@ -72,7 +72,7 @@ fun arrayFilled[T](length: Int, item: T) Array[T] {
   builtinArrayFilled(length, item)
 }
 fun length[T](array: Array[T]) Int {
-  builtinLength(array)
+  builtinArrayLength(array)
 }
 
 fun print[T: ToText](t: T) {
