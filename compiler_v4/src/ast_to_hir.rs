@@ -415,30 +415,6 @@ impl<'a> Context<'a> {
             }
         }
 
-        println!("{}", self.environment);
-        // let solution = self.find_unique_solver_solution_for(
-        //     &NamedType {
-        //         name: "List".into(),
-        //         type_arguments: vec![NamedType {
-        //             name: "Int".into(),
-        //             type_arguments: Box::default(),
-        //         }
-        //         .into()]
-        //         .into_boxed_slice(),
-        //     }
-        //     .into(),
-        //     &NamedType {
-        //         name: "Equal".into(),
-        //         type_arguments: Box::default(),
-        //     }
-        //     .into(),
-        // );
-        // if let Some(solution) = solution {
-        //     println!("{solution}");
-        // } else {
-        //     println!("no solution");
-        // }
-
         for trait_name in self.traits.keys().cloned().collect_vec() {
             let trait_ = &self.traits[&trait_name];
             let self_type = NamedType {
