@@ -123,7 +123,7 @@ impl Display for SolverRule {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Environment {
     pub rules: Vec<SolverRule>,
 }

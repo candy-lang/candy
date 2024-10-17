@@ -1,8 +1,9 @@
 use crate::{
+    ast_to_hir::TypeSolver,
     hir::{self, Hir, NamedType, ParameterType, Type},
     id::IdGenerator,
     mono::{self, Mono},
-    type_solver::goals::SolverGoal,
+    type_solver::{goals::SolverSolution, values::SolverVariable},
     utils::HashMapExtension,
 };
 use itertools::Itertools;
@@ -30,8 +31,7 @@ impl<'h> Context<'h> {
             assignment_initialization_order: vec![],
             functions: FxHashMap::default(),
         };
-        let main_function =
-            context.lower_function(hir.main_function_id, None, &FxHashMap::default());
+        let main_function = context.lower_function(hir.main_function_id, &FxHashMap::default());
         Mono {
             type_declarations: context
                 .type_declarations
@@ -76,25 +76,92 @@ impl<'h> Context<'h> {
     fn lower_function(
         &mut self,
         id: hir::Id,
-        used_goal: Option<&SolverGoal>,
         substitutions: &FxHashMap<ParameterType, Type>,
     ) -> Box<str> {
-        let (signature, body) = if let Some(used_goal) = used_goal {
-            let function = &self
+        let function = self.hir.functions.get(&id).unwrap_or_else(|| {
+            let (trait_, function) = self
+                .hir
+                .traits
+                .iter()
+                .find_map(|(trait_, trait_definition)| {
+                    trait_definition
+                        .functions
+                        .get(&id)
+                        .map(|function| (trait_, function))
+                })
+                .unwrap();
+            let self_type = function
+                .signature
+                .parameters
+                .first()
+                .unwrap()
+                .type_
+                .substitute(substitutions);
+            let impl_ = self
                 .hir
                 .impls
                 .iter()
-                .find(|impl_| impl_.trait_.name == used_goal.trait_)
-                .unwrap_or_else(|| panic!("Impl not found for used goal: {used_goal}"))
-                .functions[&id];
-            (&function.signature, &function.body)
-        } else {
-            let (signature, body) = self.hir.get_function(id);
-            (signature, body.unwrap())
-        };
+                .find(|impl_| {
+                    if &impl_.trait_.name != trait_ {
+                        eprintln!("Trait mismatch: {trait_} != {}", impl_.trait_.name);
+                        return false;
+                    }
+
+                    let mut unifier = TypeSolver::new(&impl_.type_parameters);
+                    if unifier.unify(&self_type, &impl_.type_) != Ok(true) {
+                        eprintln!("Type mismatch: {self_type} != {}", impl_.type_);
+                        return false;
+                    }
+
+                    let trait_declaration = &self.hir.traits[trait_];
+
+                    let self_goal =
+                        substitutions
+                            .get(&ParameterType::self_type())
+                            .map(|self_type| {
+                                trait_declaration
+                                    .solver_goal
+                                    .substitute_all(&FxHashMap::from_iter([(
+                                        SolverVariable::self_(),
+                                        self_type.clone().try_into().unwrap(),
+                                    )]))
+                            });
+
+                    let solver_substitutions = substitutions
+                        .iter()
+                        .filter_map(|(parameter_type, type_)| try {
+                            (
+                                SolverVariable::new(parameter_type.clone()),
+                                type_.clone().try_into().ok()?,
+                            )
+                        })
+                        .collect();
+
+                    self_goal
+                        .iter()
+                        .chain(trait_declaration.solver_subgoals.iter())
+                        .map(|subgoal| {
+                            let solution = self
+                                .hir
+                                .solver_environment
+                                .solve(&subgoal.substitute_all(&solver_substitutions), &[]);
+                            match solution {
+                                SolverSolution::Unique(solution) => Some(solution.used_rule),
+                                SolverSolution::Ambiguous => panic!(),
+                                SolverSolution::Impossible => None,
+                            }
+                        })
+                        .collect::<Option<Vec<_>>>()
+                        .is_some()
+                })
+                .unwrap();
+            &impl_.functions[&id]
+        });
+
         let name = self.mangle_function(
-            &signature.name,
-            &signature
+            &function.signature.name,
+            &function
+                .signature
                 .parameters
                 .iter()
                 .map(|it| it.type_.substitute(substitutions))
@@ -105,22 +172,22 @@ impl<'h> Context<'h> {
             Entry::Vacant(entry) => entry.insert(None),
         };
 
-        let (parameters, body) = match body {
+        let (parameters, body) = match &function.body {
             hir::BodyOrBuiltin::Body(body) => {
                 let (parameters, body) = BodyBuilder::build(self, substitutions, |builder| {
-                    builder.add_parameters(&signature.parameters);
+                    builder.add_parameters(&function.signature.parameters);
                     builder.lower_expressions(&body.expressions);
                 });
                 (parameters, mono::BodyOrBuiltin::Body(body))
             }
             hir::BodyOrBuiltin::Builtin(builtin_function) => {
                 let (parameters, _) = BodyBuilder::build(self, substitutions, |builder| {
-                    builder.add_parameters(&signature.parameters);
+                    builder.add_parameters(&function.signature.parameters);
                 });
                 (parameters, mono::BodyOrBuiltin::Builtin(*builtin_function))
             }
         };
-        let return_type = signature.return_type.substitute(substitutions);
+        let return_type = function.signature.return_type.substitute(substitutions);
         let function = mono::Function {
             parameters,
             return_type: self.lower_type(&return_type),
@@ -385,15 +452,12 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
             }
             hir::ExpressionKind::Call {
                 function,
-                used_goal,
                 substitutions,
                 arguments,
             } => {
-                let function = self.context.lower_function(
-                    *function,
-                    used_goal.as_ref(),
-                    &self.merge_substitutions(substitutions),
-                );
+                let function = self
+                    .context
+                    .lower_function(*function, &self.merge_substitutions(substitutions));
                 let arguments = self.lower_ids(arguments);
                 self.push(
                     id,

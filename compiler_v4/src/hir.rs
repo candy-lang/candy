@@ -3,7 +3,7 @@ use crate::{
     id::CountableId,
     impl_countable_id,
     to_text::{TextBuilder, ToText},
-    type_solver::goals::SolverGoal,
+    type_solver::goals::{Environment, SolverGoal},
 };
 use derive_more::{Deref, From};
 use extension_trait::extension_trait;
@@ -59,6 +59,7 @@ impl ToText for Id {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Hir {
+    pub solver_environment: Environment,
     pub type_declarations: FxHashMap<Box<str>, TypeDeclaration>,
     pub traits: FxHashMap<Box<str>, TraitDefinition>,
     pub impls: Box<[Impl]>,
@@ -179,6 +180,8 @@ pub enum TypeDeclarationKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TraitDefinition {
     pub type_parameters: Box<[TypeParameter]>,
+    pub solver_goal: SolverGoal,
+    pub solver_subgoals: Box<[SolverGoal]>,
     pub functions: FxHashMap<Id, TraitFunction>,
 }
 impl ToText for (&str, &TraitDefinition) {
@@ -323,6 +326,7 @@ pub enum Type {
     // TODO: encode ADT, trait, or builtin type here
     #[from]
     Named(NamedType),
+    // TODO: merge parameter and named types?
     #[from]
     Parameter(ParameterType),
     Self_ {
@@ -605,7 +609,6 @@ pub enum ExpressionKind {
     Reference(Id),
     Call {
         function: Id,
-        used_goal: Option<SolverGoal>,
         substitutions: FxHashMap<ParameterType, Type>,
         arguments: Box<[Id]>,
     },
@@ -642,7 +645,6 @@ impl ToText for ExpressionKind {
             Self::Reference(id) => id.build_text(builder),
             Self::Call {
                 function,
-                used_goal: _,
                 substitutions,
                 arguments,
             } => {

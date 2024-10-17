@@ -99,6 +99,8 @@ impl<'a> TraitDeclaration<'a> {
     fn into_definition(self) -> TraitDefinition {
         TraitDefinition {
             type_parameters: self.type_parameters,
+            solver_goal: self.solver_goal,
+            solver_subgoals: self.solver_subgoals,
             functions: self
                 .functions
                 .into_iter()
@@ -213,7 +215,7 @@ impl<'a> Context<'a> {
             traits: FxHashMap::default(),
             impls: vec![],
             // Placeholder until `lower_declarations(…)` runs:
-            environment: Environment { rules: vec![] },
+            environment: Environment::default(),
             global_identifiers: FxHashMap::default(),
             assignments: FxHashMap::default(),
             assignment_dependency_graph: DiGraph::new(),
@@ -246,6 +248,7 @@ impl<'a> Context<'a> {
             );
         }
 
+        self.hir.solver_environment = self.environment;
         self.hir.traits = self
             .traits
             .into_iter()
@@ -405,6 +408,7 @@ impl<'a> Context<'a> {
                     if let Some((id, function)) =
                         self.lower_top_level_function_signature(&[], None, function)
                     {
+                        // dbg!(&function);
                         self.functions.force_insert(id, function);
                         functions_to_lower.push(id);
                     }
@@ -593,6 +597,7 @@ impl<'a> Context<'a> {
             name: name.string.clone(),
             type_arguments: type_parameters.type_(),
         };
+        // TODO: check that functions accept self as first parameter
         let functions = trait_
             .functions
             .iter()
@@ -1579,7 +1584,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             None,
                             ExpressionKind::Call {
                                 function: BuiltinFunction::TextConcat.id(),
-                                used_goal: None,
                                 substitutions: FxHashMap::default(),
                                 arguments: [lhs, rhs].into(),
                             },
@@ -2420,7 +2424,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             let mut mismatches = vec![];
             for (id, function, trait_, substitutions) in old_matches {
                 let Some(trait_) = trait_ else {
-                    matches.push((id, function, None, substitutions));
+                    // TODO: check whether type parameter substitutions are valid (upper bounds are fulfilled)
+                    matches.push((id, function, substitutions));
                     continue;
                 };
 
@@ -2472,14 +2477,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         }
                     })
                     .collect::<Option<Vec<_>>>();
-                if let Some(mut used_rule) = used_rule {
-                    used_rule.truncate(1);
-                    matches.push((
-                        id,
-                        function,
-                        Some(used_rule.pop().unwrap().goal),
-                        substitutions,
-                    ));
+                if used_rule.is_some() {
+                    matches.push((id, function, substitutions));
                 } else {
                     mismatches.push(function);
                 }
@@ -2512,7 +2511,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         ),
                         matches
                             .iter()
-                            .map(|(_, it, _, _)| format!("\n• {}", it.signature_to_string()))
+                            .map(|(_, it, _)| format!("\n• {}", it.signature_to_string()))
                             .join(""),
                     ),
                 );
@@ -2521,13 +2520,12 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             matches
         };
 
-        let (function, signature, used_goal, substitutions) = matches.pop().unwrap();
+        let (function, signature, substitutions) = matches.pop().unwrap();
         let return_type = signature.return_type.substitute(&substitutions);
         self.push_lowered(
             None,
             ExpressionKind::Call {
                 function,
-                used_goal,
                 substitutions,
                 arguments: arguments.iter().map(|(id, _)| *id).collect(),
             },
@@ -2545,7 +2543,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             None,
             ExpressionKind::Call {
                 function: BuiltinFunction::Panic.id(),
-                used_goal: None,
                 substitutions: FxHashMap::default(),
                 arguments: vec![message].into_boxed_slice(),
             },
@@ -2626,6 +2623,7 @@ enum LoweredExpression {
 //     Error,
 // }
 
+// TODO: rename to TypeUnifier
 pub struct TypeSolver<'h> {
     type_parameters: &'h [TypeParameter],
     substitutions: FxHashMap<ParameterType, Type>,
@@ -2646,6 +2644,7 @@ impl<'h> TypeSolver<'h> {
                 match self.substitutions.entry(parameter.clone()) {
                     Entry::Occupied(entry) => {
                         if !entry.get().equals_lenient(argument) {
+                            // TODO: show all mismatches, not only the first
                             return Err(format!("Type parameter {} gets resolved to different types: `{}` and `{argument}`", parameter.name,entry.get()).into_boxed_str());
                         }
                     }
