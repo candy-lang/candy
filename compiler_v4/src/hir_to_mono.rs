@@ -103,13 +103,11 @@ impl<'h> Context<'h> {
                 .iter()
                 .find(|impl_| {
                     if &impl_.trait_.name != trait_ {
-                        eprintln!("Trait mismatch: {trait_} != {}", impl_.trait_.name);
                         return false;
                     }
 
                     let mut unifier = TypeSolver::new(&impl_.type_parameters);
                     if unifier.unify(&self_type, &impl_.type_) != Ok(true) {
-                        eprintln!("Type mismatch: {self_type} != {}", impl_.type_);
                         return false;
                     }
 
