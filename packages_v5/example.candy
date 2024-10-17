@@ -66,6 +66,11 @@ impl Int: Subtract {
 }
 
 struct Text = builtin
+impl Text: ToText {
+  fun toText(self: Text) Text {
+    self
+  }
+}
 
 struct Array[T] = builtin
 fun arrayFilled[T](length: Int, item: T) Array[T] {
