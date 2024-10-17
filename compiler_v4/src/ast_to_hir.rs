@@ -41,7 +41,6 @@ struct Context<'a> {
     path: &'a Path,
     ast: &'a Ast,
     id_generator: IdGenerator<Id>,
-    // TODO: merge structs and enums into this map, but split in final HIR
     traits: FxHashMap<Box<str>, TraitDeclaration<'a>>,
     impls: Vec<ImplDeclaration<'a>>,
     environment: Environment,
@@ -1570,6 +1569,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         }
                         AstTextPart::Interpolation { expression, .. } => {
                             if let Some(expression) = expression.value() {
+                                // TODO: accept impl ToText
                                 self.lower_expression(expression, Some(&NamedType::text().into()))
                                     .0
                             } else {
@@ -2347,14 +2347,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         let mut matches = vec![];
         let mut mismatches = vec![];
         'outer: for (id, function, solver_rule) in old_matches {
-            let mut type_solver = TypeSolver::new(&function.type_parameters);
+            let mut unifier = TypeUnifier::new(&function.type_parameters);
             // Type arguments
             if let Some((type_arguments, _)) = &type_arguments {
                 for (type_argument, type_parameter) in type_arguments
                     .iter()
                     .zip_eq(function.type_parameters.iter())
                 {
-                    match type_solver.unify(type_argument, &type_parameter.type_().into()) {
+                    match unifier.unify(type_argument, &type_parameter.type_().into()) {
                         Ok(true) => {}
                         Ok(false) => unreachable!(),
                         Err(reason) => {
@@ -2369,7 +2369,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             for (argument_type, parameter) in
                 argument_types.iter().zip_eq(function.parameters.iter())
             {
-                match type_solver.unify(argument_type, &parameter.type_) {
+                match unifier.unify(argument_type, &parameter.type_) {
                     Ok(true) => {}
                     Ok(false) => {
                         mismatches.push((id, function, None));
@@ -2382,7 +2382,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 };
             }
 
-            match type_solver.finish() {
+            match unifier.finish() {
                 Ok(substitutions) => matches.push((id, function, solver_rule, substitutions)),
                 Err(error) => mismatches.push((id, function, Some(error))),
             }
@@ -2623,12 +2623,11 @@ enum LoweredExpression {
 //     Error,
 // }
 
-// TODO: rename to TypeUnifier
-pub struct TypeSolver<'h> {
+pub struct TypeUnifier<'h> {
     type_parameters: &'h [TypeParameter],
     substitutions: FxHashMap<ParameterType, Type>,
 }
-impl<'h> TypeSolver<'h> {
+impl<'h> TypeUnifier<'h> {
     #[must_use]
     pub fn new(type_parameters: &'h [TypeParameter]) -> Self {
         Self {

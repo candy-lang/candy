@@ -1,5 +1,5 @@
 use crate::{
-    ast_to_hir::TypeSolver,
+    ast_to_hir::TypeUnifier,
     hir::{self, Hir, NamedType, ParameterType, Type},
     id::IdGenerator,
     mono::{self, Mono},
@@ -106,7 +106,7 @@ impl<'h> Context<'h> {
                         return false;
                     }
 
-                    let mut unifier = TypeSolver::new(&impl_.type_parameters);
+                    let mut unifier = TypeUnifier::new(&impl_.type_parameters);
                     if unifier.unify(&self_type, &impl_.type_) != Ok(true) {
                         return false;
                     }
