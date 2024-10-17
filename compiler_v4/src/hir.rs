@@ -333,43 +333,36 @@ pub struct NamedType {
     pub type_arguments: Box<[Type]>,
 }
 impl NamedType {
+    #[must_use]
+    pub fn new(name: impl Into<Box<str>>, type_arguments: impl Into<Box<[Type]>>) -> Self {
+        Self {
+            name: name.into(),
+            type_arguments: type_arguments.into(),
+        }
+    }
+
     // Builtin types
     #[must_use]
     pub fn int() -> Self {
-        Self {
-            name: "Int".into(),
-            type_arguments: [].into(),
-        }
+        Self::new("Int", [])
     }
     #[must_use]
     pub fn text() -> Self {
-        Self {
-            name: "Text".into(),
-            type_arguments: [].into(),
-        }
+        Self::new("Text", [])
     }
 
     // Standard library types
     #[must_use]
     pub fn nothing() -> Self {
-        Self {
-            name: "Nothing".into(),
-            type_arguments: [].into(),
-        }
+        Self::new("Nothing", [])
     }
     #[must_use]
     pub fn never() -> Self {
-        Self {
-            name: "Never".into(),
-            type_arguments: [].into(),
-        }
+        Self::new("Never", [])
     }
     #[must_use]
     pub fn ordering() -> Self {
-        Self {
-            name: "Ordering".into(),
-            type_arguments: [].into(),
-        }
+        Self::new("Ordering", [])
     }
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -377,6 +370,11 @@ pub struct ParameterType {
     pub name: Box<str>,
 }
 impl ParameterType {
+    #[must_use]
+    pub fn new(name: impl Into<Box<str>>) -> Self {
+        Self { name: name.into() }
+    }
+
     const SELF_TYPE_NAME: &'static str = "Self";
 
     #[must_use]
