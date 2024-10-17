@@ -1,9 +1,6 @@
 use crate::{
     hir::BuiltinFunction,
-    mono::{
-        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Mono, Parameter,
-        TypeDeclaration,
-    },
+    mono::{Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Mono, TypeDeclaration},
 };
 use itertools::Itertools;
 

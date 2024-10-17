@@ -79,50 +79,17 @@ impl<'h> Context<'h> {
         used_goal: Option<&SolverGoal>,
         substitutions: &FxHashMap<ParameterType, Type>,
     ) -> Box<str> {
-        let (signature, body) = self.hir.get_function(id);
         let (signature, body) = if let Some(used_goal) = used_goal {
-            let (_, function) = self
+            let function = &self
                 .hir
                 .impls
                 .iter()
-                .filter(|impl_| {
-                    matches!(
-                        &impl_.trait_,
-                        hir::Result::Ok(hir::Trait { name, .. })
-                        if name == &used_goal.trait_
-                    )
-                })
-                .flat_map(|impl_| impl_.functions.iter())
-                .find(|(_, function)| {
-                    function.signature.name == signature.name
-                        && function.signature.type_parameters.len()
-                            == signature.type_parameters.len()
-                        && function
-                            .signature
-                            .type_parameters
-                            .iter()
-                            .zip(signature.type_parameters.iter())
-                            .all(|(function, signature)| {
-                                function.upper_bound.clone()
-                                    == signature.upper_bound.as_ref().map(|it| {
-                                        it.as_ref().map(|it| it.substitute(substitutions))
-                                    })
-                            })
-                        && function.signature.parameters.len() == signature.parameters.len()
-                        && function
-                            .signature
-                            .parameters
-                            .iter()
-                            .zip(signature.parameters.iter())
-                            .all(|(function, signature)| {
-                                function.type_ == signature.type_.substitute(substitutions)
-                            })
-                        && function.signature.return_type
-                            == signature.return_type.substitute(substitutions)
-                })
-                .unwrap_or_else(|| panic!("Function not found for used goal: {used_goal}"));
+                .find(|impl_| impl_.trait_.name == used_goal.trait_)
+                .unwrap_or_else(|| panic!("Impl not found for used goal: {used_goal}"))
+                .functions[&id];
             (&function.signature, &function.body)
         } else {
+            let (signature, body) = self.hir.get_function(id);
             (signature, body.unwrap())
         };
         let name = self.mangle_function(

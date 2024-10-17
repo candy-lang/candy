@@ -60,6 +60,41 @@ struct TraitDeclaration<'a> {
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
 }
 impl<'a> TraitDeclaration<'a> {
+    fn find_parent_function_of(
+        &self,
+        substitutions: &FxHashMap<ParameterType, Type>,
+        impl_function: &FunctionDeclaration<'a>,
+    ) -> Option<Id> {
+        self.functions
+            .iter()
+            .find(|(_, trait_function)| {
+                impl_function.name == trait_function.name
+                    && impl_function.type_parameters.len() == trait_function.type_parameters.len()
+                    && impl_function
+                        .type_parameters
+                        .iter()
+                        .zip(trait_function.type_parameters.iter())
+                        .all(|(function, signature)| {
+                            function.upper_bound
+                                == signature
+                                    .upper_bound
+                                    .as_ref()
+                                    .map(|it| it.as_ref().map(|it| it.substitute(substitutions)))
+                        })
+                    && impl_function.parameters.len() == trait_function.parameters.len()
+                    && impl_function
+                        .parameters
+                        .iter()
+                        .zip(trait_function.parameters.iter())
+                        .all(|(function, signature)| {
+                            function.type_ == signature.type_.substitute(substitutions)
+                        })
+                    && impl_function.return_type
+                        == trait_function.return_type.substitute(substitutions)
+            })
+            .map(|(id, _)| *id)
+    }
+
     #[must_use]
     fn into_definition(self) -> TraitDefinition {
         TraitDefinition {
@@ -77,7 +112,7 @@ struct ImplDeclaration<'a> {
     type_parameters: Box<[TypeParameter]>,
     type_: Type,
     self_type: NamedType,
-    trait_: hir::Result<Trait>,
+    trait_: Trait,
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
 }
 impl<'a> ImplDeclaration<'a> {
@@ -112,6 +147,7 @@ struct AssignmentDeclaration<'a> {
 struct FunctionDeclaration<'a> {
     ast: Option<&'a AstFunction>,
     name: Box<str>,
+    name_span: Option<Range<Offset>>,
     type_parameters: Box<[TypeParameter]>,
     parameters: Box<[Parameter]>,
     return_type: Type,
@@ -332,6 +368,7 @@ impl<'a> Context<'a> {
                 FunctionDeclaration {
                     ast: None,
                     name: signature.name.clone(),
+                    name_span: None,
                     type_parameters,
                     parameters,
                     return_type: signature.return_type,
@@ -556,8 +593,14 @@ impl<'a> Context<'a> {
             name: name.string.clone(),
             type_arguments: type_parameters.type_(),
         };
-        let functions =
-            self.lower_function_signatures(&type_parameters, Some(&self_type), &trait_.functions);
+        let functions = trait_
+            .functions
+            .iter()
+            .filter_map(|function| {
+                self.lower_function_signature(&type_parameters, Some(&self_type), function)
+                    .map(|function| (self.id_generator.generate(), function))
+            })
+            .collect();
 
         if self.hir.type_declarations.contains_key(&name.string) {
             self.add_error(
@@ -704,19 +747,17 @@ impl<'a> Context<'a> {
         let Some(trait_) = impl_.trait_.value() else {
             return;
         };
-        let trait_ = self.lower_trait(&type_parameters, Some(&self_type), trait_);
+        let hir::Ok(trait_) = self.lower_trait(&type_parameters, Some(&self_type), trait_) else {
+            return;
+        };
+        let trait_declaration = self.traits[&*trait_.name].clone();
 
         if let Type::Named(type_) = &type_
             && let Ok(solver_type) = SolverValue::try_from(type_.clone())
-            && let hir::Ok(Trait {
-                name: trait_name, ..
-            }) = &trait_
         {
-            let trait_declaration = &self.traits[trait_name];
-
             let rule = SolverRule {
                 goal: SolverGoal {
-                    trait_: trait_name.clone(),
+                    trait_: trait_.name.clone(),
                     parameters: trait_declaration
                         .type_parameters
                         .iter()
@@ -732,8 +773,46 @@ impl<'a> Context<'a> {
             self.environment.rules.push(rule);
         };
 
-        let functions =
-            self.lower_function_signatures(&type_parameters, Some(&self_type), &impl_.functions);
+        let trait_substitutions = trait_declaration
+            .type_parameters
+            .iter()
+            .map(TypeParameter::type_)
+            .zip(trait_.type_arguments.iter().cloned())
+            .chain([(ParameterType::self_type(), type_.clone())])
+            .collect();
+
+        let functions = impl_
+            .functions
+            .iter()
+            .filter_map(|function| try {
+                let function =
+                    self.lower_function_signature(&type_parameters, Some(&self_type), function)?;
+                let Some(parent_function_id) =
+                    trait_declaration.find_parent_function_of(&trait_substitutions, &function)
+                else {
+                    self.add_error(
+                        function.name_span.unwrap(),
+                        "This function is not part of the implemented trait.",
+                    );
+                    return None;
+                };
+
+                (parent_function_id, function)
+            })
+            .collect::<FxHashMap<_, _>>();
+        if functions.len() < trait_declaration.functions.len() {
+            for (trait_function_id, trait_function) in trait_declaration.functions {
+                if !functions.contains_key(&trait_function_id) {
+                    self.add_error(
+                        impl_.impl_keyword_span.clone(),
+                        format!(
+                            "Missing implementation of function {}.",
+                            trait_function.signature_to_string(),
+                        ),
+                    );
+                }
+            }
+        }
 
         self.impls.push(ImplDeclaration {
             type_parameters,
@@ -962,27 +1041,14 @@ impl<'a> Context<'a> {
         self.assignments.get_mut(&id).unwrap().body = Some(hir_body);
     }
 
-    fn lower_function_signatures(
-        &mut self,
-        outer_type_parameters: &[TypeParameter],
-        self_type: Option<&NamedType>,
-        functions: &'a [AstFunction],
-    ) -> FxHashMap<Id, FunctionDeclaration<'a>> {
-        functions
-            .iter()
-            .filter_map(|function| {
-                self.lower_function_signature(outer_type_parameters, self_type, function)
-            })
-            .collect()
-    }
     fn lower_top_level_function_signature(
         &mut self,
         outer_type_parameters: &[TypeParameter],
         self_type: Option<&NamedType>,
         function: &'a AstFunction,
     ) -> Option<(Id, FunctionDeclaration<'a>)> {
-        let (id, function) =
-            self.lower_function_signature(outer_type_parameters, self_type, function)?;
+        let function = self.lower_function_signature(outer_type_parameters, self_type, function)?;
+        let id = self.id_generator.generate();
         match self.global_identifiers.entry(function.name.clone()) {
             Entry::Occupied(mut entry) => match entry.get_mut() {
                 Named::Functions(functions) => {
@@ -1008,10 +1074,8 @@ impl<'a> Context<'a> {
         outer_type_parameters: &[TypeParameter],
         self_type: Option<&NamedType>,
         function: &'a AstFunction,
-    ) -> Option<(Id, FunctionDeclaration<'a>)> {
+    ) -> Option<FunctionDeclaration<'a>> {
         let name = function.name.value()?;
-
-        let id = self.id_generator.generate();
 
         let type_parameters = self.lower_type_parameters(
             outer_type_parameters,
@@ -1030,17 +1094,15 @@ impl<'a> Context<'a> {
             || NamedType::nothing().into(),
             |it| self.lower_type(&all_type_parameters, self_type, it),
         );
-        Some((
-            id,
-            FunctionDeclaration {
-                ast: Some(function),
-                name: name.string.clone(),
-                type_parameters,
-                parameters,
-                return_type,
-                body: None,
-            },
-        ))
+        Some(FunctionDeclaration {
+            ast: Some(function),
+            name: name.string.clone(),
+            name_span: Some(name.span.clone()),
+            type_parameters,
+            parameters,
+            return_type,
+            body: None,
+        })
     }
     fn lower_parameters(
         &mut self,

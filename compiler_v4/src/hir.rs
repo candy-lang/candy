@@ -250,7 +250,10 @@ impl ToText for (&Id, &TraitFunction) {
 pub struct Impl {
     pub type_parameters: Box<[TypeParameter]>,
     pub type_: Type,
-    pub trait_: Result<Trait>,
+    pub trait_: Trait,
+
+    /// The function IDs match the IDs of the parent function in the implemented
+    /// trait.
     pub functions: FxHashMap<Id, Function>,
 }
 impl ToText for Impl {

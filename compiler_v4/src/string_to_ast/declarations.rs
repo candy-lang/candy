@@ -237,7 +237,9 @@ fn trait_<'a>(parser: Parser) -> Option<(Parser, AstTrait)> {
 
 #[instrument(level = "trace")]
 fn impl_<'a>(parser: Parser) -> Option<(Parser, AstImpl)> {
+    let start_offset = parser.offset();
     let parser = impl_keyword(parser)?.and_trailing_whitespace();
+    let impl_keyword_span = start_offset..parser.offset();
 
     let (parser, type_parameters) = type_parameters(parser)
         .optional(parser)
@@ -267,6 +269,7 @@ fn impl_<'a>(parser: Parser) -> Option<(Parser, AstImpl)> {
     Some((
         parser,
         AstImpl {
+            impl_keyword_span,
             type_parameters,
             type_: base_type,
             colon_error,

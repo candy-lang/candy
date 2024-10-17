@@ -119,6 +119,7 @@ pub struct AstTrait {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstImpl {
+    pub impl_keyword_span: Range<Offset>,
     pub type_parameters: Option<AstTypeParameters>,
     pub type_: AstResult<AstType>,
     pub colon_error: Option<AstError>,
@@ -384,12 +385,12 @@ impl CollectAstErrors for AstStruct {
 impl CollectAstErrors for AstStructKind {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         match self {
-            AstStructKind::Builtin {
+            Self::Builtin {
                 builtin_keyword_error,
             } => {
                 builtin_keyword_error.collect_errors_to(errors);
             }
-            AstStructKind::UserDefined {
+            Self::UserDefined {
                 opening_curly_brace_error,
                 fields,
                 closing_curly_brace_error,
