@@ -438,6 +438,7 @@ impl Type {
                         .all(|(this, other)| this.equals_lenient(other))
             }
             (Self::Parameter(from), Self::Parameter(to)) => from == to,
+            (Self::Self_ { base_type: from }, Self::Self_ { base_type: to }) => from == to,
             _ => false,
         }
     }
