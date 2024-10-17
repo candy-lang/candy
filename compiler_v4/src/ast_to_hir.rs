@@ -1,8 +1,8 @@
 use crate::{
     ast::{
         Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
-        AstFunction, AstImpl, AstParameter, AstResult, AstStatement, AstString, AstStruct,
-        AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType, AstTypeArguments,
+        AstExpressionKind, AstFunction, AstImpl, AstParameter, AstResult, AstStatement, AstString,
+        AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType, AstTypeArguments,
         AstTypeParameter, AstTypeParameters,
     },
     error::CompilerError,
@@ -1277,9 +1277,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 if let Some(context_type) = context_type
                     && !type_.equals_lenient(context_type)
                 {
-                    // TODO: report actual error location
                     self.context.add_error(
-                        Offset(0)..Offset(0),
+                        expression.span.clone(),
                         format!("Expected type `{context_type:?}`, got `{type_:?}`."),
                     );
                     (self.push_error(), Type::Error)
@@ -1289,15 +1288,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             }
             LoweredExpression::NamedTypeReference(_)
             | LoweredExpression::TypeParameterReference { .. } => {
-                // TODO: report actual error location
                 self.context
-                    .add_error(Offset(0)..Offset(0), "Type must be instantiated.");
+                    .add_error(expression.span.clone(), "Type must be instantiated.");
                 (self.push_error(), Type::Error)
             }
             LoweredExpression::EnumVariantReference { enum_, variant } => {
-                // TODO: report actual error location
                 self.context.add_error(
-                    Offset(0)..Offset(0),
+                    expression.span.clone(),
                     format!("Enum variant `{enum_:?}.{variant}` must be instantiated."),
                 );
                 (self.push_error(), Type::Error)
@@ -1310,21 +1307,21 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         expression: &AstExpression,
         context_type: Option<&Type>,
     ) -> LoweredExpression {
-        match expression {
-            AstExpression::Identifier(identifier) => {
+        match &expression.kind {
+            AstExpressionKind::Identifier(identifier) => {
                 let Some(identifier) = identifier.identifier.value() else {
                     return LoweredExpression::Error;
                 };
                 self.lower_identifier(identifier)
             }
-            AstExpression::Int(int) => self.push_lowered(
+            AstExpressionKind::Int(int) => self.push_lowered(
                 None,
                 int.value
                     .value()
                     .map_or(ExpressionKind::Error, |it| ExpressionKind::Int(*it)),
                 NamedType::int(),
             ),
-            AstExpression::Text(text) => {
+            AstExpressionKind::Text(text) => {
                 let text = text
                     .parts
                     .iter()
@@ -1363,7 +1360,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     type_: NamedType::text().into(),
                 }
             }
-            AstExpression::Parenthesized(parenthesized) => {
+            AstExpressionKind::Parenthesized(parenthesized) => {
                 return parenthesized
                     .inner
                     .value()
@@ -1371,10 +1368,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         self.lower_expression_raw(it, context_type)
                     });
             }
-            AstExpression::Call(call) => {
+            AstExpressionKind::Call(call) => {
                 fn lower_arguments(
                     builder: &mut BodyBuilder,
                     call: &AstCall,
+                    fallback_span: Range<Offset>,
                     arguments: &AstResult<AstArguments>,
                     parameter_types: Option<&[Type]>,
                 ) -> Option<Box<[(Id, Type)]>> {
@@ -1394,10 +1392,9 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     {
                         builder.context.add_error(
                             if arguments.len() < parameter_types.len() {
-                                // TODO: report actual error location
-                                call.arguments.value().map_or(Offset(0)..Offset(0), |it| {
-                                    it.opening_parenthesis_span.clone()
-                                })
+                                call.arguments
+                                    .value()
+                                    .map_or(fallback_span, |it| it.opening_parenthesis_span.clone())
                             } else {
                                 let arguments = &call.arguments.value().unwrap().arguments;
                                 arguments[parameter_types.len()].span.start
@@ -1414,25 +1411,38 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     Some(arguments)
                 }
 
-                match &*call.receiver {
-                    AstExpression::Navigation(navigation)
+                match &call.receiver.kind {
+                    AstExpressionKind::Navigation(navigation)
                         if let Some(key) = navigation.key.value() =>
                     {
                         let receiver = self.lower_expression(&navigation.receiver, None);
-                        let arguments = lower_arguments(self, call, &call.arguments, None).unwrap();
+                        let arguments = lower_arguments(
+                            self,
+                            call,
+                            expression.span.clone(),
+                            &call.arguments,
+                            None,
+                        )
+                        .unwrap();
                         let arguments = iter::once(receiver)
                             .chain(arguments.into_vec())
                             .collect_vec();
                         return self.lower_call(key, call.type_arguments.as_ref(), &arguments);
                     }
-                    AstExpression::Identifier(identifier) => {
+                    AstExpressionKind::Identifier(identifier) => {
                         let Some(identifier) = identifier.identifier.value() else {
                             return LoweredExpression::Error;
                         };
 
                         if identifier.string.chars().next().unwrap().is_lowercase() {
-                            let arguments =
-                                lower_arguments(self, call, &call.arguments, None).unwrap();
+                            let arguments = lower_arguments(
+                                self,
+                                call,
+                                expression.span.clone(),
+                                &call.arguments,
+                                None,
+                            )
+                            .unwrap();
                             return self.lower_call(
                                 identifier,
                                 call.type_arguments.as_ref(),
@@ -1454,7 +1464,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
                                         let Some(fields) = fields else {
                                             self.context.add_error(
-                                                Offset(0)..Offset(0),
+                                                call.receiver.span.clone(),
                                                 format!("Can't instantiate builtin type {type_} directly"),
                                             );
                                             return LoweredExpression::Error;
@@ -1463,6 +1473,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         let fields = lower_arguments(
                                             self,
                                             call,
+                                            expression.span.clone(),
                                             &call.arguments,
                                             Some(
                                                 &fields
@@ -1493,17 +1504,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         kind: TypeDeclarationKind::Enum { .. },
                                         ..
                                     }) => {
-                                        // TODO: report actual error location
                                         self.context.add_error(
-                                            Offset(0)..Offset(0),
+                                            call.receiver.span.clone(),
                                             "Enum variant is missing.",
                                         );
                                         LoweredExpression::Error
                                     }
                                     None => {
-                                        // TODO: report actual error location
                                         self.context.add_error(
-                                            Offset(0)..Offset(0),
+                                            call.receiver.span.clone(),
                                             format!(
                                                 "Can't instantiate builtin type {type_} directly."
                                             ),
@@ -1513,9 +1522,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 }
                             }
                             LoweredExpression::TypeParameterReference(type_) => {
-                                // TODO: report actual error location
                                 self.context.add_error(
-                                    Offset(0)..Offset(0),
+                                    call.receiver.span.clone(),
                                     format!("Can't instantiate type parameter {type_} directly."),
                                 );
                                 LoweredExpression::Error
@@ -1553,6 +1561,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 let arguments = lower_arguments(
                                     self,
                                     call,
+                                    expression.span.clone(),
                                     &call.arguments,
                                     Some(parameter_types.as_slice()),
                                 );
@@ -1574,7 +1583,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     _ => todo!("Support calling other expressions"),
                 }
             }
-            AstExpression::Navigation(navigation) => {
+            AstExpressionKind::Navigation(navigation) => {
                 let receiver = self.lower_expression_raw(&navigation.receiver, None);
 
                 let Some(key) = navigation.key.value() else {
@@ -1701,11 +1710,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
             }
-            AstExpression::Body(AstBody { statements, .. }) => {
+            AstExpressionKind::Body(AstBody { statements, .. }) => {
                 let (id, type_) = self.lower_statements(statements, context_type);
                 LoweredExpression::Expression { id, type_ }
             }
-            AstExpression::Switch(AstSwitch { value, cases, .. }) => {
+            AstExpressionKind::Switch(AstSwitch { value, cases, .. }) => {
                 let Some(value) = value.value() else {
                     return LoweredExpression::Error;
                 };
@@ -1716,18 +1725,16 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         let Some(declaration) =
                             &self.context.hir.type_declarations.get(&type_.name)
                         else {
-                            // TODO: report actual error location
                             self.context.add_error(
-                                Offset(0)..Offset(0),
+                                expression.span.clone(),
                                 format!("Can't switch over builtin type `{enum_:?}`"),
                             );
                             return LoweredExpression::Error;
                         };
                         match &declaration.kind {
                             TypeDeclarationKind::Struct { .. } => {
-                                // TODO: report actual error location
                                 self.context.add_error(
-                                    Offset(0)..Offset(0),
+                                    expression.span.clone(),
                                     format!("Can't switch over struct `{enum_:?}`"),
                                 );
                                 return LoweredExpression::Error;
@@ -1744,9 +1751,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         }
                     }
                     Type::Parameter(type_) => {
-                        // TODO: report actual error location
                         self.context.add_error(
-                            Offset(0)..Offset(0),
+                            expression.span.clone(),
                             format!("Can't switch over type parameter `{}`", type_.name),
                         );
                         return LoweredExpression::Error;

@@ -198,7 +198,12 @@ pub struct AstTypeArgument {
 // Expressions
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum AstExpression {
+pub struct AstExpression {
+    pub span: Range<Offset>,
+    pub kind: AstExpressionKind,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum AstExpressionKind {
     // TODO: differentiate values and types
     Identifier(AstIdentifier),
     Int(AstInt),
@@ -515,6 +520,11 @@ impl CollectAstErrors for AstTypeArgument {
 }
 
 impl CollectAstErrors for AstExpression {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.kind.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstExpressionKind {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         match &self {
             Self::Identifier(identifier) => identifier.collect_errors_to(errors),

@@ -15,8 +15,9 @@ use super::{
     word::{raw_identifier, word},
 };
 use crate::ast::{
-    AstArgument, AstArguments, AstBody, AstCall, AstError, AstExpression, AstIdentifier, AstInt,
-    AstNavigation, AstParenthesized, AstResult, AstStatement, AstSwitch, AstSwitchCase,
+    AstArgument, AstArguments, AstBody, AstCall, AstError, AstExpression, AstExpressionKind,
+    AstIdentifier, AstInt, AstNavigation, AstParenthesized, AstResult, AstStatement, AstSwitch,
+    AstSwitchCase,
 };
 use replace_with::replace_with_or_abort;
 use tracing::instrument;
@@ -25,22 +26,25 @@ use tracing::instrument;
 pub fn expression(parser: Parser) -> Option<(Parser, AstExpression)> {
     // If we start the call list with `if … else …`, the formatting looks weird.
     // Hence, we start with a single `None`.
-    let (mut parser, mut result) = None
+    let start_offset = parser.offset();
+    let (mut parser, kind) = None
         .or_else(|| {
             raw_identifier(parser).map(|(parser, identifier)| {
                 (
                     parser,
-                    AstExpression::Identifier(AstIdentifier { identifier }),
+                    AstExpressionKind::Identifier(AstIdentifier { identifier }),
                 )
             })
         })
-        .or_else(|| int(parser).map(|(parser, it)| (parser, AstExpression::Int(it))))
-        .or_else(|| text(parser).map(|(parser, it)| (parser, AstExpression::Text(it))))
+        .or_else(|| int(parser).map(|(parser, it)| (parser, AstExpressionKind::Int(it))))
+        .or_else(|| text(parser).map(|(parser, it)| (parser, AstExpressionKind::Text(it))))
         .or_else(|| {
-            parenthesized(parser).map(|(parser, it)| (parser, AstExpression::Parenthesized(it)))
+            parenthesized(parser).map(|(parser, it)| (parser, AstExpressionKind::Parenthesized(it)))
         })
-        .or_else(|| body(parser).map(|(parser, it)| (parser, AstExpression::Body(it))))
-        .or_else(|| switch(parser).map(|(parser, it)| (parser, AstExpression::Switch(it))))?;
+        .or_else(|| body(parser).map(|(parser, it)| (parser, AstExpressionKind::Body(it))))
+        .or_else(|| switch(parser).map(|(parser, it)| (parser, AstExpressionKind::Switch(it))))?;
+    let span = start_offset..parser.offset();
+    let mut result = AstExpression { kind, span };
 
     loop {
         fn parse_suffix<'a>(
@@ -224,6 +228,7 @@ fn expression_suffix_navigation<'s>(
     parser: Parser<'s>,
     current: &mut AstExpression,
 ) -> Option<Parser<'s>> {
+    let start_offset = parser.offset();
     let parser = whitespace(parser).unwrap_or(parser);
 
     let parser = dot(parser)?.and_trailing_whitespace();
@@ -231,11 +236,12 @@ fn expression_suffix_navigation<'s>(
     let (parser, key) = raw_identifier(parser)
         .unwrap_or_ast_error_result(parser, "This struct access is missing a key.");
 
-    replace_with_or_abort(current, |current| {
-        AstExpression::Navigation(AstNavigation {
+    replace_with_or_abort(current, |current| AstExpression {
+        span: start_offset..parser.offset(),
+        kind: AstExpressionKind::Navigation(AstNavigation {
             receiver: Box::new(current),
             key,
-        })
+        }),
     });
 
     Some(parser)
@@ -246,6 +252,7 @@ fn expression_suffix_call<'s>(
     parser: Parser<'s>,
     current: &mut AstExpression,
 ) -> Option<Parser<'s>> {
+    let start_offset = parser.offset();
     let parser = whitespace(parser).unwrap_or(parser);
 
     let (parser, type_arguments) = type_arguments(parser).optional(parser);
@@ -263,12 +270,13 @@ fn expression_suffix_call<'s>(
         )
     };
 
-    replace_with_or_abort(current, |current| {
-        AstExpression::Call(AstCall {
+    replace_with_or_abort(current, |current| AstExpression {
+        span: start_offset..parser.offset(),
+        kind: AstExpressionKind::Call(AstCall {
             receiver: Box::new(current),
             type_arguments,
             arguments,
-        })
+        }),
     });
 
     Some(parser)
