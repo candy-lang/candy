@@ -121,15 +121,15 @@ fn compile(options: CompileOptions) -> ProgramResult {
     let started_at = Instant::now();
     let (hir, errors) = compile_hir(&options.path, &source);
 
+    if options.debug_print_hir {
+        println!("Hir:\n{}", hir.to_text(true));
+    }
+
     if !errors.is_empty() {
         for error in errors {
             error!("{}", error.to_string_with_location(&source));
         }
         return Err(Exit::CodeContainsErrors);
-    }
-
-    if options.debug_print_hir {
-        println!("Hir:\n{}", hir.to_text(true));
     }
 
     let mono = hir_to_mono(&hir);
