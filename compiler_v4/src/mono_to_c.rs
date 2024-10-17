@@ -188,6 +188,13 @@ impl<'h> Context<'h> {
                         length = function.parameters[0].id,
                         item = function.parameters[1].id,
                     )),
+                    BuiltinFunction::ArrayLength => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {array}->length;
+                        return result_pointer;",
+                        array = function.parameters[0].id,
+                    )),
                     BuiltinFunction::IntAdd => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));

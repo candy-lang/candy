@@ -703,6 +703,7 @@ pub struct SwitchCase {
 #[strum(serialize_all = "camelCase")]
 pub enum BuiltinFunction {
     ArrayFilled,
+    ArrayLength,
     IntAdd,
     IntCompareTo,
     IntSubtract,
@@ -730,8 +731,18 @@ impl BuiltinFunction {
                 .into(),
                 return_type: NamedType::array(ParameterType::new("T")).into(),
             },
+            Self::ArrayLength => BuiltinFunctionSignature {
+                name: "builtinArrayLength".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [(
+                    "array".into(),
+                    NamedType::array(ParameterType::new("T")).into(),
+                )]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
             Self::IntAdd => BuiltinFunctionSignature {
-                name: "builtinAdd".into(),
+                name: "builtinIntAdd".into(),
                 type_parameters: Box::default(),
                 parameters: [
                     ("a".into(), NamedType::int().into()),
@@ -741,7 +752,7 @@ impl BuiltinFunction {
                 return_type: NamedType::int().into(),
             },
             Self::IntCompareTo => BuiltinFunctionSignature {
-                name: "builtinCompareTo".into(),
+                name: "builtinIntCompareTo".into(),
                 type_parameters: Box::default(),
                 parameters: [
                     ("a".into(), NamedType::int().into()),
@@ -751,7 +762,7 @@ impl BuiltinFunction {
                 return_type: NamedType::ordering().into(),
             },
             Self::IntSubtract => BuiltinFunctionSignature {
-                name: "builtinSubtract".into(),
+                name: "builtinIntSubtract".into(),
                 type_parameters: Box::default(),
                 parameters: [
                     ("a".into(), NamedType::int().into()),
@@ -761,7 +772,7 @@ impl BuiltinFunction {
                 return_type: NamedType::int().into(),
             },
             Self::IntToText => BuiltinFunctionSignature {
-                name: "builtinToText".into(),
+                name: "builtinIntToText".into(),
                 type_parameters: Box::default(),
                 parameters: [("int".into(), NamedType::int().into())].into(),
                 return_type: NamedType::text().into(),
@@ -779,7 +790,7 @@ impl BuiltinFunction {
                 return_type: NamedType::nothing().into(),
             },
             Self::TextConcat => BuiltinFunctionSignature {
-                name: "builtinConcat".into(),
+                name: "builtinTextConcat".into(),
                 type_parameters: Box::default(),
                 parameters: [
                     ("a".into(), NamedType::text().into()),

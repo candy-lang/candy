@@ -71,6 +71,9 @@ struct Array[T] = builtin
 fun arrayFilled[T](length: Int, item: T) Array[T] {
   builtinArrayFilled(length, item)
 }
+fun length[T](array: Array[T]) Int {
+  builtinLength(array)
+}
 
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
@@ -98,7 +101,6 @@ enum MyEnum {
   bar,
 }
 
-# array type: `Array[Int]`
 # function type: `Fun[Int, Text, Int]`, later `Fun (Int, Text) Int`
 
 # Expressions
