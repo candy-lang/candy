@@ -265,7 +265,7 @@ impl<'h> Context<'h> {
                     result.push_str("$of$");
                     for type_ in type_.type_arguments.iter() {
                         Self::mangle_type_helper(result, type_);
-                        result.push('&');
+                        result.push('$');
                     }
                     result.push_str("end$");
                 }
@@ -499,26 +499,14 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
             hir::Type::Named(NamedType {
                 name,
                 type_arguments,
-            }) => {
-                // TODO: Is the `type_arguments.is_empty()` check necessary?
-                if type_arguments.is_empty()
-                    && let Some(type_parameter_name) = name.strip_prefix('$')
-                {
-                    self.environment[&ParameterType {
-                        name: type_parameter_name.into(),
-                    }]
-                        .clone()
-                } else {
-                    hir::Type::Named(NamedType {
-                        name: name.clone(),
-                        type_arguments: type_arguments
-                            .iter()
-                            .map(|it| self.merge_substitution(it))
-                            .collect(),
-                    })
-                }
-            }
-            hir::Type::Parameter(parameter_type) => parameter_type.clone().into(),
+            }) => hir::Type::Named(NamedType {
+                name: name.clone(),
+                type_arguments: type_arguments
+                    .iter()
+                    .map(|it| self.merge_substitution(it))
+                    .collect(),
+            }),
+            hir::Type::Parameter(parameter_type) => self.environment[parameter_type].clone(),
             hir::Type::Self_ { .. } | hir::Type::Error => unreachable!(),
         }
     }

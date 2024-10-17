@@ -2303,7 +2303,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             for (argument_type, parameter) in
                 argument_types.iter().zip_eq(function.parameters.iter())
             {
-                match type_solver.unify(&Self::canonicalize_type(argument_type), &parameter.type_) {
+                match type_solver.unify(argument_type, &parameter.type_) {
                     Ok(true) => {}
                     Ok(false) => {
                         mismatches.push((id, function, None));
@@ -2471,30 +2471,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             },
             return_type,
         )
-    }
-    fn canonicalize_type(type_: &Type) -> Type {
-        match type_ {
-            Type::Named(named_type) => Self::canonicalize_named_type(named_type).into(),
-            Type::Parameter(parameter_type) => NamedType {
-                name: format!("${parameter_type}").into_boxed_str(),
-                type_arguments: Box::default(),
-            }
-            .into(),
-            Type::Self_ { base_type } => Type::Self_ {
-                base_type: Self::canonicalize_named_type(base_type),
-            },
-            Type::Error => Type::Error,
-        }
-    }
-    fn canonicalize_named_type(type_: &NamedType) -> NamedType {
-        NamedType {
-            name: type_.name.clone(),
-            type_arguments: type_
-                .type_arguments
-                .iter()
-                .map(Self::canonicalize_type)
-                .collect(),
-        }
     }
 
     fn push_panic(&mut self, message: impl Into<Box<str>>) {
