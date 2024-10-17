@@ -2596,7 +2596,7 @@ impl<'h> TypeSolver<'h> {
                             .iter()
                             .any(|it| it.name == parameter.name),
                     "Unresolved type parameter: `{}`",
-                    parameter.name
+                    parameter.name,
                 );
                 match self.substitutions.entry(parameter.clone()) {
                     Entry::Occupied(entry) => {
