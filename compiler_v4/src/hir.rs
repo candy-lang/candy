@@ -343,6 +343,10 @@ impl NamedType {
 
     // Builtin types
     #[must_use]
+    pub fn array(t: impl Into<Type>) -> Self {
+        Self::new("Array", [t.into()])
+    }
+    #[must_use]
     pub fn int() -> Self {
         Self::new("Int", [])
     }
@@ -698,6 +702,7 @@ pub struct SwitchCase {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
 #[strum(serialize_all = "camelCase")]
 pub enum BuiltinFunction {
+    ArrayFilled,
     IntAdd,
     IntCompareTo,
     IntSubtract,
@@ -715,6 +720,16 @@ impl BuiltinFunction {
     #[must_use]
     pub fn signature(self) -> BuiltinFunctionSignature {
         match self {
+            Self::ArrayFilled => BuiltinFunctionSignature {
+                name: "builtinArrayFilled".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("length".into(), NamedType::int().into()),
+                    ("item".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::array(ParameterType::new("T")).into(),
+            },
             Self::IntAdd => BuiltinFunctionSignature {
                 name: "builtinAdd".into(),
                 type_parameters: Box::default(),
