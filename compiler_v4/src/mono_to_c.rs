@@ -72,13 +72,18 @@ impl<'h> Context<'h> {
                     type_arguments,
                 } => {
                     match name.as_ref() {
+                        "Array" => {
+                            assert_eq!(type_arguments.len(), 1);
+                            self.push("uint64_t length;\n");
+                            self.push(format!("{}** values;\n", type_arguments[0]));
+                        }
                         "Int" => {
                             assert!(type_arguments.is_empty());
-                            self.push("uint64_t value;\n")
+                            self.push("uint64_t value;\n");
                         }
                         "Text" => {
                             assert!(type_arguments.is_empty());
-                            self.push("char* value;\n")
+                            self.push("char* value;\n");
                         }
                         _ => panic!("Unknown builtin type: {name}"),
                     }
@@ -151,7 +156,7 @@ impl<'h> Context<'h> {
         for (name, function) in &self.mono.functions {
             self.lower_function_signature(name, function);
             self.push(" {\n");
-            self.lower_body_or_builtin(&function.parameters, &function.body);
+            self.lower_body_or_builtin(function);
             self.push("}\n\n");
         }
     }
@@ -165,18 +170,31 @@ impl<'h> Context<'h> {
         }
         self.push(")");
     }
-    fn lower_body_or_builtin(&mut self, parameters: &[Parameter], body: &BodyOrBuiltin) {
-        match body {
+    fn lower_body_or_builtin(&mut self, function: &Function) {
+        match &function.body {
             BodyOrBuiltin::Builtin(builtin_function) => {
                 self.push("// builtin function\n");
                 match builtin_function {
+                    BuiltinFunction::ArrayFilled => self.push(format!(
+                        "\
+                        {array_type}* result_pointer = malloc(sizeof({array_type}));
+                        result_pointer->length = {length}->value;
+                        result_pointer->values = malloc({length}->value * sizeof({array_type}));
+                        for (uint64_t i = 0; i < {length}->value; i++) {{
+                            result_pointer->values[i] = {item};
+                        }}
+                        return result_pointer;",
+                        array_type = function.return_type,
+                        length = function.parameters[0].id,
+                        item = function.parameters[1].id,
+                    )),
                     BuiltinFunction::IntAdd => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
                         result_pointer->value = {a}->value + {b}->value;
                         return result_pointer;",
-                        a = parameters[0].id,
-                        b = parameters[1].id,
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
                     )),
                     BuiltinFunction::IntCompareTo => self.push(format!(
                         "\
@@ -185,16 +203,16 @@ impl<'h> Context<'h> {
                                                   : {a}->value == {b}->value ? Ordering_equal
                                                                              : Ordering_greater;
                         return result_pointer;",
-                        a = parameters[0].id,
-                        b = parameters[1].id,
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
                     )),
                     BuiltinFunction::IntSubtract => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
                         result_pointer->value = {a}->value - {b}->value;
                         return result_pointer;",
-                        a = parameters[0].id,
-                        b = parameters[1].id,
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
                     )),
                     BuiltinFunction::IntToText => self.push(format!(
                         "\
@@ -205,14 +223,14 @@ impl<'h> Context<'h> {
                         Text* result_pointer = malloc(sizeof(Text));
                         result_pointer->value = result;
                         return result_pointer;",
-                        int = parameters[0].id,
+                        int = function.parameters[0].id,
                     )),
                     BuiltinFunction::Panic => {
                         self.push(format!(
                             "\
                             fputs({}->value, stderr);
                             exit(1);",
-                            parameters[0].id,
+                            function.parameters[0].id,
                         ));
                     }
                     BuiltinFunction::Print => {
@@ -221,7 +239,7 @@ impl<'h> Context<'h> {
                             puts({}->value);
                             Nothing *_1 = malloc(sizeof(Nothing));
                             return _1;",
-                            parameters[0].id,
+                            function.parameters[0].id,
                         ));
                     }
                     BuiltinFunction::TextConcat => self.push(format!(
@@ -234,8 +252,8 @@ impl<'h> Context<'h> {
                         Text* result_pointer = malloc(sizeof(Text));
                         result_pointer->value = result;
                         return result_pointer;",
-                        a = parameters[0].id,
-                        b = parameters[1].id,
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
                     )),
                 }
             }
