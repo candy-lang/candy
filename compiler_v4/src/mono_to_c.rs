@@ -48,7 +48,6 @@ impl<'h> Context<'h> {
 
         self.push("/// Function Definitions\n\n");
         self.lower_function_definitions();
-        // TODO: init assignments in main in correct order
 
         self.push("int main() {\n");
         for name in self.mono.assignment_initialization_order.iter() {
