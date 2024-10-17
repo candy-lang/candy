@@ -424,6 +424,23 @@ impl Type {
             Self::Error => Self::Error,
         }
     }
+
+    #[must_use]
+    pub fn equals_lenient(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Error, _) | (_, Self::Error) => true,
+            (Self::Named(from), Self::Named(to)) => {
+                from.name == to.name
+                    && from
+                        .type_arguments
+                        .iter()
+                        .zip_eq(to.type_arguments.iter())
+                        .all(|(this, other)| this.equals_lenient(other))
+            }
+            (Self::Parameter(from), Self::Parameter(to)) => from == to,
+            _ => false,
+        }
+    }
 }
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

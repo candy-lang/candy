@@ -1116,23 +1116,6 @@ impl<'a> Context<'a> {
             .unwrap()
     }
 
-    fn is_assignable_to(from: &Type, to: &Type) -> bool {
-        match (from, to) {
-            (Type::Error, _) | (_, Type::Error) => true,
-            (Type::Named(from), Type::Named(to)) => {
-                from.name == to.name
-                    && from
-                        .type_arguments
-                        .iter()
-                        .zip_eq(to.type_arguments.iter())
-                        .all(|(from, to)| Self::is_assignable_to(from, to))
-            }
-            (Type::Parameter(from), Type::Parameter(to)) => from == to,
-            // TODO: Self type
-            _ => false,
-        }
-    }
-
     fn get_all_functions_matching_name(&mut self, name: &str) -> Vec<Id> {
         self.functions
             .iter()
@@ -1461,7 +1444,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         match self.lower_expression_raw(expression, context_type) {
             LoweredExpression::Expression { id, type_ } => {
                 if let Some(context_type) = context_type
-                    && !Context::is_assignable_to(&type_, context_type)
+                    && !type_.equals_lenient(context_type)
                 {
                     // TODO: report actual error location
                     self.context.add_error(
@@ -2641,7 +2624,7 @@ impl<'h> TypeSolver<'h> {
                 );
                 match self.substitutions.entry(parameter.clone()) {
                     Entry::Occupied(entry) => {
-                        if !Context::is_assignable_to(entry.get(), argument) {
+                        if !entry.get().equals_lenient(argument) {
                             return Err(format!("Type parameter {} gets resolved to different types: `{}` and `{argument}`", parameter.name,entry.get()).into_boxed_str());
                         }
                     }
