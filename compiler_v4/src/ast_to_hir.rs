@@ -2581,23 +2581,6 @@ impl<'h> TypeSolver<'h> {
         match (argument, parameter) {
             (Type::Error, _) | (_, Type::Error) => Ok(true),
             (_, Type::Parameter(parameter)) => {
-                if let Some(mapped) = self.substitutions.get(parameter) {
-                    if let Type::Parameter { .. } = mapped {
-                        panic!("Type parameters can't depend on each other.")
-                    }
-                    let mapped = mapped.clone();
-                    return self.unify(argument, &mapped);
-                }
-
-                assert!(
-                    parameter.is_self_type()
-                        || self
-                            .type_parameters
-                            .iter()
-                            .any(|it| it.name == parameter.name),
-                    "Unresolved type parameter: `{}`",
-                    parameter.name,
-                );
                 match self.substitutions.entry(parameter.clone()) {
                     Entry::Occupied(entry) => {
                         if !entry.get().equals_lenient(argument) {
