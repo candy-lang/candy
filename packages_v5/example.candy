@@ -23,6 +23,34 @@ trait Equal {
 trait Compare {
   fun compareTo(self: Self, other: Self) Ordering
 }
+fun isLessThan[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => true,
+    equal => false,
+    greater => false,
+  }
+}
+fun isLessThanOrEqualTo[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => true,
+    equal => true,
+    greater => false,
+  }
+}
+fun isGreaterThan[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => false,
+    equal => false,
+    greater => true,
+  }
+}
+fun isGreaterThanOrEqualTo[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => false,
+    equal => true,
+    greater => true,
+  }
+}
 enum Ordering { less, equal, greater }
 impl Ordering: ToText {
   fun toText(self: Ordering) Text {
