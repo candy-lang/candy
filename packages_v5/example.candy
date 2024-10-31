@@ -161,14 +161,6 @@ let valueWithoutExplicitType = 42
 # }
 # aDate.add(Duration(days: 1)) # is equivalent to `add(aDate, Duration(days: 1))`
 
-fun isLessThan(a: Int, b: Int) Bool {
-  switch a.compareTo(b) {
-    less => true,
-    equal => false,
-    greater => false,
-  }
-}
-
 # fun twar() Int {
 #  foo
 #     bar
