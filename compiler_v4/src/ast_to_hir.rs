@@ -1,9 +1,6 @@
 use crate::{
     ast::{
-        Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
-        AstExpressionKind, AstFunction, AstImpl, AstParameter, AstResult, AstStatement, AstString,
-        AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType, AstTypeArguments,
-        AstTypeParameter, AstTypeParameters,
+        Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression, AstExpressionKind, AstFunction, AstImpl, AstLambda, AstParameter, AstParameters, AstResult, AstStatement, AstString, AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType, AstTypeArguments, AstTypeParameter, AstTypeParameters
     },
     error::CompilerError,
     hir::{
@@ -1068,8 +1065,8 @@ impl<'a> Context<'a> {
             .cloned()
             .collect::<Box<_>>();
 
-        let parameters =
-            self.lower_parameters(&all_type_parameters, self_type, &function.parameters);
+        let parameters = function.parameters.value().map(|it| self.lower_parameters(&all_type_parameters, self_type, it))
+            .unwrap_or(Box::default());
         let return_type = function.return_type.as_ref().map_or_else(
             || NamedType::nothing().into(),
             |it| self.lower_type(&all_type_parameters, self_type, it),
@@ -1088,10 +1085,10 @@ impl<'a> Context<'a> {
         &mut self,
         type_parameters: &[TypeParameter],
         self_type: Option<&NamedType>,
-        parameters: &'a [AstParameter],
+        parameters: &'a AstParameters,
     ) -> Box<[Parameter]> {
         let mut parameter_names = FxHashSet::default();
-        parameters
+        parameters.parameters
             .iter()
             .filter_map(|parameter| try {
                 let name = parameter.name.value()?.clone();
@@ -1131,7 +1128,7 @@ impl<'a> Context<'a> {
                 }
 
                 if let Some(body) = function.ast.unwrap().body.as_ref() {
-                    builder.lower_statements(&body.body, Some(&function.return_type));
+                    builder.lower_statements(&body.statements, Some(&function.return_type));
                 } else {
                     builder.context.add_error(
                         function.ast.unwrap().display_span.clone(),
@@ -1709,6 +1706,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     LoweredExpression::EnumVariantReference { .. } => todo!(),
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
+            }
+            AstExpressionKind::Lambda(AstLambda { parameters, .. }) => { todo!()
             }
             AstExpressionKind::Body(AstBody { statements, .. }) => {
                 let (id, type_) = self.lower_statements(statements, context_type);

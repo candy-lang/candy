@@ -1,5 +1,5 @@
 use super::{
-    expression::{expression, statement},
+    expression::{body, expression},
     list::list_of,
     literal::{
         builtin_keyword, closing_bracket, closing_curly_brace, closing_parenthesis, colon, comma,
@@ -15,9 +15,7 @@ use super::{
     word::raw_identifier,
 };
 use crate::ast::{
-    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstFunctionBody,
-    AstImpl, AstParameter, AstString, AstStruct, AstStructField, AstStructKind, AstTrait,
-    AstTypeParameter, AstTypeParameters,
+    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstImpl, AstParameter, AstParameters, AstString, AstStruct, AstStructField, AstStructKind, AstTrait, AstTypeParameter, AstTypeParameters
 };
 use tracing::instrument;
 
@@ -331,34 +329,9 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
     let display_span = name.value().map_or(fun_keyword_span, |it| it.span.clone());
 
     let (parser, type_parameters) = type_parameters(parser).optional(parser);
-
-    let (mut parser, opening_parenthesis_error) = opening_parenthesis(parser)
-        .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This function is missing an opening parenthesis.");
-
-    let mut parameters: Vec<AstParameter> = vec![];
-    // TODO: error on duplicate parameter names
-    let mut parser_for_missing_comma_error: Option<Parser> = None;
-    while let Some((new_parser, variant, new_parser_for_missing_comma_error)) = parameter(parser) {
-        if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
-            parameters.last_mut().unwrap().comma_error = Some(
-                parser_for_missing_comma_error
-                    .error_at_current_offset("This function variant is missing a comma."),
-            );
-        }
-
-        parser = new_parser.and_trailing_whitespace();
-        parameters.push(variant);
-        parser_for_missing_comma_error = new_parser_for_missing_comma_error;
-    }
-
-    let (parser, closing_parenthesis_error) = closing_parenthesis(parser)
-        .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This function is missing a closing parenthesis.");
-
+    let (parser, parameters) = parameters(parser).unwrap_or_ast_error(parser, "Expected parameters");
     let (parser, return_type) = type_(parser).optional(parser).and_trailing_whitespace();
-
-    let (parser, body) = function_body(parser).optional(parser);
+    let (parser, body) = body(parser).optional(parser);
 
     Some((
         parser,
@@ -366,30 +339,38 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
             display_span,
             name,
             type_parameters,
-            opening_parenthesis_error,
             parameters,
-            closing_parenthesis_error,
             return_type,
             body,
         },
     ))
 }
 #[instrument(level = "trace")]
-fn function_body<'a>(parser: Parser) -> Option<(Parser, AstFunctionBody)> {
-    let parser = opening_curly_brace(parser)?.and_trailing_whitespace();
+pub fn parameters<'a>(parser: Parser) -> Option<(Parser, AstParameters)> {
+    let mut parser = opening_parenthesis(parser)?
+        .and_trailing_whitespace();
 
-    let (parser, body) = list_of(parser, statement);
+    let mut parameters: Vec<AstParameter> = vec![];
+    // TODO: error on duplicate parameter names
+    let mut parser_for_missing_comma_error: Option<Parser> = None;
+    while let Some((new_parser, parameter, new_parser_for_missing_comma_error)) = parameter(parser) {
+        if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
+            parameters.last_mut().unwrap().comma_error = Some(
+                parser_for_missing_comma_error
+                    .error_at_current_offset("This parameter is missing a comma."),
+            );
+        }
 
-    let (parser, closing_curly_brace_error) = closing_curly_brace(parser)
-        .unwrap_or_ast_error(parser, "This function is missing a closing curly brace.");
+        parser = new_parser.and_trailing_whitespace();
+        parameters.push(parameter);
+        parser_for_missing_comma_error = new_parser_for_missing_comma_error;
+    }
 
-    Some((
-        parser,
-        AstFunctionBody {
-            body,
-            closing_curly_brace_error,
-        },
-    ))
+    let (parser, closing_parenthesis_error) = closing_parenthesis(parser)
+        .and_trailing_whitespace()
+        .unwrap_or_ast_error(parser, "This parameter list is missing a closing parenthesis.");
+
+    Some((parser, AstParameters { parameters, closing_parenthesis_error }))
 }
 #[instrument(level = "trace")]
 fn parameter<'a>(parser: Parser) -> Option<(Parser, AstParameter, Option<Parser>)> {
@@ -397,11 +378,11 @@ fn parameter<'a>(parser: Parser) -> Option<(Parser, AstParameter, Option<Parser>
 
     let (parser, colon_error) = colon(parser)
         .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This struct field is missing a colon.");
+        .unwrap_or_ast_error(parser, "This parameter is missing a colon.");
 
     let (parser, type_) = type_(parser)
         .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This struct field is missing a type.");
+        .unwrap_or_ast_error(parser, "This parameter is missing a type.");
 
     let (parser, parser_for_missing_comma_error) =
         comma(parser).map_or((parser, Some(parser)), |parser| (parser, None));

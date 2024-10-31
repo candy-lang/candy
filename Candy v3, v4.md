@@ -205,7 +205,7 @@ fun map[T, R](list: List[T], f: Fun[T, R]) List[R] {}
 fun average[T: Number](list: List[T]) T {
   needs(!list.is_empty())
   # TODO: maybe implicit `it`
-  list.reduce(T.zero(), (a, b) { a + b })
+  # list.reduce(T.zero(), (a: T, b: T) { a + b })
 }
 
 trait Number {
