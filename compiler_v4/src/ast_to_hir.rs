@@ -2067,20 +2067,23 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             let mut matches = vec![];
             let mut mismatches = vec![];
             for (id, function, trait_, substitutions) in old_matches {
-                let Some(trait_) = trait_ else {
-                    // TODO: check whether type parameter substitutions are valid (upper bounds are fulfilled)
-                    matches.push((id, function, substitutions));
-                    continue;
-                };
+                let self_goal =
+                    substitutions
+                        .get(&ParameterType::self_type())
+                        .map(|self_type| {
+                            trait_.as_ref().unwrap().solver_goal.substitute_all(
+                                &FxHashMap::from_iter([(
+                                    SolverVariable::self_(),
+                                    self_type.clone().try_into().unwrap(),
+                                )]),
+                            )
+                        });
 
-                let self_goal = substitutions
-                    .get(&ParameterType::self_type())
-                    .map(|self_type| {
-                        trait_.solver_goal.substitute_all(&FxHashMap::from_iter([(
-                            SolverVariable::self_(),
-                            self_type.clone().try_into().unwrap(),
-                        )]))
-                    });
+                let type_parameter_subgoals = function
+                    .type_parameters
+                    .iter()
+                    .filter_map(|it| it.clone().try_into().ok())
+                    .collect_vec();
 
                 let solver_substitutions = substitutions
                     .iter()
@@ -2094,7 +2097,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
                 let used_rule = self_goal
                     .iter()
-                    .chain(trait_.solver_subgoals.iter())
+                    .chain(trait_.iter().flat_map(|it| it.solver_subgoals.iter()))
+                    .chain(type_parameter_subgoals.iter())
                     .map(|subgoal| {
                         let solution = self.context.environment.solve(
                             &subgoal.substitute_all(&solver_substitutions),
