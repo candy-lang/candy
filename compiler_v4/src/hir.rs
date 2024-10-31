@@ -216,7 +216,7 @@ impl Display for Trait {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TraitFunction {
     pub signature: FunctionSignature,
-    pub body: Option<BodyOrBuiltin>,
+    pub body: Option<Body>,
 }
 impl ToText for (&Id, &TraitFunction) {
     fn build_text(&self, builder: &mut TextBuilder) {
@@ -224,12 +224,7 @@ impl ToText for (&Id, &TraitFunction) {
         self.1.signature.build_text(builder);
         if let Some(body) = &self.1.body {
             builder.push(" ");
-            match body {
-                BodyOrBuiltin::Body(body) => body.build_text(builder),
-                BodyOrBuiltin::Builtin(builtin_function) => {
-                    builder.push(format!("= {builtin_function:?}"));
-                }
-            }
+            body.build_text(builder);
         }
     }
 }

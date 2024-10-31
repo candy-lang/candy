@@ -180,7 +180,10 @@ impl<'a> FunctionDeclaration<'a> {
 
     #[must_use]
     fn into_trait_function(mut self) -> TraitFunction {
-        let body = mem::take(&mut self.body);
+        let body = mem::take(&mut self.body).map(|it| match it {
+            BodyOrBuiltin::Body(body) => body,
+            BodyOrBuiltin::Builtin(_) => panic!("Trait functions may not be built-in"),
+        });
         TraitFunction {
             signature: self.into_function_signature(),
             body,
