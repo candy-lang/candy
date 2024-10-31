@@ -164,7 +164,13 @@ impl<'a> FunctionDeclaration<'a> {
             } else {
                 format!(
                     "[{}]",
-                    self.type_parameters.iter().map(|it| &it.name).join(", ")
+                    self.type_parameters
+                        .iter()
+                        .map(|it| it.upper_bound.as_ref().map_or_else(
+                            || it.name.to_string(),
+                            |upper_bound| format!("{}: {upper_bound}", it.name)
+                        ))
+                        .join(", ")
                 )
             },
             self.parameters
