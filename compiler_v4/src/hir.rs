@@ -67,21 +67,6 @@ pub struct Hir {
     pub functions: FxHashMap<Id, Function>,
     pub main_function_id: Id,
 }
-impl Hir {
-    pub fn get_function(&self, id: Id) -> (&FunctionSignature, Option<&BodyOrBuiltin>) {
-        self.functions
-            .get(&id)
-            .or_else(|| self.impls.iter().find_map(|it| it.functions.get(&id)))
-            .map(|it| (&it.signature, Some(&it.body)))
-            .or_else(|| {
-                self.traits
-                    .values()
-                    .find_map(|it| it.functions.get(&id))
-                    .map(|it| (&it.signature, it.body.as_ref()))
-            })
-            .unwrap()
-    }
-}
 impl ToText for Hir {
     fn build_text(&self, builder: &mut TextBuilder) {
         for (name, declaration) in self
