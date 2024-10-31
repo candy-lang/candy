@@ -34,6 +34,7 @@
             RUSTFLAGS = "-C link-arg=-fuse-ld=mold";
             buildInputs = [
               cargo-insta
+              gcc13
               hyperfine
               libffi
               libsForQt5.kcachegrind

@@ -1,0 +1,36 @@
+trait ToText {
+  fun toText(self: Self) Text
+}
+
+fun printToText[T: ToText](t: T) {
+  print(t.toText())
+}
+
+struct Nothing {}
+enum Never {}
+
+enum Bool { true, false }
+impl Bool: ToText {
+  fun toText(self: Bool) Text {
+    switch self {
+      true => "true",
+      false => "false",
+    }
+  }
+}
+
+enum Ordering { less, equal, greater }
+impl Ordering: ToText {
+  fun toText(self: Ordering) Text {
+    switch self {
+      less => "less",
+      equal => "equal",
+      greater => "greater",
+    }
+  }
+}
+
+fun main() Int {
+  printToText(Bool.true)
+  0
+}

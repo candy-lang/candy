@@ -5,6 +5,14 @@
       "path": "."
     },
     {
+      "name": "Compiler v4",
+      "path": "compiler_v4"
+    },
+    {
+      "name": "Packages v5",
+      "path": "packages_v5"
+    },
+    {
       "name": "Compiler: Frontend",
       "path": "compiler/frontend"
     },
@@ -74,6 +82,13 @@
     "rust-analyzer.check.command": "clippy",
     "rust-analyzer.imports.group.enable": false,
     "task.allowAutomaticTasks": "on",
-    "todo-tree.general.tags": ["FIXME", "PERF", "TODO"]
+    "todo-tree.general.tags": ["FIXME", "PERF", "TODO"],
+    "files.associations": {
+      "*.arb": "json",
+      "*.companionconfig": "json",
+      "*.tpp": "cpp",
+      "cstring": "c",
+      "locale": "c"
+    }
   }
 }

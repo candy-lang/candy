@@ -1,0 +1,215 @@
+struct Nothing {}
+enum Never {}
+
+# struct List[T] {}
+# impl[T: Equal] List[T]: Equal {
+#   # fun equals(self: Self, other: Self) Bool {}
+# }
+
+trait ToText {
+  fun toText(self: Self) Text
+}
+
+# Operators
+trait OperatorPlus[T] {
+  # TODO: add associated type for return type
+  fun plus(self: Self, other: T) Self
+}
+
+trait Equal {
+  fun equals(self: Self, other: Self) Bool
+}
+
+trait Compare {
+  fun compareTo(self: Self, other: Self) Ordering
+}
+fun isLessThan[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => true,
+    equal => false,
+    greater => false,
+  }
+}
+fun isLessThanOrEqualTo[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => true,
+    equal => true,
+    greater => false,
+  }
+}
+fun isGreaterThan[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => false,
+    equal => false,
+    greater => true,
+  }
+}
+fun isGreaterThanOrEqualTo[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => false,
+    equal => true,
+    greater => true,
+  }
+}
+enum Ordering { less, equal, greater }
+impl Ordering: ToText {
+  fun toText(self: Ordering) Text {
+    switch self {
+      less => "less",
+      equal => "equal",
+      greater => "greater",
+    }
+  }
+}
+# TODO: `impl[T: Compare] T: Equal {}`
+
+trait Add {
+  fun add(self: Self, other: Self) Self
+}
+trait Subtract {
+  fun subtract(self: Self, other: Self) Self
+}
+# TODO: `impl[T: Add] T: OperatorPlus[T] {}`, etc.
+
+struct Int = builtin
+impl Int: ToText {
+  fun toText(self: Int) Text {
+    self.builtinIntToText()
+  }
+}
+impl Int: Compare {
+  fun compareTo(self: Int, other: Int) Ordering {
+    self.builtinIntCompareTo(other)
+  }
+}
+impl Int: Add {
+  fun add(self: Int, other: Int) Int {
+    self.builtinIntAdd(other)
+  }
+}
+impl Int: Subtract {
+  fun subtract(self: Int, other: Int) Int {
+    self.builtinIntSubtract(other)
+  }
+}
+
+struct Text = builtin
+impl Text: ToText {
+  fun toText(self: Text) Text {
+    self
+  }
+}
+
+struct Array[T] = builtin
+fun arrayFilled[T](length: Int, item: T) Array[T] {
+  builtinArrayFilled(length, item)
+}
+fun length[T](array: Array[T]) Int {
+  builtinArrayLength(array)
+}
+
+fun print[T: ToText](t: T) {
+  builtinPrint(t.toText())
+}
+
+struct MyStruct {
+  name: Text,
+  color: Int,
+}
+
+enum Bool { true, false }
+let true: Bool = Bool.true
+let false: Bool = Bool.false
+impl Bool: ToText {
+  fun toText(self: Bool) Text {
+    switch self {
+      true => "true",
+      false => "false",
+    }
+  }
+}
+
+enum MyEnum {
+  foo: Int,
+  bar,
+}
+
+# function type: `Fun[Int, Text, Int]`, later `Fun (Int, Text) Int`
+
+# Expressions
+let intExpression: Int = 42
+let textExpression: Text = "Hello, World!"
+# let textExpressionWithInterpolation = "The answer is {intExpression}!"
+let identifierExpression: Int = intExpression
+# let parenthesizedExpression = (intExpression)
+let structExpression: MyStruct = MyStruct("Banana", 12345)
+# let lambdaExpression = (x: Int) { x }
+
+# Assignments
+let valueWithExplicitType: Int = 42
+let valueWithoutExplicitType = 42
+
+# Uniform Function Call Syntax
+# Functions can also be overloaded
+# fun add(aDate: Date, duration: Duration) Self {
+#   needs(days.isNonNegative())
+#   Date(
+#     aDate.year,
+#     aDate.month,
+#     aDate.day.add(duration.days),
+#   )
+# }
+# aDate.add(Duration(days: 1)) # is equivalent to `add(aDate, Duration(days: 1))`
+
+fun isLessThan(a: Int, b: Int) Bool {
+  switch a.compareTo(b) {
+    less => true,
+    equal => false,
+    greater => false,
+  }
+}
+
+# fun twar() Int {
+#  foo
+#     bar
+#       fds
+#  % True: foo
+#      fff
+#    False: blub
+#}
+
+fun fibonacci(n: Int) Int {
+  switch isLessThan(n, 2) {
+    true => n,
+    false => fibonacci(n.subtract(1)).add(fibonacci(n.subtract(2))),
+  }
+}
+
+fun identity[T](t: T) T {
+  t
+}
+
+fun main() Int {
+  identity(1)
+  identity("foo")
+#  # (x: Int) { x }
+#
+#  let helloWorld = "Hello, World!"
+#  printHello("World")
+#
+#  # let theAnswer = 40.add(2)
+#  let theAnswer = 42
+#  let theAnswerText = "42"
+#  print("The answer is {theAnswerText}!")
+#
+#  theAnswer
+  print("fibonacci(20) = {fibonacci(20).toText()}")
+  print(Ordering.less)
+  print(true)
+  print(false)
+  0
+}
+
+# calculator
+# 2048
+# sudoku
