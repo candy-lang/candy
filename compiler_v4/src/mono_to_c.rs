@@ -30,6 +30,10 @@ impl<'h> Context<'h> {
         self.push("#include <stdlib.h>\n");
         self.push("#include <string.h>\n\n");
 
+        self.push("/// Type Forward Declarations\n\n");
+        self.lower_type_forward_declarations();
+        self.push("\n");
+
         self.push("/// Type Declarations\n\n");
         self.lower_type_declarations();
         self.push("\n");
@@ -59,6 +63,11 @@ impl<'h> Context<'h> {
         ));
     }
 
+    fn lower_type_forward_declarations(&mut self) {
+        for name in self.mono.type_declarations.keys() {
+            self.push(format!("typedef struct {name} {name};\n"));
+        }
+    }
     fn lower_type_declarations(&mut self) {
         for (name, declaration) in &self.mono.type_declarations {
             self.push(format!("struct {name} {{\n"));
@@ -109,7 +118,6 @@ impl<'h> Context<'h> {
                     self.push("} value;\n};\n");
                 }
             }
-            self.push(format!("typedef struct {name} {name};\n"));
         }
     }
 
