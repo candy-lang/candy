@@ -2026,13 +2026,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             }
         };
 
-        let struct_type = Type::Named(NamedType::new(
+        let struct_type = NamedType::new(
             type_,
             type_parameters
                 .iter()
                 .map(|it| substitutions[&it.type_()].clone())
                 .collect_vec(),
-        ));
+        );
         self.push_lowered(
             None,
             ExpressionKind::CreateStruct {
@@ -2228,7 +2228,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         self.push(
             None,
             ExpressionKind::CreateStruct {
-                struct_: Type::nothing(),
+                struct_: NamedType::nothing(),
                 fields: [].into(),
             },
             Type::nothing(),

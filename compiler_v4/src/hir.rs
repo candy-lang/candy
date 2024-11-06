@@ -561,7 +561,7 @@ impl Expression {
     pub fn nothing() -> Self {
         Self {
             kind: ExpressionKind::CreateStruct {
-                struct_: Type::nothing(),
+                struct_: NamedType::nothing(),
                 fields: [].into(),
             },
             type_: Type::nothing(),
@@ -574,7 +574,7 @@ pub enum ExpressionKind {
     Int(i64),
     Text(Box<str>),
     CreateStruct {
-        struct_: Type,
+        struct_: NamedType,
         fields: Box<[Id]>,
     },
     StructAccess {
