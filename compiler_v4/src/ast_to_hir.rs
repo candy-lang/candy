@@ -2,8 +2,8 @@ use crate::{
     ast::{
         Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
         AstExpressionKind, AstFunction, AstImpl, AstParameter, AstResult, AstStatement, AstString,
-        AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType, AstTypeArguments,
-        AstTypeParameter, AstTypeParameters,
+        AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType, AstTypeParameter,
+        AstTypeParameters,
     },
     error::CompilerError,
     hir::{
@@ -450,12 +450,13 @@ impl<'a> Context<'a> {
 
         for trait_name in self.traits.keys().cloned().collect_vec() {
             let trait_ = &self.traits[&trait_name];
+            let type_parameters = trait_.type_parameters.clone();
             let self_type = NamedType {
                 name: trait_name.clone(),
-                type_arguments: trait_.type_parameters.type_(),
+                type_arguments: type_parameters.type_(),
             };
             for (id, mut function) in trait_.functions.clone() {
-                self.lower_function(Some(&self_type), &mut function, true);
+                self.lower_function(Some(&self_type), &type_parameters, &mut function, true);
                 self.traits
                     .get_mut(&trait_name)
                     .unwrap()
@@ -466,9 +467,10 @@ impl<'a> Context<'a> {
         }
         for index in 0..self.impls.len() {
             let impl_ = &self.impls[index];
+            let type_parameters = impl_.type_parameters.clone();
             let self_type = impl_.self_type.clone();
             for (id, mut function) in impl_.functions.clone() {
-                self.lower_function(Some(&self_type), &mut function, false);
+                self.lower_function(Some(&self_type), &type_parameters, &mut function, false);
                 self.impls[index].functions.insert(id, function).unwrap();
             }
         }
@@ -477,7 +479,7 @@ impl<'a> Context<'a> {
         }
         for id in functions_to_lower {
             let mut function = self.functions.get(&id).unwrap().clone();
-            self.lower_function(None, &mut function, false);
+            self.lower_function(None, &[], &mut function, false);
             self.functions.insert(id, function).unwrap();
         }
     }
@@ -1152,6 +1154,7 @@ impl<'a> Context<'a> {
     fn lower_function(
         &mut self,
         self_type: Option<&NamedType>,
+        outer_type_parameters: &[TypeParameter],
         function: &mut FunctionDeclaration<'a>,
         body_is_optional: bool,
     ) {
@@ -1161,7 +1164,11 @@ impl<'a> Context<'a> {
 
         let (hir_body, _) = BodyBuilder::build(
             self,
-            &function.signature.type_parameters,
+            &outer_type_parameters
+                .iter()
+                .cloned()
+                .chain(function.signature.type_parameters.iter().cloned())
+                .collect_vec(),
             self_type,
             |builder| {
                 for parameter in function.signature.parameters.iter() {
