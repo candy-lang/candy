@@ -3,19 +3,7 @@ enum Never {}
 struct Int = builtin
 struct Text = builtin
 
-trait ToText {
-  fun toText(self: Self) Text
-}
-impl Int: ToText {
-  fun toText(self: Int) Text {
-    builtinIntToText(self)
-  }
-}
-fun print[T: ToText](t: T) {
-  builtinPrint(t.toText())
-}
-
 fun main() Int {
-  print(42)
+  builtinPrint(42.builtinIntToText())
   0
 }
