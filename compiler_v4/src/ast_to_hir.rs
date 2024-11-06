@@ -1408,54 +1408,22 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     });
             }
             AstExpressionKind::Call(call) => {
-                fn lower_arguments(
-                    builder: &mut BodyBuilder,
-                    call: &AstCall,
-                    fallback_span: Range<Offset>,
-                    arguments: &AstResult<AstArguments>,
-                    parameter_types: Option<&[Type]>,
-                ) -> Option<Box<[(Id, Type)]>> {
-                    let arguments = arguments
-                        .arguments_or_default()
+                let type_arguments = call.type_arguments.as_ref().map(|it| {
+                    it.arguments
                         .iter()
-                        .enumerate()
-                        .map(|(index, argument)| {
-                            builder.lower_expression(
-                                &argument.value,
-                                parameter_types.and_then(|it| it.get(index)),
-                            )
+                        .map(|it| {
+                            self.context
+                                .lower_type(self.type_parameters, self.self_type, &it.type_)
                         })
-                        .collect::<Box<_>>();
-                    if let Some(parameter_types) = parameter_types
-                        && arguments.len() != parameter_types.len()
-                    {
-                        builder.context.add_error(
-                            if arguments.len() < parameter_types.len() {
-                                call.arguments
-                                    .value()
-                                    .map_or(fallback_span, |it| it.opening_parenthesis_span.clone())
-                            } else {
-                                let arguments = &call.arguments.value().unwrap().arguments;
-                                arguments[parameter_types.len()].span.start
-                                    ..arguments.last().unwrap().span.end
-                            },
-                            format!(
-                                "Expected {} argument(s), got {}.",
-                                parameter_types.len(),
-                                arguments.len(),
-                            ),
-                        );
-                        return None;
-                    }
-                    Some(arguments)
-                }
-
+                        .collect_vec()
+                });
                 match &call.receiver.kind {
                     AstExpressionKind::Navigation(navigation)
                         if let Some(key) = navigation.key.value() =>
                     {
+                        // bar.foo(baz)
                         let receiver = self.lower_expression(&navigation.receiver, None);
-                        let arguments = lower_arguments(
+                        let arguments = Self::lower_arguments(
                             self,
                             call,
                             expression.span.clone(),
@@ -1466,7 +1434,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         let arguments = iter::once(receiver)
                             .chain(arguments.into_vec())
                             .collect_vec();
-                        return self.lower_call(key, call.type_arguments.as_ref(), &arguments);
+                        self.lower_call(key, type_arguments.as_deref(), &arguments)
                     }
                     AstExpressionKind::Identifier(identifier) => {
                         let Some(identifier) = identifier.identifier.value() else {
@@ -1474,7 +1442,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         };
 
                         if identifier.string.chars().next().unwrap().is_lowercase() {
-                            let arguments = lower_arguments(
+                            // foo(bar, baz)
+                            let arguments = Self::lower_arguments(
                                 self,
                                 call,
                                 expression.span.clone(),
@@ -1484,7 +1453,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             .unwrap();
                             return self.lower_call(
                                 identifier,
-                                call.type_arguments.as_ref(),
+                                type_arguments.as_deref(),
                                 &arguments,
                             );
                         }
@@ -1492,69 +1461,24 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         match self.lower_identifier(identifier) {
                             LoweredExpression::Expression { .. } => todo!("support lambdas"),
                             LoweredExpression::NamedTypeReference(type_) => {
-                                match self.context.hir.type_declarations.get(&type_) {
-                                    Some(TypeDeclaration {
-                                        type_parameters,
-                                        kind: TypeDeclarationKind::Struct { fields },
-                                    }) => {
-                                        if !type_parameters.is_empty() {
-                                            todo!("Use type solver");
-                                        }
-
-                                        let Some(fields) = fields else {
-                                            self.context.add_error(
-                                                call.receiver.span.clone(),
-                                                format!("Can't instantiate builtin type {type_} directly"),
-                                            );
-                                            return LoweredExpression::Error;
-                                        };
-
-                                        let fields = lower_arguments(
-                                            self,
-                                            call,
+                                let type_declaration =
+                                    self.context.hir.type_declarations[&type_].clone();
+                                match &type_declaration.kind {
+                                    TypeDeclarationKind::Struct { fields } => {
+                                        // Foo(bar, baz)
+                                        self.lower_struct_creation(
                                             expression.span.clone(),
-                                            &call.arguments,
-                                            Some(
-                                                &fields
-                                                    .iter()
-                                                    .map(|(_, type_)| type_.clone())
-                                                    .collect_vec(),
-                                            ),
-                                        );
-                                        let type_ = Type::Named(NamedType {
-                                            name: type_.clone(),
-                                            type_arguments: Box::default(),
-                                        });
-                                        fields.map_or(LoweredExpression::Error, |fields| {
-                                            self.push_lowered(
-                                                None,
-                                                ExpressionKind::CreateStruct {
-                                                    struct_: type_.clone(),
-                                                    fields: fields
-                                                        .iter()
-                                                        .map(|(id, _)| *id)
-                                                        .collect(),
-                                                },
-                                                type_,
-                                            )
-                                        })
+                                            call,
+                                            type_arguments.as_deref(),
+                                            &type_,
+                                            &type_declaration.type_parameters,
+                                            fields,
+                                        )
                                     }
-                                    Some(TypeDeclaration {
-                                        kind: TypeDeclarationKind::Enum { .. },
-                                        ..
-                                    }) => {
+                                    TypeDeclarationKind::Enum { .. } => {
                                         self.context.add_error(
                                             call.receiver.span.clone(),
                                             "Enum variant is missing.",
-                                        );
-                                        LoweredExpression::Error
-                                    }
-                                    None => {
-                                        self.context.add_error(
-                                            call.receiver.span.clone(),
-                                            format!(
-                                                "Can't instantiate builtin type {type_} directly."
-                                            ),
                                         );
                                         LoweredExpression::Error
                                     }
@@ -1597,7 +1521,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         &enum_named_type.type_arguments,
                                     ));
                                 let parameter_types = [variant_type];
-                                let arguments = lower_arguments(
+                                let arguments = Self::lower_arguments(
                                     self,
                                     call,
                                     expression.span.clone(),
@@ -1920,22 +1844,9 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     fn lower_call(
         &mut self,
         name: &AstString,
-        type_arguments: Option<&AstTypeArguments>,
+        type_arguments: Option<&[Type]>,
         arguments: &[(Id, Type)],
     ) -> LoweredExpression {
-        let type_arguments = type_arguments.map(|it| {
-            (
-                it.arguments
-                    .iter()
-                    .map(|it| {
-                        self.context
-                            .lower_type(self.type_parameters, self.self_type, &it.type_)
-                    })
-                    .collect::<Box<_>>(),
-                it.span.clone(),
-            )
-        });
-
         // TODO(lambdas): resolve local identifiers as well if not calling using instance syntax
         let matches = self
             .context
@@ -1967,8 +1878,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     trait_
                         .as_ref()
                         .map(|it| (&it.solver_goal, it.solver_subgoals.as_ref())),
-                    &function.signature,
-                    type_arguments.as_ref().map(|(box it, _)| it),
+                    &function.signature.type_parameters,
+                    &function
+                        .signature
+                        .parameters
+                        .iter()
+                        .map(|it| it.type_.clone())
+                        .collect::<Box<_>>(),
+                    type_arguments,
                     &argument_types,
                 );
                 match result {
@@ -2041,33 +1958,150 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             return_type,
         )
     }
+    fn lower_struct_creation(
+        &mut self,
+        span: Range<Offset>,
+        call: &AstCall,
+        type_arguments: Option<&[Type]>,
+        type_: &str,
+        type_parameters: &[TypeParameter],
+        fields: &Option<Box<[(Box<str>, Type)]>>,
+    ) -> LoweredExpression {
+        let Some(fields) = fields else {
+            self.context.add_error(
+                call.receiver.span.clone(),
+                format!("Can't instantiate builtin type {type_} directly"),
+            );
+            return LoweredExpression::Error;
+        };
+
+        let arguments =
+            Self::lower_arguments(self, call, span.clone(), &call.arguments, None).unwrap();
+
+        // TODO(lambdas): resolve local identifiers as well if not calling using instance syntax
+        let result = self.match_signature(
+            None,
+            type_parameters,
+            &fields
+                .iter()
+                .map(|(_, type_)| type_.clone())
+                .collect::<Box<_>>(),
+            type_arguments,
+            &arguments
+                .iter()
+                .map(|(_, type_)| type_.clone())
+                .collect::<Box<_>>(),
+        );
+        let substitutions = match result {
+            Ok(substitutions) => substitutions,
+            Err(error) => {
+                self.context.add_error(
+                    span,
+                    format!(
+                        "Invalid struct creation: {}",
+                        match error {
+                            CallLikeLoweringError::TypeArgumentCount =>
+                                "Wrong number of type arguments".to_string(),
+                            CallLikeLoweringError::ArgumentCount =>
+                                "Wrong number of fields".to_string(),
+                            CallLikeLoweringError::Unification(Some(error)) => error.into_string(),
+                            CallLikeLoweringError::Unification(None) =>
+                                "Mismatching types".to_string(),
+                            CallLikeLoweringError::FunctionReachableViaMultipleImpls =>
+                                unreachable!(),
+                            // TODO: more specific error message
+                            CallLikeLoweringError::TypeArgumentMismatch =>
+                                "Type arguments are not assignable".to_string(),
+                        },
+                    ),
+                );
+                return LoweredExpression::Error;
+            }
+        };
+
+        let struct_type = Type::Named(NamedType::new(
+            type_,
+            type_parameters
+                .iter()
+                .map(|it| substitutions[&it.type_()].clone())
+                .collect_vec(),
+        ));
+        self.push_lowered(
+            None,
+            ExpressionKind::CreateStruct {
+                struct_: struct_type.clone(),
+                fields: arguments.iter().map(|(id, _)| *id).collect(),
+            },
+            struct_type,
+        )
+    }
+    fn lower_arguments(
+        builder: &mut BodyBuilder,
+        call: &AstCall,
+        fallback_span: Range<Offset>,
+        arguments: &AstResult<AstArguments>,
+        parameter_types: Option<&[Type]>,
+    ) -> Option<Box<[(Id, Type)]>> {
+        let arguments = arguments
+            .arguments_or_default()
+            .iter()
+            .enumerate()
+            .map(|(index, argument)| {
+                builder.lower_expression(
+                    &argument.value,
+                    parameter_types.and_then(|it| it.get(index)),
+                )
+            })
+            .collect::<Box<_>>();
+        if let Some(parameter_types) = parameter_types
+            && arguments.len() != parameter_types.len()
+        {
+            builder.context.add_error(
+                if arguments.len() < parameter_types.len() {
+                    call.arguments
+                        .value()
+                        .map_or(fallback_span, |it| it.opening_parenthesis_span.clone())
+                } else {
+                    let arguments = &call.arguments.value().unwrap().arguments;
+                    arguments[parameter_types.len()].span.start..arguments.last().unwrap().span.end
+                },
+                format!(
+                    "Expected {} argument(s), got {}.",
+                    parameter_types.len(),
+                    arguments.len(),
+                ),
+            );
+            return None;
+        }
+        Some(arguments)
+    }
     fn match_signature(
         &mut self,
         trait_goal_and_subgoals: Option<(&SolverGoal, &[SolverGoal])>,
-        signature: &Signature,
+        type_parameters: &[TypeParameter],
+        parameter_types: &[Type],
         type_arguments: Option<&[Type]>,
         argument_types: &[Type],
     ) -> Result<FxHashMap<ParameterType, Type>, CallLikeLoweringError> {
         // Check type argument count
         if let Some(type_arguments) = type_arguments
-            && type_arguments.len() != signature.type_parameters.len()
+            && type_arguments.len() != type_parameters.len()
         {
             return Err(CallLikeLoweringError::TypeArgumentCount);
         }
 
         // Check argument count
-        if argument_types.len() != signature.parameters.len() {
+        if argument_types.len() != parameter_types.len() {
             return Err(CallLikeLoweringError::ArgumentCount);
         }
 
         // Check argument types
         let substitutions = {
-            let mut unifier = TypeUnifier::new(&signature.type_parameters);
+            let mut unifier = TypeUnifier::new(type_parameters);
             // Type arguments
             if let Some(type_arguments) = type_arguments {
-                for (type_argument, type_parameter) in type_arguments
-                    .iter()
-                    .zip_eq(signature.type_parameters.iter())
+                for (type_argument, type_parameter) in
+                    type_arguments.iter().zip_eq(type_parameters.iter())
                 {
                     match unifier.unify(type_argument, &type_parameter.type_().into()) {
                         Ok(true) => {}
@@ -2080,10 +2114,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             }
 
             // Arguments
-            for (argument_type, parameter) in
-                argument_types.iter().zip_eq(signature.parameters.iter())
+            for (argument_type, parameter_type) in
+                argument_types.iter().zip_eq(parameter_types.iter())
             {
-                match unifier.unify(argument_type, &parameter.type_) {
+                match unifier.unify(argument_type, parameter_type) {
                     Ok(true) => {}
                     Ok(false) => return Err(CallLikeLoweringError::Unification(None)),
                     Err(reason) => return Err(CallLikeLoweringError::Unification(Some(reason))),
@@ -2110,8 +2144,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         )]))
                 });
 
-            let type_parameter_subgoals = signature
-                .type_parameters
+            let type_parameter_subgoals = type_parameters
                 .iter()
                 .filter_map(|it| it.clone().try_into().ok())
                 .collect_vec();
