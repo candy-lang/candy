@@ -1,9 +1,9 @@
 use crate::{
     ast::{
         Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
-        AstExpressionKind, AstFunction, AstImpl, AstLambda, AstParameter, AstParameters, AstResult,
-        AstStatement, AstString, AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait,
-        AstType, AstTypeParameter, AstTypeParameters,
+        AstExpressionKind, AstFunction, AstImpl, AstLambda, AstParameters, AstResult, AstStatement,
+        AstString, AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType,
+        AstTypeParameter, AstTypeParameters,
     },
     error::CompilerError,
     hir::{
@@ -1107,7 +1107,7 @@ impl<'a> Context<'a> {
             .parameters
             .value()
             .map(|it| self.lower_parameters(&all_type_parameters, self_type, it))
-            .unwrap_or(Box::default());
+            .unwrap_or_default();
         let return_type = function.return_type.as_ref().map_or_else(
             || NamedType::nothing().into(),
             |it| self.lower_type(&all_type_parameters, self_type, it),
@@ -1685,7 +1685,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
             }
-            AstExpressionKind::Lambda(AstLambda { parameters, .. }) => {
+            AstExpressionKind::Lambda(AstLambda { .. }) => {
                 todo!()
             }
             AstExpressionKind::Body(AstBody { statements, .. }) => {
