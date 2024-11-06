@@ -1,5 +1,5 @@
 use super::{
-    declarations::assignment,
+    declarations::{assignment, parameters},
     list::list_of,
     literal::{
         arrow, closing_curly_brace, closing_parenthesis, comma, dot, opening_curly_brace,
@@ -15,9 +15,7 @@ use super::{
     word::{raw_identifier, word},
 };
 use crate::ast::{
-    AstArgument, AstArguments, AstBody, AstCall, AstError, AstExpression, AstExpressionKind,
-    AstIdentifier, AstInt, AstNavigation, AstParenthesized, AstResult, AstStatement, AstSwitch,
-    AstSwitchCase,
+    AstArgument, AstArguments, AstBody, AstCall, AstError, AstExpression, AstExpressionKind, AstIdentifier, AstInt, AstLambda, AstNavigation, AstParenthesized, AstResult, AstStatement, AstSwitch, AstSwitchCase
 };
 use replace_with::replace_with_or_abort;
 use tracing::instrument;
@@ -38,6 +36,7 @@ pub fn expression(parser: Parser) -> Option<(Parser, AstExpression)> {
         })
         .or_else(|| int(parser).map(|(parser, it)| (parser, AstExpressionKind::Int(it))))
         .or_else(|| text(parser).map(|(parser, it)| (parser, AstExpressionKind::Text(it))))
+        .or_else(|| lambda(parser).map(|(parser, it)| (parser, AstExpressionKind::Lambda(it))))
         .or_else(|| {
             parenthesized(parser).map(|(parser, it)| (parser, AstExpressionKind::Parenthesized(it)))
         })
@@ -111,7 +110,21 @@ fn parenthesized<'a>(parser: Parser) -> Option<(Parser, AstParenthesized)> {
     ))
 }
 #[instrument(level = "trace")]
-fn body<'a>(parser: Parser) -> Option<(Parser, AstBody)> {
+fn lambda<'a>(parser: Parser) -> Option<(Parser, AstLambda)> {
+    let (parser, parameters) = parameters(parser)?
+        .and_trailing_whitespace();
+    let (parser, body) = body(parser)?;
+
+    Some((
+        parser,
+        AstLambda {
+            parameters,
+            body,
+        },
+    ))
+}
+#[instrument(level = "trace")]
+pub fn body<'a>(parser: Parser) -> Option<(Parser, AstBody)> {
     let parser = opening_curly_brace(parser)?.and_trailing_whitespace();
 
     let (parser, statements) = list_of(parser, statement);

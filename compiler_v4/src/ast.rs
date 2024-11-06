@@ -142,16 +142,14 @@ pub struct AstFunction {
     pub display_span: Range<Offset>,
     pub name: AstResult<AstString>,
     pub type_parameters: Option<AstTypeParameters>,
-    pub opening_parenthesis_error: Option<AstError>,
-    pub parameters: Vec<AstParameter>,
-    pub closing_parenthesis_error: Option<AstError>,
+    pub parameters: AstResult<AstParameters>,
     pub return_type: Option<AstType>,
-    pub body: Option<AstFunctionBody>,
+    pub body: Option<AstBody>,
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct AstFunctionBody {
-    pub body: Vec<AstStatement>,
-    pub closing_curly_brace_error: Option<AstError>,
+pub struct AstParameters {
+    pub parameters: Vec<AstParameter>,
+    pub closing_parenthesis_error: Option<AstError>,
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstParameter {
@@ -211,7 +209,7 @@ pub enum AstExpressionKind {
     Parenthesized(AstParenthesized),
     Call(AstCall),
     Navigation(AstNavigation),
-    // Lambda(AstLambda),
+    Lambda(AstLambda),
     Body(AstBody),
     Switch(AstSwitch),
 }
@@ -278,12 +276,11 @@ pub struct AstNavigation {
     pub key: AstResult<AstString>,
 }
 
-// #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-// pub struct AstLambda {
-//     pub parameters: Vec<AstParameter>,
-//     pub body: Vec<AstStatement>,
-//     pub closing_curly_brace_error: Option<AstError>,
-// }
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstLambda {
+    pub parameters: AstParameters,
+    pub body: AstBody,
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstBody {
@@ -463,17 +460,15 @@ impl CollectAstErrors for AstFunction {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.name.collect_errors_to(errors);
         self.type_parameters.collect_errors_to(errors);
-        self.opening_parenthesis_error.collect_errors_to(errors);
         self.parameters.collect_errors_to(errors);
-        self.closing_parenthesis_error.collect_errors_to(errors);
         self.return_type.collect_errors_to(errors);
         self.body.collect_errors_to(errors);
     }
 }
-impl CollectAstErrors for AstFunctionBody {
+impl CollectAstErrors for AstParameters {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
-        self.body.collect_errors_to(errors);
-        self.closing_curly_brace_error.collect_errors_to(errors);
+        self.parameters.collect_errors_to(errors);
+        self.closing_parenthesis_error.collect_errors_to(errors);
     }
 }
 impl CollectAstErrors for AstParameter {
@@ -533,6 +528,7 @@ impl CollectAstErrors for AstExpressionKind {
             Self::Parenthesized(parenthesized) => parenthesized.collect_errors_to(errors),
             Self::Call(call) => call.collect_errors_to(errors),
             Self::Navigation(navigation) => navigation.collect_errors_to(errors),
+            Self::Lambda(lambda) => lambda.collect_errors_to(errors),
             Self::Body(body) => body.collect_errors_to(errors),
             Self::Switch(switch) => switch.collect_errors_to(errors),
         }
@@ -598,6 +594,12 @@ impl CollectAstErrors for AstNavigation {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.receiver.collect_errors_to(errors);
         self.key.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstLambda {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.parameters.collect_errors_to(errors);
+        self.body.collect_errors_to(errors);
     }
 }
 impl CollectAstErrors for AstBody {

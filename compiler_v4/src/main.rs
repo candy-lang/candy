@@ -23,7 +23,7 @@ extern crate self as candy_compiler_v4;
 
 use ast::CollectAstErrors;
 use ast_to_hir::ast_to_hir;
-use clap::{Parser, ValueHint};
+use clap::{arg, Parser, Subcommand, ValueHint};
 use error::CompilerError;
 use hir::Hir;
 use hir_to_mono::hir_to_mono;
@@ -57,6 +57,8 @@ mod utils;
 #[derive(Parser, Debug)]
 #[command(name = "candy", about = "The 🍭 Candy CLI.")]
 enum CandyOptions {
+    #[command(subcommand)]
+    Debug(DebugOptions),
     Check(CheckOptions),
     Compile(CompileOptions),
 }
@@ -67,6 +69,7 @@ fn main() -> ProgramResult {
     init_logger();
 
     match options {
+        CandyOptions::Debug(options) => debug(options),
         CandyOptions::Check(options) => check(options),
         CandyOptions::Compile(options) => compile(options),
     }
@@ -76,6 +79,53 @@ pub type ProgramResult = Result<(), Exit>;
 pub enum Exit {
     FileNotFound,
     CodeContainsErrors,
+}
+
+#[derive(Subcommand, Debug)]
+enum DebugOptions {
+    Ast(DebugStageOptions),
+    Hir(DebugStageOptions),
+    Mono(DebugStageOptions),
+}
+#[derive(Parser, Debug)]
+struct DebugStageOptions {
+    #[arg(value_hint = ValueHint::FilePath)]
+    path: PathBuf,
+}
+
+#[allow(clippy::needless_pass_by_value)]
+fn debug(options: DebugOptions) -> ProgramResult {
+    match options {
+        DebugOptions::Ast(options) => {
+            let source = fs::read_to_string(&options.path).unwrap();
+            let ast = string_to_ast::string_to_ast(&options.path, &source);
+            println!("{ast:#?}");
+        },
+        DebugOptions::Hir(options) => {
+            let source = fs::read_to_string(&options.path).unwrap();
+            let (hir, errors) = compile_hir(&options.path, &source);
+            if !errors.is_empty() {
+                for error in errors {
+                    error!("{}", error.to_string_with_location(&source));
+                }
+                return Err(Exit::CodeContainsErrors);
+            }
+            println!("{}", hir.to_text(true));
+        },
+        DebugOptions::Mono(options) => {
+            let source = fs::read_to_string(&options.path).unwrap();
+            let (hir, errors) = compile_hir(&options.path, &source);
+            if !errors.is_empty() {
+                for error in errors {
+                    error!("{}", error.to_string_with_location(&source));
+                }
+                return Err(Exit::CodeContainsErrors);
+            }
+            let mono = hir_to_mono(&hir);
+            println!("{mono:?}");
+        },
+    }
+    Ok(())
 }
 
 #[derive(Parser, Debug)]
@@ -106,9 +156,6 @@ fn check(options: CheckOptions) -> ProgramResult {
 
 #[derive(Parser, Debug)]
 struct CompileOptions {
-    #[arg(long)]
-    debug_print_hir: bool,
-
     /// The file or package to compile to C.
     #[arg(value_hint = ValueHint::FilePath)]
     path: PathBuf,
@@ -120,10 +167,6 @@ fn compile(options: CompileOptions) -> ProgramResult {
 
     let started_at = Instant::now();
     let (hir, errors) = compile_hir(&options.path, &source);
-
-    if options.debug_print_hir {
-        println!("Hir:\n{}", hir.to_text(true));
-    }
 
     if !errors.is_empty() {
         for error in errors {
