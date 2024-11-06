@@ -2138,60 +2138,56 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         };
 
         // Solve traits
-        {
-            let self_goal = substitutions
-                .get(&ParameterType::self_type())
-                .map(|self_type| {
-                    trait_goal_and_subgoals
-                        .unwrap()
-                        .0
-                        .substitute_all(&FxHashMap::from_iter([(
-                            SolverVariable::self_(),
-                            self_type.clone().try_into().unwrap(),
-                        )]))
-                });
+        let self_goal = substitutions
+            .get(&ParameterType::self_type())
+            .map(|self_type| {
+                trait_goal_and_subgoals
+                    .unwrap()
+                    .0
+                    .substitute_all(&FxHashMap::from_iter([(
+                        SolverVariable::self_(),
+                        self_type.clone().try_into().unwrap(),
+                    )]))
+            });
 
-            let type_parameter_subgoals = type_parameters
-                .iter()
-                .filter_map(|it| it.clone().try_into().ok())
-                .collect_vec();
+        let type_parameter_subgoals = type_parameters
+            .iter()
+            .filter_map(|it| it.clone().try_into().ok())
+            .collect_vec();
 
-            let solver_substitutions = substitutions
-                .iter()
-                .filter_map(|(parameter_type, type_)| try {
-                    (
-                        SolverVariable::new(parameter_type.clone()),
-                        type_.clone().try_into().ok()?,
-                    )
-                })
-                .collect();
+        let solver_substitutions = substitutions
+            .iter()
+            .filter_map(|(parameter_type, type_)| try {
+                (
+                    SolverVariable::new(parameter_type.clone()),
+                    type_.clone().try_into().ok()?,
+                )
+            })
+            .collect();
 
-            let error = self_goal
-                .iter()
-                .chain(trait_goal_and_subgoals.iter().flat_map(|it| it.1.iter()))
-                .chain(type_parameter_subgoals.iter())
-                .find_map(|subgoal| {
-                    let solution = self.context.environment.solve(
-                        &subgoal.substitute_all(&solver_substitutions),
-                        &self
-                            .type_parameters
-                            .iter()
-                            .filter_map(|it| it.clone().try_into().ok())
-                            .collect::<Box<[SolverGoal]>>(),
-                    );
-                    match solution {
-                        SolverSolution::Unique(_) => None,
-                        SolverSolution::Ambiguous => {
-                            Some(CallLikeLoweringError::FunctionReachableViaMultipleImpls)
-                        }
-                        SolverSolution::Impossible => {
-                            Some(CallLikeLoweringError::TypeArgumentMismatch)
-                        }
+        let error = self_goal
+            .iter()
+            .chain(trait_goal_and_subgoals.iter().flat_map(|it| it.1.iter()))
+            .chain(type_parameter_subgoals.iter())
+            .find_map(|subgoal| {
+                let solution = self.context.environment.solve(
+                    &subgoal.substitute_all(&solver_substitutions),
+                    &self
+                        .type_parameters
+                        .iter()
+                        .filter_map(|it| it.clone().try_into().ok())
+                        .collect::<Box<[SolverGoal]>>(),
+                );
+                match solution {
+                    SolverSolution::Unique(_) => None,
+                    SolverSolution::Ambiguous => {
+                        Some(CallLikeLoweringError::FunctionReachableViaMultipleImpls)
                     }
-                });
-            if let Some(error) = error {
-                return Err(error);
-            }
+                    SolverSolution::Impossible => Some(CallLikeLoweringError::TypeArgumentMismatch),
+                }
+            });
+        if let Some(error) = error {
+            return Err(error);
         }
 
         Ok(substitutions)
