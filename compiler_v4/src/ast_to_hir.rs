@@ -1430,14 +1430,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         match receiver {
                             LoweredExpression::Expression { id, type_ } => {
                                 // bar.foo(baz)
-                                let arguments = Self::lower_arguments(
-                                    self,
-                                    call,
-                                    expression.span.clone(),
-                                    &call.arguments,
-                                    None,
-                                )
-                                .unwrap();
+                                let arguments = Self::lower_arguments(self, &call.arguments);
                                 let arguments = iter::once((id, type_))
                                     .chain(arguments.into_vec())
                                     .collect_vec();
@@ -1480,14 +1473,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
                         if identifier.string.chars().next().unwrap().is_lowercase() {
                             // foo(bar, baz)
-                            let arguments = Self::lower_arguments(
-                                self,
-                                call,
-                                expression.span.clone(),
-                                &call.arguments,
-                                None,
-                            )
-                            .unwrap();
+                            let arguments = Self::lower_arguments(self, &call.arguments);
                             return self.lower_call(
                                 identifier,
                                 type_arguments.as_deref(),
@@ -1945,8 +1931,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             return LoweredExpression::Error;
         };
 
-        let arguments =
-            Self::lower_arguments(self, call, span.clone(), &call.arguments, None).unwrap();
+        let arguments = Self::lower_arguments(self, &call.arguments);
 
         let result = self.match_signature(
             None,
@@ -2029,8 +2014,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             .as_ref()
             .map(|variant_type| vec![variant_type.clone()].into_boxed_slice())
             .unwrap_or_default();
-        let arguments =
-            Self::lower_arguments(self, call, variant.span.clone(), &call.arguments, None).unwrap();
+        let arguments = Self::lower_arguments(self, &call.arguments);
 
         let result = self.match_signature(
             None,
@@ -2088,43 +2072,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     }
     fn lower_arguments(
         builder: &mut BodyBuilder,
-        call: &AstCall,
-        fallback_span: Range<Offset>,
         arguments: &AstResult<AstArguments>,
-        parameter_types: Option<&[Type]>,
-    ) -> Option<Box<[(Id, Type)]>> {
-        let arguments = arguments
+    ) -> Box<[(Id, Type)]> {
+        arguments
             .arguments_or_default()
             .iter()
-            .enumerate()
-            .map(|(index, argument)| {
-                builder.lower_expression(
-                    &argument.value,
-                    parameter_types.and_then(|it| it.get(index)),
-                )
-            })
-            .collect::<Box<_>>();
-        if let Some(parameter_types) = parameter_types
-            && arguments.len() != parameter_types.len()
-        {
-            builder.context.add_error(
-                if arguments.len() < parameter_types.len() {
-                    call.arguments
-                        .value()
-                        .map_or(fallback_span, |it| it.opening_parenthesis_span.clone())
-                } else {
-                    let arguments = &call.arguments.value().unwrap().arguments;
-                    arguments[parameter_types.len()].span.start..arguments.last().unwrap().span.end
-                },
-                format!(
-                    "Expected {} argument(s), got {}.",
-                    parameter_types.len(),
-                    arguments.len(),
-                ),
-            );
-            return None;
-        }
-        Some(arguments)
+            .map(|argument| builder.lower_expression(&argument.value, None))
+            .collect::<Box<_>>()
     }
     fn match_signature(
         &mut self,
