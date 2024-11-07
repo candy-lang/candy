@@ -582,7 +582,7 @@ pub enum ExpressionKind {
         field: Box<str>,
     },
     CreateEnum {
-        enum_: Type,
+        enum_: NamedType,
         variant: Box<str>,
         value: Option<Id>,
     },

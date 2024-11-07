@@ -118,8 +118,8 @@ struct MyStruct {
 }
 
 enum Bool { true, false }
-let true: Bool = Bool.true
-let false: Bool = Bool.false
+let true: Bool = Bool.true()
+let false: Bool = Bool.false()
 impl Bool: ToText {
   fun toText(self: Bool) Text {
     switch self {
@@ -196,7 +196,7 @@ fun main() Int {
 #
 #  theAnswer
   print("fibonacci(20) = {fibonacci(20).toText()}")
-  print(Ordering.less)
+  print(Ordering.less())
   print(true)
   print(false)
   0
