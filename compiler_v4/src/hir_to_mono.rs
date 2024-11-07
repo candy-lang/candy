@@ -160,6 +160,12 @@ impl<'h> Context<'h> {
             &function.signature.name,
             &function
                 .signature
+                .type_parameters
+                .iter()
+                .map(|it| hir::Type::from(it.type_()).substitute(substitutions))
+                .collect_vec(),
+            &function
+                .signature
                 .parameters
                 .iter()
                 .map(|it| it.type_.substitute(substitutions))
@@ -194,7 +200,12 @@ impl<'h> Context<'h> {
         *self.functions.get_mut(&name).unwrap() = Some(function);
         name
     }
-    fn mangle_function(&mut self, name: &str, parameter_types: &[hir::Type]) -> Box<str> {
+    fn mangle_function(
+        &mut self,
+        name: &str,
+        type_parameters: &[hir::Type],
+        parameter_types: &[hir::Type],
+    ) -> Box<str> {
         let mut result = if name == "main" && parameter_types.is_empty() {
             // Avoid name clash with the main function in C.
             // It would be cleaner to do this in `mono_to_c`, but it's easier to do it here.
@@ -203,6 +214,11 @@ impl<'h> Context<'h> {
             name
         }
         .to_string();
+        for type_parameter in type_parameters {
+            result.push('$');
+            result.push_str(&self.lower_type(type_parameter));
+        }
+        result.push('$');
         for parameter_type in parameter_types {
             result.push('$');
             result.push_str(&self.lower_type(parameter_type));
