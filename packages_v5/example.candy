@@ -129,6 +129,25 @@ impl Bool: ToText {
   }
 }
 
+enum Maybe[T] {
+  some: T,
+  none,
+}
+fun some[T](value: T) Maybe[T] {
+  Maybe.some(value)
+}
+fun none[T]() Maybe[T] {
+  Maybe.none[T]()
+}
+# impl[T] Maybe[T]: ToText {
+#   fun toText(self: Maybe[T]) Text {
+#     switch self {
+#       some(value) => "some({value.toText()})",
+#       none => "none()",
+#     }
+#   }
+# }
+
 enum MyEnum {
   foo: Int,
   bar,
