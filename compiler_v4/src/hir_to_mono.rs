@@ -366,13 +366,16 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
     fn add_parameter(&mut self, parameter: &hir::Parameter) {
         let id = self.id_generator.generate();
         self.id_mapping.force_insert(parameter.id, id);
+        let type_ = self.lower_type(&parameter.type_);
         self.parameters.push(mono::Parameter {
             id,
             name: parameter.name.clone(),
-            type_: self
-                .context
-                .lower_type(&parameter.type_.substitute(self.environment)),
+            type_,
         });
+    }
+
+    fn lower_type(&mut self, type_: &hir::Type) -> Box<str> {
+        self.context.lower_type(&type_.substitute(self.environment))
     }
 
     fn lower_expressions(&mut self, expressions: &[(hir::Id, Option<Box<str>>, hir::Expression)]) {
@@ -425,7 +428,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 variant,
                 value,
             } => {
-                let enum_ = self.context.lower_type(enum_);
+                let enum_ = self.lower_type(&enum_.clone().into());
                 let value = value.map(|it| self.lower_id(it));
                 self.push(
                     id,
@@ -473,7 +476,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 cases,
             } => {
                 let value = self.lower_id(*value);
-                let enum_ = self.context.lower_type(enum_);
+                let enum_ = self.lower_type(enum_);
                 let cases = cases
                     .iter()
                     .map(|case| mono::SwitchCase {
@@ -551,7 +554,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
         if let Some(hir_id) = hir_id.into() {
             self.id_mapping.force_insert(hir_id, id);
         }
-        let type_ = self.context.lower_type(&type_.substitute(self.environment));
+        let type_ = self.lower_type(type_);
         self.body
             .expressions
             .push((id, name.into(), mono::Expression { kind, type_ }));
