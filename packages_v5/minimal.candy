@@ -1,14 +1,9 @@
 struct Nothing {}
 enum Never {}
-struct Text = builtin
 struct Int = builtin
-
-fun print(message: Text) {
-  builtinPrint(message)
-}
+struct Text = builtin
 
 fun main() Int {
-  let identity = (x: Text) { x }
-  print(identity("Hello"))
+  builtinPrint(42.builtinIntToText())
   0
 }

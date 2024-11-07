@@ -1,6 +1,9 @@
 use crate::{
     ast::{
-        Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression, AstExpressionKind, AstFunction, AstImpl, AstLambda, AstParameter, AstParameters, AstResult, AstStatement, AstString, AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType, AstTypeArguments, AstTypeParameter, AstTypeParameters
+        Ast, AstArguments, AstAssignment, AstBody, AstCall, AstDeclaration, AstEnum, AstExpression,
+        AstExpressionKind, AstFunction, AstImpl, AstLambda, AstParameters, AstResult, AstStatement,
+        AstString, AstStruct, AstStructKind, AstSwitch, AstTextPart, AstTrait, AstType,
+        AstTypeParameter, AstTypeParameters,
     },
     error::CompilerError,
     hir::{
@@ -23,7 +26,13 @@ use petgraph::{
     graph::{DiGraph, NodeIndex},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{collections::hash_map::Entry, iter, mem, ops::Range, path::Path};
+use std::{
+    collections::hash_map::Entry,
+    fmt::{self, Display, Formatter},
+    iter, mem,
+    ops::Range,
+    path::Path,
+};
 use strum::VariantArray;
 
 pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
@@ -65,11 +74,13 @@ impl<'a> TraitDeclaration<'a> {
             .iter()
             .find(|(_, trait_function)| {
                 impl_function.name == trait_function.name
-                    && impl_function.type_parameters.len() == trait_function.type_parameters.len()
+                    && impl_function.signature.type_parameters.len()
+                        == trait_function.signature.type_parameters.len()
                     && impl_function
+                        .signature
                         .type_parameters
                         .iter()
-                        .zip(trait_function.type_parameters.iter())
+                        .zip(trait_function.signature.type_parameters.iter())
                         .all(|(function, signature)| {
                             function.upper_bound
                                 == signature
@@ -77,16 +88,21 @@ impl<'a> TraitDeclaration<'a> {
                                     .as_ref()
                                     .map(|it| it.as_ref().map(|it| it.substitute(substitutions)))
                         })
-                    && impl_function.parameters.len() == trait_function.parameters.len()
+                    && impl_function.signature.parameters.len()
+                        == trait_function.signature.parameters.len()
                     && impl_function
+                        .signature
                         .parameters
                         .iter()
-                        .zip(trait_function.parameters.iter())
+                        .zip(trait_function.signature.parameters.iter())
                         .all(|(function, signature)| {
                             function.type_ == signature.type_.substitute(substitutions)
                         })
-                    && impl_function.return_type
-                        == trait_function.return_type.substitute(substitutions)
+                    && impl_function.signature.return_type
+                        == trait_function
+                            .signature
+                            .return_type
+                            .substitute(substitutions)
             })
             .map(|(id, _)| *id)
     }
@@ -146,29 +162,12 @@ struct FunctionDeclaration<'a> {
     ast: Option<&'a AstFunction>,
     name: Box<str>,
     name_span: Option<Range<Offset>>,
-    type_parameters: Box<[TypeParameter]>,
-    parameters: Box<[Parameter]>,
-    return_type: Type,
+    signature: Signature,
     body: Option<BodyOrBuiltin>,
 }
 impl<'a> FunctionDeclaration<'a> {
     fn signature_to_string(&self) -> String {
-        format!(
-            "{}{}({})",
-            self.name,
-            if self.type_parameters.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    "[{}]",
-                    self.type_parameters.iter().map(|it| &it.name).join(", ")
-                )
-            },
-            self.parameters
-                .iter()
-                .map(|it| format!("{}: {}", it.name, it.type_))
-                .join(", "),
-        )
+        format!("{}{}", self.name, self.signature)
     }
 
     fn call_signature_to_string(function_name: &str, argument_types: &[Type]) -> String {
@@ -177,7 +176,10 @@ impl<'a> FunctionDeclaration<'a> {
 
     #[must_use]
     fn into_trait_function(mut self) -> TraitFunction {
-        let body = mem::take(&mut self.body);
+        let body = mem::take(&mut self.body).map(|it| match it {
+            BodyOrBuiltin::Body(body) => body,
+            BodyOrBuiltin::Builtin(_) => panic!("Trait functions may not be built-in"),
+        });
         TraitFunction {
             signature: self.into_function_signature(),
             body,
@@ -195,10 +197,42 @@ impl<'a> FunctionDeclaration<'a> {
     fn into_function_signature(self) -> FunctionSignature {
         FunctionSignature {
             name: self.name,
-            type_parameters: self.type_parameters,
-            parameters: self.parameters,
-            return_type: self.return_type,
+            type_parameters: self.signature.type_parameters,
+            parameters: self.signature.parameters,
+            return_type: self.signature.return_type,
         }
+    }
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Signature {
+    pub type_parameters: Box<[TypeParameter]>,
+    pub parameters: Box<[Parameter]>,
+    pub return_type: Type,
+}
+impl Display for Signature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}({})",
+            if self.type_parameters.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "[{}]",
+                    self.type_parameters
+                        .iter()
+                        .map(|it| it.upper_bound.as_ref().map_or_else(
+                            || it.name.to_string(),
+                            |upper_bound| format!("{}: {upper_bound}", it.name)
+                        ))
+                        .join(", ")
+                )
+            },
+            self.parameters
+                .iter()
+                .map(|it| format!("{}: {}", it.name, it.type_))
+                .join(", "),
+        )
     }
 }
 
@@ -314,14 +348,14 @@ impl<'a> Context<'a> {
                             "Main function may not be overloaded",
                         );
                         None
-                    } else if !function.parameters.is_empty() {
+                    } else if !function.signature.parameters.is_empty() {
                         self.add_error(
                             function.ast.unwrap().name.value().unwrap().span.clone(),
                             "Main function must not have parameters",
                         );
                         None
-                    } else if function.return_type != Type::Error
-                        && function.return_type != NamedType::int().into()
+                    } else if function.signature.return_type != Type::Error
+                        && function.signature.return_type != NamedType::int().into()
                     {
                         self.add_error(
                             function.ast.unwrap().name.value().unwrap().span.clone(),
@@ -368,9 +402,11 @@ impl<'a> Context<'a> {
                     ast: None,
                     name: signature.name.clone(),
                     name_span: None,
-                    type_parameters,
-                    parameters,
-                    return_type: signature.return_type,
+                    signature: Signature {
+                        type_parameters,
+                        parameters,
+                        return_type: signature.return_type,
+                    },
                     body: Some(BodyOrBuiltin::Builtin(*builtin_function)),
                 },
             );
@@ -414,12 +450,13 @@ impl<'a> Context<'a> {
 
         for trait_name in self.traits.keys().cloned().collect_vec() {
             let trait_ = &self.traits[&trait_name];
+            let type_parameters = trait_.type_parameters.clone();
             let self_type = NamedType {
                 name: trait_name.clone(),
-                type_arguments: trait_.type_parameters.type_(),
+                type_arguments: type_parameters.type_(),
             };
             for (id, mut function) in trait_.functions.clone() {
-                self.lower_function(Some(&self_type), &mut function, true);
+                self.lower_function(Some(&self_type), &type_parameters, &mut function, true);
                 self.traits
                     .get_mut(&trait_name)
                     .unwrap()
@@ -430,9 +467,10 @@ impl<'a> Context<'a> {
         }
         for index in 0..self.impls.len() {
             let impl_ = &self.impls[index];
+            let type_parameters = impl_.type_parameters.clone();
             let self_type = impl_.self_type.clone();
             for (id, mut function) in impl_.functions.clone() {
-                self.lower_function(Some(&self_type), &mut function, false);
+                self.lower_function(Some(&self_type), &type_parameters, &mut function, false);
                 self.impls[index].functions.insert(id, function).unwrap();
             }
         }
@@ -441,7 +479,7 @@ impl<'a> Context<'a> {
         }
         for id in functions_to_lower {
             let mut function = self.functions.get(&id).unwrap().clone();
-            self.lower_function(None, &mut function, false);
+            self.lower_function(None, &[], &mut function, false);
             self.functions.insert(id, function).unwrap();
         }
     }
@@ -1065,8 +1103,11 @@ impl<'a> Context<'a> {
             .cloned()
             .collect::<Box<_>>();
 
-        let parameters = function.parameters.value().map(|it| self.lower_parameters(&all_type_parameters, self_type, it))
-            .unwrap_or(Box::default());
+        let parameters = function
+            .parameters
+            .value()
+            .map(|it| self.lower_parameters(&all_type_parameters, self_type, it))
+            .unwrap_or_default();
         let return_type = function.return_type.as_ref().map_or_else(
             || NamedType::nothing().into(),
             |it| self.lower_type(&all_type_parameters, self_type, it),
@@ -1075,9 +1116,11 @@ impl<'a> Context<'a> {
             ast: Some(function),
             name: name.string.clone(),
             name_span: Some(name.span.clone()),
-            type_parameters,
-            parameters,
-            return_type,
+            signature: Signature {
+                type_parameters,
+                parameters,
+                return_type,
+            },
             body: None,
         })
     }
@@ -1088,7 +1131,8 @@ impl<'a> Context<'a> {
         parameters: &'a AstParameters,
     ) -> Box<[Parameter]> {
         let mut parameter_names = FxHashSet::default();
-        parameters.parameters
+        parameters
+            .parameters
             .iter()
             .filter_map(|parameter| try {
                 let name = parameter.name.value()?.clone();
@@ -1114,6 +1158,7 @@ impl<'a> Context<'a> {
     fn lower_function(
         &mut self,
         self_type: Option<&NamedType>,
+        outer_type_parameters: &[TypeParameter],
         function: &mut FunctionDeclaration<'a>,
         body_is_optional: bool,
     ) {
@@ -1121,14 +1166,22 @@ impl<'a> Context<'a> {
             return;
         }
 
-        let (hir_body, _) =
-            BodyBuilder::build(self, &function.type_parameters, self_type, |builder| {
-                for parameter in function.parameters.iter() {
+        let (hir_body, _) = BodyBuilder::build(
+            self,
+            &outer_type_parameters
+                .iter()
+                .cloned()
+                .chain(function.signature.type_parameters.iter().cloned())
+                .collect_vec(),
+            self_type,
+            |builder| {
+                for parameter in function.signature.parameters.iter() {
                     builder.push_parameter(parameter.clone());
                 }
 
                 if let Some(body) = function.ast.unwrap().body.as_ref() {
-                    builder.lower_statements(&body.statements, Some(&function.return_type));
+                    builder
+                        .lower_statements(&body.statements, Some(&function.signature.return_type));
                 } else {
                     builder.context.add_error(
                         function.ast.unwrap().display_span.clone(),
@@ -1136,7 +1189,8 @@ impl<'a> Context<'a> {
                     );
                     builder.push_panic("No function body provided");
                 }
-            });
+            },
+        );
 
         function.body = Some(BodyOrBuiltin::Body(hir_body));
     }
@@ -1366,54 +1420,22 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     });
             }
             AstExpressionKind::Call(call) => {
-                fn lower_arguments(
-                    builder: &mut BodyBuilder,
-                    call: &AstCall,
-                    fallback_span: Range<Offset>,
-                    arguments: &AstResult<AstArguments>,
-                    parameter_types: Option<&[Type]>,
-                ) -> Option<Box<[(Id, Type)]>> {
-                    let arguments = arguments
-                        .arguments_or_default()
+                let type_arguments = call.type_arguments.as_ref().map(|it| {
+                    it.arguments
                         .iter()
-                        .enumerate()
-                        .map(|(index, argument)| {
-                            builder.lower_expression(
-                                &argument.value,
-                                parameter_types.and_then(|it| it.get(index)),
-                            )
+                        .map(|it| {
+                            self.context
+                                .lower_type(self.type_parameters, self.self_type, &it.type_)
                         })
-                        .collect::<Box<_>>();
-                    if let Some(parameter_types) = parameter_types
-                        && arguments.len() != parameter_types.len()
-                    {
-                        builder.context.add_error(
-                            if arguments.len() < parameter_types.len() {
-                                call.arguments
-                                    .value()
-                                    .map_or(fallback_span, |it| it.opening_parenthesis_span.clone())
-                            } else {
-                                let arguments = &call.arguments.value().unwrap().arguments;
-                                arguments[parameter_types.len()].span.start
-                                    ..arguments.last().unwrap().span.end
-                            },
-                            format!(
-                                "Expected {} argument(s), got {}.",
-                                parameter_types.len(),
-                                arguments.len(),
-                            ),
-                        );
-                        return None;
-                    }
-                    Some(arguments)
-                }
-
+                        .collect_vec()
+                });
                 match &call.receiver.kind {
                     AstExpressionKind::Navigation(navigation)
                         if let Some(key) = navigation.key.value() =>
                     {
+                        // bar.foo(baz)
                         let receiver = self.lower_expression(&navigation.receiver, None);
-                        let arguments = lower_arguments(
+                        let arguments = Self::lower_arguments(
                             self,
                             call,
                             expression.span.clone(),
@@ -1424,7 +1446,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         let arguments = iter::once(receiver)
                             .chain(arguments.into_vec())
                             .collect_vec();
-                        return self.lower_call(key, call.type_arguments.as_ref(), &arguments);
+                        self.lower_call(key, type_arguments.as_deref(), &arguments)
                     }
                     AstExpressionKind::Identifier(identifier) => {
                         let Some(identifier) = identifier.identifier.value() else {
@@ -1432,7 +1454,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         };
 
                         if identifier.string.chars().next().unwrap().is_lowercase() {
-                            let arguments = lower_arguments(
+                            // foo(bar, baz)
+                            let arguments = Self::lower_arguments(
                                 self,
                                 call,
                                 expression.span.clone(),
@@ -1442,7 +1465,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             .unwrap();
                             return self.lower_call(
                                 identifier,
-                                call.type_arguments.as_ref(),
+                                type_arguments.as_deref(),
                                 &arguments,
                             );
                         }
@@ -1450,69 +1473,24 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         match self.lower_identifier(identifier) {
                             LoweredExpression::Expression { .. } => todo!("support lambdas"),
                             LoweredExpression::NamedTypeReference(type_) => {
-                                match self.context.hir.type_declarations.get(&type_) {
-                                    Some(TypeDeclaration {
-                                        type_parameters,
-                                        kind: TypeDeclarationKind::Struct { fields },
-                                    }) => {
-                                        if !type_parameters.is_empty() {
-                                            todo!("Use type solver");
-                                        }
-
-                                        let Some(fields) = fields else {
-                                            self.context.add_error(
-                                                call.receiver.span.clone(),
-                                                format!("Can't instantiate builtin type {type_} directly"),
-                                            );
-                                            return LoweredExpression::Error;
-                                        };
-
-                                        let fields = lower_arguments(
-                                            self,
-                                            call,
+                                let type_declaration =
+                                    self.context.hir.type_declarations[&type_].clone();
+                                match &type_declaration.kind {
+                                    TypeDeclarationKind::Struct { fields } => {
+                                        // Foo(bar, baz)
+                                        self.lower_struct_creation(
                                             expression.span.clone(),
-                                            &call.arguments,
-                                            Some(
-                                                &fields
-                                                    .iter()
-                                                    .map(|(_, type_)| type_.clone())
-                                                    .collect_vec(),
-                                            ),
-                                        );
-                                        let type_ = Type::Named(NamedType {
-                                            name: type_.clone(),
-                                            type_arguments: Box::default(),
-                                        });
-                                        fields.map_or(LoweredExpression::Error, |fields| {
-                                            self.push_lowered(
-                                                None,
-                                                ExpressionKind::CreateStruct {
-                                                    struct_: type_.clone(),
-                                                    fields: fields
-                                                        .iter()
-                                                        .map(|(id, _)| *id)
-                                                        .collect(),
-                                                },
-                                                type_,
-                                            )
-                                        })
+                                            call,
+                                            type_arguments.as_deref(),
+                                            &type_,
+                                            &type_declaration.type_parameters,
+                                            fields,
+                                        )
                                     }
-                                    Some(TypeDeclaration {
-                                        kind: TypeDeclarationKind::Enum { .. },
-                                        ..
-                                    }) => {
+                                    TypeDeclarationKind::Enum { .. } => {
                                         self.context.add_error(
                                             call.receiver.span.clone(),
                                             "Enum variant is missing.",
-                                        );
-                                        LoweredExpression::Error
-                                    }
-                                    None => {
-                                        self.context.add_error(
-                                            call.receiver.span.clone(),
-                                            format!(
-                                                "Can't instantiate builtin type {type_} directly."
-                                            ),
                                         );
                                         LoweredExpression::Error
                                     }
@@ -1555,7 +1533,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         &enum_named_type.type_arguments,
                                     ));
                                 let parameter_types = [variant_type];
-                                let arguments = lower_arguments(
+                                let arguments = Self::lower_arguments(
                                     self,
                                     call,
                                     expression.span.clone(),
@@ -1707,7 +1685,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
             }
-            AstExpressionKind::Lambda(AstLambda { parameters, .. }) => { todo!()
+            AstExpressionKind::Lambda(AstLambda { .. }) => {
+                todo!()
             }
             AstExpressionKind::Body(AstBody { statements, .. }) => {
                 let (id, type_) = self.lower_statements(statements, context_type);
@@ -1880,22 +1859,9 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     fn lower_call(
         &mut self,
         name: &AstString,
-        type_arguments: Option<&AstTypeArguments>,
+        type_arguments: Option<&[Type]>,
         arguments: &[(Id, Type)],
     ) -> LoweredExpression {
-        let type_arguments = type_arguments.map(|it| {
-            (
-                it.arguments
-                    .iter()
-                    .map(|it| {
-                        self.context
-                            .lower_type(self.type_parameters, self.self_type, &it.type_)
-                    })
-                    .collect::<Box<_>>(),
-                it.span.clone(),
-            )
-        });
-
         // TODO(lambdas): resolve local identifiers as well if not calling using instance syntax
         let matches = self
             .context
@@ -1906,6 +1872,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 (id, function.clone(), trait_.cloned())
             })
             .collect_vec();
+
         if matches.is_empty() {
             self.context.add_error(
                 name.span.clone(),
@@ -1914,257 +1881,324 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             return LoweredExpression::Error;
         }
 
-        // Check type parameter count
-        let matches = if let Some((type_arguments, type_arguments_span)) = &type_arguments {
-            let (matches, mismatches) = matches.into_iter().partition::<Vec<_>, _>(|(_, it, _)| {
-                it.type_parameters.len() == type_arguments.len()
-            });
-            if matches.is_empty() {
-                self.context.add_error(
-                    type_arguments_span.clone(),
-                    format!(
-                        "No overload accepts exactly {} {}:\n{}",
-                        arguments.len(),
-                        if arguments.len() == 1 {
-                            "type argument"
-                        } else {
-                            "type arguments"
-                        },
-                        mismatches
-                            .iter()
-                            .map(|(_, it, _)| it.signature_to_string())
-                            .join("\n"),
-                    ),
-                );
-                return LoweredExpression::Error;
-            }
-            matches
-        } else {
-            matches
-        };
-
-        // TODO: show mismatches from previous steps
-
-        // Check parameter count
-        let matches = {
-            let (matches, mismatches) = matches
-                .into_iter()
-                .partition::<Vec<_>, _>(|(_, it, _)| it.parameters.len() == arguments.len());
-            if matches.is_empty() {
-                self.context.add_error(
-                    name.span.clone(),
-                    format!(
-                        "No overload accepts exactly {} {}:\n{}",
-                        arguments.len(),
-                        if arguments.len() == 1 {
-                            "argument"
-                        } else {
-                            "arguments"
-                        },
-                        mismatches
-                            .iter()
-                            .map(|(_, it, _)| it.signature_to_string())
-                            .join("\n"),
-                    ),
-                );
-                return LoweredExpression::Error;
-            }
-            matches
-        };
-
-        // Check argument types
         let argument_types = arguments
             .iter()
             .map(|(_, type_)| type_.clone())
             .collect::<Box<_>>();
-        let old_matches = matches;
-        let mut matches = vec![];
-        let mut mismatches = vec![];
-        'outer: for (id, function, solver_rule) in old_matches {
-            let mut unifier = TypeUnifier::new(&function.type_parameters);
-            // Type arguments
-            if let Some((type_arguments, _)) = &type_arguments {
-                for (type_argument, type_parameter) in type_arguments
-                    .iter()
-                    .zip_eq(function.type_parameters.iter())
-                {
-                    match unifier.unify(type_argument, &type_parameter.type_().into()) {
-                        Ok(true) => {}
-                        Ok(false) => unreachable!(),
-                        Err(reason) => {
-                            mismatches.push((id, function, Some(reason)));
-                            continue 'outer;
-                        }
-                    };
+
+        let (mut matches, mismatches): (Vec<_>, Vec<_>) = matches
+            .into_iter()
+            .map(|(id, function, trait_)| {
+                let result = self.match_signature(
+                    trait_
+                        .as_ref()
+                        .map(|it| (&it.solver_goal, it.solver_subgoals.as_ref())),
+                    &function.signature.type_parameters,
+                    &function
+                        .signature
+                        .parameters
+                        .iter()
+                        .map(|it| it.type_.clone())
+                        .collect::<Box<_>>(),
+                    type_arguments,
+                    &argument_types,
+                );
+                match result {
+                    Ok(substitutions) => Ok((id, function, substitutions)),
+                    Err(error) => Err((function, error)),
                 }
-            }
-
-            // Arguments
-            for (argument_type, parameter) in
-                argument_types.iter().zip_eq(function.parameters.iter())
-            {
-                match unifier.unify(argument_type, &parameter.type_) {
-                    Ok(true) => {}
-                    Ok(false) => {
-                        mismatches.push((id, function, None));
-                        continue 'outer;
-                    }
-                    Err(reason) => {
-                        mismatches.push((id, function, Some(reason)));
-                        continue 'outer;
-                    }
-                };
-            }
-
-            match unifier.finish() {
-                Ok(substitutions) => matches.push((id, function, solver_rule, substitutions)),
-                Err(error) => mismatches.push((id, function, Some(error))),
-            }
-        }
+            })
+            .partition_result();
 
         if matches.is_empty() {
             self.context.add_error(
                 name.span.clone(),
                 format!(
                     "No matching function found for:\n  {}\n{}:{}",
-                    FunctionDeclaration::call_signature_to_string(
-                        mismatches.first().unwrap().1.name.as_ref(),
-                        argument_types.as_ref()
-                    ),
+                    FunctionDeclaration::call_signature_to_string(&name.string, &argument_types),
                     if mismatches.len() == 1 {
                         "This is the candidate function"
                     } else {
                         "These are candidate functions"
                     },
                     mismatches
-                        .iter()
-                        .map(|(_, it, reason)| format!(
-                            "\n• {}{}",
-                            it.signature_to_string(),
-                            reason
-                                .as_ref()
-                                .map_or_else(String::new, |reason| format!(" ({reason})")),
+                        .into_iter()
+                        .map(|(function, error)| format!(
+                            "\n• {}: {}",
+                            function.signature_to_string(),
+                            match error {
+                                CallLikeLoweringError::TypeArgumentCount =>
+                                    "Wrong number of type arguments".to_string(),
+                                CallLikeLoweringError::ArgumentCount =>
+                                    "Wrong number of arguments".to_string(),
+                                CallLikeLoweringError::Unification(Some(error)) =>
+                                    error.into_string(),
+                                CallLikeLoweringError::Unification(None) =>
+                                    "Mismatching types".to_string(),
+                                CallLikeLoweringError::FunctionReachableViaMultipleImpls =>
+                                    "Function is reachable via multiple impls".to_string(),
+                                // TODO: more specific error message
+                                CallLikeLoweringError::TypeArgumentMismatch =>
+                                    "Type arguments are not assignable".to_string(),
+                            },
                         ))
+                        .join(""),
+                ),
+            );
+            return LoweredExpression::Error;
+        } else if matches.len() > 1 {
+            self.context.add_error(
+                name.span.clone(),
+                format!(
+                    "Multiple matching function found for:\n  {}\nThese are candidate functions:{}",
+                    FunctionDeclaration::call_signature_to_string(&name.string, &argument_types),
+                    matches
+                        .iter()
+                        .map(|(_, function, _)| format!("\n• {}", function.signature_to_string()))
                         .join(""),
                 ),
             );
             return LoweredExpression::Error;
         }
 
-        // Solve traits
-        let mut matches = {
-            let old_matches = matches;
-            let mut matches = vec![];
-            let mut mismatches = vec![];
-            for (id, function, trait_, substitutions) in old_matches {
-                let Some(trait_) = trait_ else {
-                    // TODO: check whether type parameter substitutions are valid (upper bounds are fulfilled)
-                    matches.push((id, function, substitutions));
-                    continue;
-                };
-
-                let self_goal = substitutions
-                    .get(&ParameterType::self_type())
-                    .map(|self_type| {
-                        trait_.solver_goal.substitute_all(&FxHashMap::from_iter([(
-                            SolverVariable::self_(),
-                            self_type.clone().try_into().unwrap(),
-                        )]))
-                    });
-
-                let solver_substitutions = substitutions
-                    .iter()
-                    .filter_map(|(parameter_type, type_)| try {
-                        (
-                            SolverVariable::new(parameter_type.clone()),
-                            type_.clone().try_into().ok()?,
-                        )
-                    })
-                    .collect();
-
-                let used_rule = self_goal
-                    .iter()
-                    .chain(trait_.solver_subgoals.iter())
-                    .map(|subgoal| {
-                        let solution = self.context.environment.solve(
-                            &subgoal.substitute_all(&solver_substitutions),
-                            &self
-                                .type_parameters
-                                .iter()
-                                .filter_map(|it| it.clone().try_into().ok())
-                                .collect::<Box<[SolverGoal]>>(),
-                        );
-                        match solution {
-                            SolverSolution::Unique(solution) => Some(solution.used_rule),
-                            SolverSolution::Ambiguous => {
-                                // TODO: Add syntax to disambiguate trait function call on parameter types.
-                                self.context.add_error(
-                                    name.span.clone(),
-                                    format!(
-                                        "Function is reachable via multiple impls:\n{}",
-                                        function.signature_to_string(),
-                                    ),
-                                );
-                                None
-                            }
-                            SolverSolution::Impossible => None,
-                        }
-                    })
-                    .collect::<Option<Vec<_>>>();
-                if used_rule.is_some() {
-                    matches.push((id, function, substitutions));
-                } else {
-                    mismatches.push(function);
-                }
-            }
-            if matches.is_empty() {
-                // TODO: hide this error when there's an ambiguous solution
-                self.context.add_error(
-                    name.span.clone(),
-                    format!(
-                        "No function matches this signature:\n  {}\nThese are candidate functions:{}",
-                        FunctionDeclaration::call_signature_to_string(
-                            name.string.as_ref(),
-                            argument_types.as_ref()
-                        ),
-                        mismatches
-                            .iter()
-                            .map(|it| format!("\n• {}", it.signature_to_string()))
-                            .join(""),
-                    ),
-                );
-                return LoweredExpression::Error;
-            } else if matches.len() > 1 {
-                self.context.add_error(
-                    name.span.clone(),
-                    format!(
-                        "Multiple matching function found for:\n  {}\nThese are candidate functions:{}",
-                        FunctionDeclaration::call_signature_to_string(
-                            name.string.as_ref(),
-                            argument_types.as_ref()
-                        ),
-                        matches
-                            .iter()
-                            .map(|(_, it, _)| format!("\n• {}", it.signature_to_string()))
-                            .join(""),
-                    ),
-                );
-                return LoweredExpression::Error;
-            }
-            matches
-        };
-
-        let (function, signature, substitutions) = matches.pop().unwrap();
-        let return_type = signature.return_type.substitute(&substitutions);
+        let (id, function, substitutions) = matches.pop().unwrap();
+        let return_type = function.signature.return_type.substitute(&substitutions);
         self.push_lowered(
             None,
             ExpressionKind::Call {
-                function,
+                function: id,
                 substitutions,
                 arguments: arguments.iter().map(|(id, _)| *id).collect(),
             },
             return_type,
         )
+    }
+    fn lower_struct_creation(
+        &mut self,
+        span: Range<Offset>,
+        call: &AstCall,
+        type_arguments: Option<&[Type]>,
+        type_: &str,
+        type_parameters: &[TypeParameter],
+        fields: &Option<Box<[(Box<str>, Type)]>>,
+    ) -> LoweredExpression {
+        let Some(fields) = fields else {
+            self.context.add_error(
+                call.receiver.span.clone(),
+                format!("Can't instantiate builtin type {type_} directly"),
+            );
+            return LoweredExpression::Error;
+        };
+
+        let arguments =
+            Self::lower_arguments(self, call, span.clone(), &call.arguments, None).unwrap();
+
+        // TODO(lambdas): resolve local identifiers as well if not calling using instance syntax
+        let result = self.match_signature(
+            None,
+            type_parameters,
+            &fields
+                .iter()
+                .map(|(_, type_)| type_.clone())
+                .collect::<Box<_>>(),
+            type_arguments,
+            &arguments
+                .iter()
+                .map(|(_, type_)| type_.clone())
+                .collect::<Box<_>>(),
+        );
+        let substitutions = match result {
+            Ok(substitutions) => substitutions,
+            Err(error) => {
+                self.context.add_error(
+                    span,
+                    format!(
+                        "Invalid struct creation: {}",
+                        match error {
+                            CallLikeLoweringError::TypeArgumentCount =>
+                                "Wrong number of type arguments".to_string(),
+                            CallLikeLoweringError::ArgumentCount =>
+                                "Wrong number of fields".to_string(),
+                            CallLikeLoweringError::Unification(Some(error)) => error.into_string(),
+                            CallLikeLoweringError::Unification(None) =>
+                                "Mismatching types".to_string(),
+                            CallLikeLoweringError::FunctionReachableViaMultipleImpls =>
+                                unreachable!(),
+                            // TODO: more specific error message
+                            CallLikeLoweringError::TypeArgumentMismatch =>
+                                "Type arguments are not assignable".to_string(),
+                        },
+                    ),
+                );
+                return LoweredExpression::Error;
+            }
+        };
+
+        let struct_type = NamedType::new(
+            type_,
+            type_parameters
+                .iter()
+                .map(|it| substitutions[&it.type_()].clone())
+                .collect_vec(),
+        );
+        self.push_lowered(
+            None,
+            ExpressionKind::CreateStruct {
+                struct_: struct_type.clone(),
+                fields: arguments.iter().map(|(id, _)| *id).collect(),
+            },
+            struct_type,
+        )
+    }
+    fn lower_arguments(
+        builder: &mut BodyBuilder,
+        call: &AstCall,
+        fallback_span: Range<Offset>,
+        arguments: &AstResult<AstArguments>,
+        parameter_types: Option<&[Type]>,
+    ) -> Option<Box<[(Id, Type)]>> {
+        let arguments = arguments
+            .arguments_or_default()
+            .iter()
+            .enumerate()
+            .map(|(index, argument)| {
+                builder.lower_expression(
+                    &argument.value,
+                    parameter_types.and_then(|it| it.get(index)),
+                )
+            })
+            .collect::<Box<_>>();
+        if let Some(parameter_types) = parameter_types
+            && arguments.len() != parameter_types.len()
+        {
+            builder.context.add_error(
+                if arguments.len() < parameter_types.len() {
+                    call.arguments
+                        .value()
+                        .map_or(fallback_span, |it| it.opening_parenthesis_span.clone())
+                } else {
+                    let arguments = &call.arguments.value().unwrap().arguments;
+                    arguments[parameter_types.len()].span.start..arguments.last().unwrap().span.end
+                },
+                format!(
+                    "Expected {} argument(s), got {}.",
+                    parameter_types.len(),
+                    arguments.len(),
+                ),
+            );
+            return None;
+        }
+        Some(arguments)
+    }
+    fn match_signature(
+        &mut self,
+        trait_goal_and_subgoals: Option<(&SolverGoal, &[SolverGoal])>,
+        type_parameters: &[TypeParameter],
+        parameter_types: &[Type],
+        type_arguments: Option<&[Type]>,
+        argument_types: &[Type],
+    ) -> Result<FxHashMap<ParameterType, Type>, CallLikeLoweringError> {
+        // Check type argument count
+        if let Some(type_arguments) = type_arguments
+            && type_arguments.len() != type_parameters.len()
+        {
+            return Err(CallLikeLoweringError::TypeArgumentCount);
+        }
+
+        // Check argument count
+        if argument_types.len() != parameter_types.len() {
+            return Err(CallLikeLoweringError::ArgumentCount);
+        }
+
+        // Check argument types
+        let substitutions = {
+            let mut unifier = TypeUnifier::new(type_parameters);
+            // Type arguments
+            if let Some(type_arguments) = type_arguments {
+                for (type_argument, type_parameter) in
+                    type_arguments.iter().zip_eq(type_parameters.iter())
+                {
+                    match unifier.unify(type_argument, &type_parameter.type_().into()) {
+                        Ok(true) => {}
+                        Ok(false) => unreachable!(),
+                        Err(reason) => {
+                            return Err(CallLikeLoweringError::Unification(Some(reason)))
+                        }
+                    }
+                }
+            }
+
+            // Arguments
+            for (argument_type, parameter_type) in
+                argument_types.iter().zip_eq(parameter_types.iter())
+            {
+                match unifier.unify(argument_type, parameter_type) {
+                    Ok(true) => {}
+                    Ok(false) => return Err(CallLikeLoweringError::Unification(None)),
+                    Err(reason) => return Err(CallLikeLoweringError::Unification(Some(reason))),
+                }
+            }
+
+            match unifier.finish() {
+                Ok(substitutions) => substitutions,
+                Err(error) => return Err(CallLikeLoweringError::Unification(Some(error))),
+            }
+        };
+
+        // Solve traits
+        let self_goal = substitutions
+            .get(&ParameterType::self_type())
+            .map(|self_type| {
+                trait_goal_and_subgoals
+                    .unwrap()
+                    .0
+                    .substitute_all(&FxHashMap::from_iter([(
+                        SolverVariable::self_(),
+                        self_type.clone().try_into().unwrap(),
+                    )]))
+            });
+
+        let type_parameter_subgoals = type_parameters
+            .iter()
+            .filter_map(|it| it.clone().try_into().ok())
+            .collect_vec();
+
+        let solver_substitutions = substitutions
+            .iter()
+            .filter_map(|(parameter_type, type_)| try {
+                (
+                    SolverVariable::new(parameter_type.clone()),
+                    type_.clone().try_into().ok()?,
+                )
+            })
+            .collect();
+
+        let error = self_goal
+            .iter()
+            .chain(trait_goal_and_subgoals.iter().flat_map(|it| it.1.iter()))
+            .chain(type_parameter_subgoals.iter())
+            .find_map(|subgoal| {
+                let solution = self.context.environment.solve(
+                    &subgoal.substitute_all(&solver_substitutions),
+                    &self
+                        .type_parameters
+                        .iter()
+                        .filter_map(|it| it.clone().try_into().ok())
+                        .collect::<Box<[SolverGoal]>>(),
+                );
+                match solution {
+                    SolverSolution::Unique(_) => None,
+                    SolverSolution::Ambiguous => {
+                        Some(CallLikeLoweringError::FunctionReachableViaMultipleImpls)
+                    }
+                    SolverSolution::Impossible => Some(CallLikeLoweringError::TypeArgumentMismatch),
+                }
+            });
+        if let Some(error) = error {
+            return Err(error);
+        }
+
+        Ok(substitutions)
     }
 
     fn push_panic(&mut self, message: impl Into<Box<str>>) {
@@ -2198,7 +2232,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         self.push(
             None,
             ExpressionKind::CreateStruct {
-                struct_: Type::nothing(),
+                struct_: NamedType::nothing(),
                 fields: [].into(),
             },
             Type::nothing(),
@@ -2257,6 +2291,14 @@ enum LoweredExpression {
 //     Error,
 // }
 
+enum CallLikeLoweringError {
+    TypeArgumentCount,
+    ArgumentCount,
+    Unification(Option<Box<str>>),
+    FunctionReachableViaMultipleImpls,
+    TypeArgumentMismatch,
+}
+
 pub struct TypeUnifier<'h> {
     type_parameters: &'h [TypeParameter],
     substitutions: FxHashMap<ParameterType, Type>,
@@ -2288,6 +2330,7 @@ impl<'h> TypeUnifier<'h> {
                 Ok(true)
             }
             (Type::Named(argument), Type::Named(parameter)) => {
+                // TODO: change `Ok(false)` to and `Err`
                 if argument.name != parameter.name
                     || argument.type_arguments.len() != parameter.type_arguments.len()
                 {

@@ -67,21 +67,6 @@ pub struct Hir {
     pub functions: FxHashMap<Id, Function>,
     pub main_function_id: Id,
 }
-impl Hir {
-    pub fn get_function(&self, id: Id) -> (&FunctionSignature, Option<&BodyOrBuiltin>) {
-        self.functions
-            .get(&id)
-            .or_else(|| self.impls.iter().find_map(|it| it.functions.get(&id)))
-            .map(|it| (&it.signature, Some(&it.body)))
-            .or_else(|| {
-                self.traits
-                    .values()
-                    .find_map(|it| it.functions.get(&id))
-                    .map(|it| (&it.signature, it.body.as_ref()))
-            })
-            .unwrap()
-    }
-}
 impl ToText for Hir {
     fn build_text(&self, builder: &mut TextBuilder) {
         for (name, declaration) in self
@@ -231,7 +216,7 @@ impl Display for Trait {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TraitFunction {
     pub signature: FunctionSignature,
-    pub body: Option<BodyOrBuiltin>,
+    pub body: Option<Body>,
 }
 impl ToText for (&Id, &TraitFunction) {
     fn build_text(&self, builder: &mut TextBuilder) {
@@ -239,12 +224,7 @@ impl ToText for (&Id, &TraitFunction) {
         self.1.signature.build_text(builder);
         if let Some(body) = &self.1.body {
             builder.push(" ");
-            match body {
-                BodyOrBuiltin::Body(body) => body.build_text(builder),
-                BodyOrBuiltin::Builtin(builtin_function) => {
-                    builder.push(format!("= {builtin_function:?}"));
-                }
-            }
+            body.build_text(builder);
         }
     }
 }
@@ -581,7 +561,7 @@ impl Expression {
     pub fn nothing() -> Self {
         Self {
             kind: ExpressionKind::CreateStruct {
-                struct_: Type::nothing(),
+                struct_: NamedType::nothing(),
                 fields: [].into(),
             },
             type_: Type::nothing(),
@@ -594,7 +574,7 @@ pub enum ExpressionKind {
     Int(i64),
     Text(Box<str>),
     CreateStruct {
-        struct_: Type,
+        struct_: NamedType,
         fields: Box<[Id]>,
     },
     StructAccess {

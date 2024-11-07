@@ -399,7 +399,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 );
             }
             hir::ExpressionKind::CreateStruct { struct_, fields } => {
-                let struct_ = self.context.lower_type(struct_);
+                let struct_ = self.context.lower_type(&struct_.clone().into());
                 let fields = self.lower_ids(fields);
                 self.push(
                     id,

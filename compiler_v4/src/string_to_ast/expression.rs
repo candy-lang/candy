@@ -43,7 +43,7 @@ pub fn expression(parser: Parser) -> Option<(Parser, AstExpression)> {
         .or_else(|| body(parser).map(|(parser, it)| (parser, AstExpressionKind::Body(it))))
         .or_else(|| switch(parser).map(|(parser, it)| (parser, AstExpressionKind::Switch(it))))?;
     let span = start_offset..parser.offset();
-    let mut result = AstExpression { kind, span };
+    let mut result = AstExpression { span, kind };
 
     loop {
         fn parse_suffix<'a>(
