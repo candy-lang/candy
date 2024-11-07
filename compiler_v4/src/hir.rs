@@ -312,7 +312,7 @@ pub enum Type {
     #[from]
     Parameter(ParameterType),
     Self_ {
-        base_type: NamedType,
+        base_type: Box<Type>,
     },
     Error,
 }
