@@ -7,10 +7,10 @@ use crate::{
     },
     error::CompilerError,
     hir::{
-        self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind,
-        Function, FunctionSignature, Hir, Id, Impl, NamedType, Parameter, ParameterType,
-        SliceOfTypeParameter, SwitchCase, Trait, TraitDefinition, TraitFunction, Type,
-        TypeDeclaration, TypeDeclarationKind, TypeParameter,
+        self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, ContainsError, Expression,
+        ExpressionKind, Function, FunctionSignature, Hir, Id, Impl, NamedType, Parameter,
+        ParameterType, SliceOfTypeParameter, SwitchCase, Trait, TraitDefinition, TraitFunction,
+        Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
     position::Offset,
@@ -1836,6 +1836,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             .iter()
             .map(|(_, type_)| type_.clone())
             .collect::<Box<_>>();
+
+        if argument_types.iter().any(ContainsError::contains_error) {
+            return LoweredExpression::Error;
+        }
 
         let (mut matches, mismatches): (Vec<_>, Vec<_>) = matches
             .into_iter()

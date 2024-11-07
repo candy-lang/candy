@@ -301,6 +301,8 @@ impl ToText for TypeParameter {
     }
 }
 
+// Type
+
 #[derive(Clone, Debug, Eq, From, Hash, PartialEq)]
 pub enum Type {
     // TODO: encode ADT, trait, or builtin type here
@@ -449,6 +451,27 @@ impl Display for NamedType {
             write!(f, "[{}]", self.type_arguments.iter().join(", "))?;
         }
         std::result::Result::Ok(())
+    }
+}
+
+pub trait ContainsError {
+    fn contains_error(&self) -> bool;
+}
+impl ContainsError for Type {
+    fn contains_error(&self) -> bool {
+        match self {
+            Self::Named(named_type) => named_type.contains_error(),
+            Self::Parameter(_) => false,
+            Self::Self_ { base_type } => base_type.contains_error(),
+            Self::Error => true,
+        }
+    }
+}
+impl ContainsError for NamedType {
+    fn contains_error(&self) -> bool {
+        self.type_arguments
+            .iter()
+            .any(ContainsError::contains_error)
     }
 }
 
