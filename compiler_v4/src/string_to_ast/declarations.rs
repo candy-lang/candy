@@ -15,7 +15,9 @@ use super::{
     word::raw_identifier,
 };
 use crate::ast::{
-    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstImpl, AstParameter, AstParameters, AstString, AstStruct, AstStructField, AstStructKind, AstTrait, AstTypeParameter, AstTypeParameters
+    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstImpl,
+    AstParameter, AstParameters, AstString, AstStruct, AstStructField, AstStructKind, AstTrait,
+    AstTypeParameter, AstTypeParameters,
 };
 use tracing::instrument;
 
@@ -329,7 +331,8 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
     let display_span = name.value().map_or(fun_keyword_span, |it| it.span.clone());
 
     let (parser, type_parameters) = type_parameters(parser).optional(parser);
-    let (parser, parameters) = parameters(parser).unwrap_or_ast_error(parser, "Expected parameters");
+    let (parser, parameters) =
+        parameters(parser).unwrap_or_ast_error(parser, "Expected parameters");
     let (parser, return_type) = type_(parser).optional(parser).and_trailing_whitespace();
     let (parser, body) = body(parser).optional(parser);
 
@@ -347,13 +350,13 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
 }
 #[instrument(level = "trace")]
 pub fn parameters<'a>(parser: Parser) -> Option<(Parser, AstParameters)> {
-    let mut parser = opening_parenthesis(parser)?
-        .and_trailing_whitespace();
+    let mut parser = opening_parenthesis(parser)?.and_trailing_whitespace();
 
     let mut parameters: Vec<AstParameter> = vec![];
     // TODO: error on duplicate parameter names
     let mut parser_for_missing_comma_error: Option<Parser> = None;
-    while let Some((new_parser, parameter, new_parser_for_missing_comma_error)) = parameter(parser) {
+    while let Some((new_parser, parameter, new_parser_for_missing_comma_error)) = parameter(parser)
+    {
         if let Some(parser_for_missing_comma_error) = parser_for_missing_comma_error {
             parameters.last_mut().unwrap().comma_error = Some(
                 parser_for_missing_comma_error
@@ -368,9 +371,18 @@ pub fn parameters<'a>(parser: Parser) -> Option<(Parser, AstParameters)> {
 
     let (parser, closing_parenthesis_error) = closing_parenthesis(parser)
         .and_trailing_whitespace()
-        .unwrap_or_ast_error(parser, "This parameter list is missing a closing parenthesis.");
+        .unwrap_or_ast_error(
+            parser,
+            "This parameter list is missing a closing parenthesis.",
+        );
 
-    Some((parser, AstParameters { parameters, closing_parenthesis_error }))
+    Some((
+        parser,
+        AstParameters {
+            parameters,
+            closing_parenthesis_error,
+        },
+    ))
 }
 #[instrument(level = "trace")]
 fn parameter<'a>(parser: Parser) -> Option<(Parser, AstParameter, Option<Parser>)> {
