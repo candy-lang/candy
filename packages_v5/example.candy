@@ -190,7 +190,7 @@ let valueWithoutExplicitType = 42
 #}
 
 fun fibonacci(n: Int) Int {
-  switch isLessThan(n, 2) {
+  switch n.isLessThan(2) {
     true => n,
     false => fibonacci(n.subtract(1)).add(fibonacci(n.subtract(2))),
   }
