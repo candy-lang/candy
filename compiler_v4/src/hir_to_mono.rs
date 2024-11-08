@@ -79,81 +79,7 @@ impl<'h> Context<'h> {
         substitutions: &FxHashMap<ParameterType, Type>,
     ) -> Box<str> {
         let function = self.hir.functions.get(&id).unwrap_or_else(|| {
-            let (trait_, function) = self
-                .hir
-                .traits
-                .iter()
-                .find_map(|(trait_, trait_definition)| {
-                    trait_definition
-                        .functions
-                        .get(&id)
-                        .map(|function| (trait_, function))
-                })
-                .unwrap();
-            let self_type = function
-                .signature
-                .parameters
-                .first()
-                .unwrap()
-                .type_
-                .substitute(substitutions);
-            let impl_ = self
-                .hir
-                .impls
-                .iter()
-                .find(|impl_| {
-                    if &impl_.trait_.name != trait_ {
-                        return false;
-                    }
-
-                    let mut unifier = TypeUnifier::new(&impl_.type_parameters);
-                    if unifier.unify(&self_type, &impl_.type_) != Ok(true) {
-                        return false;
-                    }
-
-                    let trait_declaration = &self.hir.traits[trait_];
-
-                    let self_goal =
-                        substitutions
-                            .get(&ParameterType::self_type())
-                            .map(|self_type| {
-                                trait_declaration
-                                    .solver_goal
-                                    .substitute_all(&FxHashMap::from_iter([(
-                                        SolverVariable::self_(),
-                                        self_type.clone().try_into().unwrap(),
-                                    )]))
-                            });
-
-                    let solver_substitutions = substitutions
-                        .iter()
-                        .filter_map(|(parameter_type, type_)| try {
-                            (
-                                SolverVariable::new(parameter_type.clone()),
-                                type_.clone().try_into().ok()?,
-                            )
-                        })
-                        .collect();
-
-                    self_goal
-                        .iter()
-                        .chain(trait_declaration.solver_subgoals.iter())
-                        .map(|subgoal| {
-                            let solution = self
-                                .hir
-                                .solver_environment
-                                .solve(&subgoal.substitute_all(&solver_substitutions), &[]);
-                            match solution {
-                                SolverSolution::Unique(solution) => Some(solution.used_rule),
-                                SolverSolution::Ambiguous => panic!(),
-                                SolverSolution::Impossible => None,
-                            }
-                        })
-                        .collect::<Option<Vec<_>>>()
-                        .is_some()
-                })
-                .unwrap();
-            &impl_.functions[&id]
+            &self.find_impl_for(id, substitutions).functions[&id]
         });
 
         let name = self.mangle_function(
@@ -199,6 +125,80 @@ impl<'h> Context<'h> {
         };
         *self.functions.get_mut(&name).unwrap() = Some(function);
         name
+    }
+    fn find_impl_for(
+        &self,
+        function_id: hir::Id,
+        substitutions: &FxHashMap<hir::ParameterType, hir::Type>,
+    ) -> &'h hir::Impl {
+        let (trait_, function) = self
+            .hir
+            .traits
+            .iter()
+            .find_map(|(trait_, trait_definition)| {
+                trait_definition
+                    .functions
+                    .get(&function_id)
+                    .map(|function| (trait_, function))
+            })
+            .unwrap();
+        let self_type = function.signature.parameters[0]
+            .type_
+            .substitute(substitutions);
+        self.hir
+            .impls
+            .iter()
+            .find(|impl_| {
+                if &impl_.trait_.name != trait_ {
+                    return false;
+                }
+
+                let mut unifier = TypeUnifier::new(&impl_.type_parameters);
+                if unifier.unify(&self_type, &impl_.type_) != Ok(true) {
+                    return false;
+                }
+
+                let trait_declaration = &self.hir.traits[trait_];
+
+                let self_goal = substitutions
+                    .get(&ParameterType::self_type())
+                    .map(|self_type| {
+                        trait_declaration
+                            .solver_goal
+                            .substitute_all(&FxHashMap::from_iter([(
+                                SolverVariable::self_(),
+                                self_type.clone().try_into().unwrap(),
+                            )]))
+                    });
+
+                let solver_substitutions = substitutions
+                    .iter()
+                    .filter_map(|(parameter_type, type_)| try {
+                        (
+                            SolverVariable::new(parameter_type.clone()),
+                            type_.clone().try_into().ok()?,
+                        )
+                    })
+                    .collect();
+
+                self_goal
+                    .iter()
+                    .chain(trait_declaration.solver_subgoals.iter())
+                    .map(|subgoal| {
+                        let solution = self
+                            .hir
+                            .solver_environment
+                            .solve(&subgoal.substitute_all(&solver_substitutions), &[]);
+                        match solution {
+                            SolverSolution::Unique(solution) => Some(solution.used_rule),
+                            SolverSolution::Ambiguous => panic!(),
+                            SolverSolution::Impossible => None,
+                        }
+                    })
+                    .collect::<Option<Vec<_>>>()
+                    .is_some()
+            })
+            .unwrap()
     }
     fn mangle_function(
         &mut self,
