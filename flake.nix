@@ -48,6 +48,7 @@
               rust-analyzer
               sccache
               valgrind
+              vsce
             ];
           };
       });
