@@ -512,12 +512,20 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 let enum_ = self.lower_type(enum_);
                 let cases = cases
                     .iter()
-                    .map(|case| mono::SwitchCase {
-                        variant: case.variant.clone(),
-                        value_id: case.value_id.map(|id| self.lower_id(id)),
-                        body: BodyBuilder::build_inner(self, |builder| {
-                            builder.lower_expressions(&case.body.expressions);
-                        }),
+                    .map(|case| {
+                        let value_ids = case
+                            .value_id
+                            .map(|hir_id| (hir_id, self.id_generator.generate()));
+                        mono::SwitchCase {
+                            variant: case.variant.clone(),
+                            value_id: value_ids.map(|(_, mir_id)| mir_id),
+                            body: BodyBuilder::build_inner(self, |builder| {
+                                if let Some((hir_id, mir_id)) = value_ids {
+                                    builder.id_mapping.force_insert(hir_id, mir_id);
+                                }
+                                builder.lower_expressions(&case.body.expressions);
+                            }),
+                        }
                     })
                     .collect();
                 self.push(

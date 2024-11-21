@@ -467,7 +467,10 @@ impl<'h> Context<'h> {
                             .value_type
                             .as_ref()
                             .unwrap();
-                        self.push(format!("{variant_type}* {value_id} = {value}->value;\n"));
+                        self.push(format!(
+                            "{variant_type}* {value_id} = {value}->value.{};\n",
+                            case.variant,
+                        ));
                     }
 
                     self.lower_body_expressions(&case.body);
