@@ -61,7 +61,15 @@ impl Ordering: ToText {
     }
   }
 }
-# TODO: `impl[T: Compare] T: Equal {}`
+impl[T: Compare] T: Equal {
+  fun equals(self: T, other: T) Bool {
+    switch self.compareTo(other) {
+      less => false,
+      equal => true,
+      greater => false,
+    }
+  }
+}
 
 trait Add {
   fun add(self: Self, other: Self) Self
@@ -136,8 +144,8 @@ struct MyStruct {
 }
 
 enum Bool { true, false }
-let true: Bool = Bool.true
-let false: Bool = Bool.false
+let true: Bool = Bool.true()
+let false: Bool = Bool.false()
 impl Bool: ToText {
   fun toText(self: Bool) Text {
     switch self {
@@ -146,6 +154,25 @@ impl Bool: ToText {
     }
   }
 }
+
+enum Maybe[T] {
+  some: T,
+  none,
+}
+fun some[T](value: T) Maybe[T] {
+  Maybe.some(value)
+}
+fun none[T]() Maybe[T] {
+  Maybe.none[T]()
+}
+# impl[T] Maybe[T]: ToText {
+#   fun toText(self: Maybe[T]) Text {
+#     switch self {
+#       some(value) => "some({value.toText()})",
+#       none => "none()",
+#     }
+#   }
+# }
 
 enum MyEnum {
   foo: Int,
@@ -189,7 +216,7 @@ let valueWithoutExplicitType = 42
 #}
 
 fun fibonacci(n: Int) Int {
-  switch isLessThan(n, 2) {
+  switch n.isLessThan(2) {
     true => n,
     false => fibonacci(n.subtract(1)).add(fibonacci(n.subtract(2))),
   }
@@ -214,9 +241,10 @@ fun main() Int {
 #
 #  theAnswer
   print("fibonacci(20) = {fibonacci(20).toText()}")
-  print(Ordering.less)
+  print(Ordering.less())
   print(true)
   print(false)
+  print("1.equals(2): {1.equals(2).toText()}")
   print("Length: {listOf(true, false).length().toText()}")
   0
 }

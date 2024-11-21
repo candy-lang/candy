@@ -301,6 +301,8 @@ impl ToText for TypeParameter {
     }
 }
 
+// Type
+
 #[derive(Clone, Debug, Eq, From, Hash, PartialEq)]
 pub enum Type {
     // TODO: encode ADT, trait, or builtin type here
@@ -310,7 +312,7 @@ pub enum Type {
     #[from]
     Parameter(ParameterType),
     Self_ {
-        base_type: NamedType,
+        base_type: Box<Type>,
     },
     Error,
 }
@@ -452,6 +454,27 @@ impl Display for NamedType {
     }
 }
 
+pub trait ContainsError {
+    fn contains_error(&self) -> bool;
+}
+impl ContainsError for Type {
+    fn contains_error(&self) -> bool {
+        match self {
+            Self::Named(named_type) => named_type.contains_error(),
+            Self::Parameter(_) => false,
+            Self::Self_ { base_type } => base_type.contains_error(),
+            Self::Error => true,
+        }
+    }
+}
+impl ContainsError for NamedType {
+    fn contains_error(&self) -> bool {
+        self.type_arguments
+            .iter()
+            .any(ContainsError::contains_error)
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Assignment {
     pub name: Box<str>,
@@ -582,7 +605,7 @@ pub enum ExpressionKind {
         field: Box<str>,
     },
     CreateEnum {
-        enum_: Type,
+        enum_: NamedType,
         variant: Box<str>,
         value: Option<Id>,
     },
