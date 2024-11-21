@@ -81,12 +81,12 @@ impl<'a> TraitDeclaration<'a> {
                         .type_parameters
                         .iter()
                         .zip(trait_function.signature.type_parameters.iter())
-                        .all(|(function, signature)| {
-                            function.upper_bound
-                                == signature
-                                    .upper_bound
-                                    .as_ref()
-                                    .map(|it| it.as_ref().map(|it| it.substitute(substitutions)))
+                        .all(|(impl_type_parameter, trait_type_parameter)| {
+                            impl_type_parameter.name == trait_type_parameter.name
+                                && impl_type_parameter.upper_bound
+                                    == trait_type_parameter.upper_bound.as_ref().map(|it| {
+                                        it.as_ref().map(|it| it.substitute(substitutions))
+                                    })
                         })
                     && impl_function.signature.parameters.len()
                         == trait_function.signature.parameters.len()
@@ -95,8 +95,10 @@ impl<'a> TraitDeclaration<'a> {
                         .parameters
                         .iter()
                         .zip(trait_function.signature.parameters.iter())
-                        .all(|(function, signature)| {
-                            function.type_ == signature.type_.substitute(substitutions)
+                        .all(|(impl_parameter, trait_parameter)| {
+                            impl_parameter.name == trait_parameter.name
+                                && impl_parameter.type_
+                                    == trait_parameter.type_.substitute(substitutions)
                         })
                     && impl_function.signature.return_type
                         == trait_function
