@@ -108,6 +108,10 @@ impl Text: ToText {
   }
 }
 
+fun panic(message: Text) Never {
+  builtinPanic(message)
+}
+
 struct List[T] = builtin
 fun listFilled[T](length: Int, item: T) List[T] {
   builtinListFilled(length, item)
