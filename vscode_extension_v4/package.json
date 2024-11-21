@@ -43,6 +43,13 @@
         ],
         "configuration": "./declarative/language-configuration.json"
       }
+    ],
+    "grammars": [
+      {
+        "language": "candy",
+        "scopeName": "source.candy",
+        "path": "./candy.tmGrammar.json"
+      }
     ]
   },
   "scripts": {
