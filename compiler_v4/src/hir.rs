@@ -720,6 +720,7 @@ pub enum BuiltinFunction {
     Print,
     TextConcat,
     TextGetRange,
+    TextLength,
 }
 impl BuiltinFunction {
     #[must_use]
@@ -818,6 +819,12 @@ impl BuiltinFunction {
                 ]
                 .into(),
                 return_type: NamedType::text().into(),
+            },
+            Self::TextLength => BuiltinFunctionSignature {
+                name: "builtinTextLength".into(),
+                type_parameters: Box::default(),
+                parameters: [("text".into(), NamedType::text().into())].into(),
+                return_type: NamedType::int().into(),
             },
         }
     }

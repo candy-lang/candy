@@ -102,6 +102,9 @@ impl Int: Subtract {
 }
 
 struct Text = builtin
+fun length(self: Text) Int {
+  self.builtinTextLength()
+}
 fun concat(self: Text, other: Text) Text {
   self.builtinTextConcat(other)
 }

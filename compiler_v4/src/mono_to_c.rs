@@ -298,6 +298,13 @@ impl<'h> Context<'h> {
                         start_inclusive = function.parameters[1].id,
                         end_exclusive = function.parameters[2].id,
                     )),
+                    BuiltinFunction::TextLength => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = strlen({text}->value);
+                        return result_pointer;",
+                        text = function.parameters[0].id,
+                    )),
                 }
             }
             BodyOrBuiltin::Body(body) => self.lower_body(body),
