@@ -168,14 +168,14 @@ fun some[T](value: T) Maybe[T] {
 fun none[T]() Maybe[T] {
   Maybe.none[T]()
 }
-# impl[T] Maybe[T]: ToText {
-#   fun toText(self: Maybe[T]) Text {
-#     switch self {
-#       some(value) => "some({value.toText()})",
-#       none => "none()",
-#     }
-#   }
-# }
+impl[T: ToText] Maybe[T]: ToText {
+  fun toText(self: Maybe[T]) Text {
+    switch self {
+      some(value) => "some({value.toText()})",
+      none => "none()",
+    }
+  }
+}
 
 enum MyEnum {
   foo: Int,
@@ -248,7 +248,10 @@ fun main() Int {
   print(true)
   print(false)
   print("1.equals(2): {1.equals(2).toText()}")
-  print("Length: {listOf(true, false).length().toText()}")
+
+  let list = listOf(true, false)
+  print("Length: {list.length().toText()}")
+  print("[{list.get(0).toText()}, {list.get(1).toText()}, {list.get(2).toText()}]")
   0
 }
 
