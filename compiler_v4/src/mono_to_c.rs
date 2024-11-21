@@ -176,7 +176,10 @@ impl<'h> Context<'h> {
     }
     fn lower_body_or_builtin(&mut self, function: &Function) {
         match &function.body {
-            BodyOrBuiltin::Builtin(builtin_function) => {
+            BodyOrBuiltin::Builtin {
+                builtin_function,
+                substitutions,
+            } => {
                 self.push("// builtin function\n");
                 match builtin_function {
                     BuiltinFunction::IntAdd => self.push(format!(
@@ -225,7 +228,7 @@ impl<'h> Context<'h> {
                             result_pointer->values[i] = {item};
                         }}
                         return result_pointer;",
-                        item_type = function.parameters[0].type_,
+                        item_type = substitutions["T"],
                         list_type = function.return_type,
                         length = function.parameters[0].id,
                         item = function.parameters[1].id,
@@ -264,7 +267,7 @@ impl<'h> Context<'h> {
                         result_pointer->values[{index}->value] = {item};
                         memcpy(result_pointer->values + {index}->value + 1, {list}->values + {index}->value, ({list}->length - {index}->value) * sizeof({item_type}));
                         return result_pointer;",
-                        item_type = function.parameters[2].type_,
+                        item_type = substitutions["T"],
                         list_type = function.return_type,
                         list = function.parameters[0].id,
                         index = function.parameters[1].id,
@@ -292,7 +295,7 @@ impl<'h> Context<'h> {
                         result_pointer->values = malloc(sizeof({item_type}));
                         result_pointer->values[0] = {item0};
                         return result_pointer;",
-                        item_type = function.parameters[0].type_,
+                        item_type = substitutions["T"],
                         list_type = function.return_type,
                         item0 = function.parameters[0].id,
                     )),
@@ -304,7 +307,7 @@ impl<'h> Context<'h> {
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         return result_pointer;",
-                        item_type = function.parameters[0].type_,
+                        item_type = substitutions["T"],
                         list_type = function.return_type,
                         item0 = function.parameters[0].id,
                         item1 = function.parameters[1].id,
@@ -318,7 +321,7 @@ impl<'h> Context<'h> {
                         result_pointer->values[1] = {item1};
                         result_pointer->values[2] = {item2};
                         return result_pointer;",
-                        item_type = function.parameters[0].type_,
+                        item_type = substitutions["T"],
                         list_type = function.return_type,
                         item0 = function.parameters[0].id,
                         item1 = function.parameters[1].id,
@@ -334,7 +337,7 @@ impl<'h> Context<'h> {
                         result_pointer->values[2] = {item2};
                         result_pointer->values[3] = {item3};
                         return result_pointer;",
-                        item_type = function.parameters[0].type_,
+                        item_type = substitutions["T"],
                         list_type = function.return_type,
                         item0 = function.parameters[0].id,
                         item1 = function.parameters[1].id,
@@ -352,7 +355,7 @@ impl<'h> Context<'h> {
                         result_pointer->values[3] = {item3};
                         result_pointer->values[4] = {item4};
                         return result_pointer;",
-                        item_type = function.parameters[0].type_,
+                        item_type = substitutions["T"],
                         list_type = function.return_type,
                         item0 = function.parameters[0].id,
                         item1 = function.parameters[1].id,
@@ -375,11 +378,11 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {list}->length;
-                        result_pointer->values = malloc({list}->length * sizeof({item_type}));
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
                         memcpy(result_pointer->values, {list}->values, {list}->length * sizeof({item_type}));
                         result_pointer->values[{index}->value] = {new_item};
                         return result_pointer;",
-                        item_type = function.parameters[2].type_,
+                        item_type = substitutions["T"],
                         list_type = function.return_type,
                         list = function.parameters[0].id,
                         index = function.parameters[1].id,

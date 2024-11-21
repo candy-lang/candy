@@ -132,7 +132,18 @@ impl<'h> Context<'h> {
                 let (parameters, _) = BodyBuilder::build(self, &substitutions, |builder| {
                     builder.add_parameters(&function.signature.parameters);
                 });
-                (parameters, mono::BodyOrBuiltin::Builtin(*builtin_function))
+                (
+                    parameters,
+                    mono::BodyOrBuiltin::Builtin {
+                        builtin_function: *builtin_function,
+                        substitutions: substitutions
+                            .iter()
+                            .map(|(parameter_type, type_)| {
+                                (parameter_type.name.clone(), self.lower_type(type_))
+                            })
+                            .collect(),
+                    },
+                )
             }
         };
         let return_type = function.signature.return_type.substitute(&substitutions);
