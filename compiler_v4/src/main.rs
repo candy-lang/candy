@@ -100,7 +100,7 @@ fn debug(options: DebugOptions) -> ProgramResult {
             let source = fs::read_to_string(&options.path).unwrap();
             let ast = string_to_ast::string_to_ast(&options.path, &source);
             println!("{ast:#?}");
-        },
+        }
         DebugOptions::Hir(options) => {
             let source = fs::read_to_string(&options.path).unwrap();
             let (hir, errors) = compile_hir(&options.path, &source);
@@ -111,7 +111,7 @@ fn debug(options: DebugOptions) -> ProgramResult {
                 return Err(Exit::CodeContainsErrors);
             }
             println!("{}", hir.to_text(true));
-        },
+        }
         DebugOptions::Mono(options) => {
             let source = fs::read_to_string(&options.path).unwrap();
             let (hir, errors) = compile_hir(&options.path, &source);
@@ -123,7 +123,7 @@ fn debug(options: DebugOptions) -> ProgramResult {
             }
             let mono = hir_to_mono(&hir);
             println!("{mono:?}");
-        },
+        }
     }
     Ok(())
 }
