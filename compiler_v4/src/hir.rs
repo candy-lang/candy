@@ -719,6 +719,7 @@ pub enum BuiltinFunction {
     Panic,
     Print,
     TextConcat,
+    TextGetRange,
 }
 impl BuiltinFunction {
     #[must_use]
@@ -803,6 +804,17 @@ impl BuiltinFunction {
                 parameters: [
                     ("a".into(), NamedType::text().into()),
                     ("b".into(), NamedType::text().into()),
+                ]
+                .into(),
+                return_type: NamedType::text().into(),
+            },
+            Self::TextGetRange => BuiltinFunctionSignature {
+                name: "builtinTextGetRange".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("text".into(), NamedType::text().into()),
+                    ("startInclusive".into(), NamedType::int().into()),
+                    ("endExclusive".into(), NamedType::int().into()),
                 ]
                 .into(),
                 return_type: NamedType::text().into(),

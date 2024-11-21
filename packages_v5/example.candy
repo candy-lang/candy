@@ -102,6 +102,9 @@ impl Int: Subtract {
 }
 
 struct Text = builtin
+fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
+  self.builtinTextGetRange(startInclusive, endExclusive)
+}
 impl Text: ToText {
   fun toText(self: Text) Text {
     self

@@ -266,6 +266,38 @@ impl<'h> Context<'h> {
                         a = function.parameters[0].id,
                         b = function.parameters[1].id,
                     )),
+                    BuiltinFunction::TextGetRange => self.push(format!(
+                        "\
+                        size_t text_length = strlen({text}->value);
+                        if (0 > {start_inclusive}->value || {start_inclusive}->value > text_length
+                            || 0 > {end_exclusive}->value || {end_exclusive}->value > text_length) {{
+                            char* message_format = \"Index out of bounds: Tried getting range %ld..%ld from text that is only %ld long.\";
+                            int length = snprintf(NULL, 0, message_format, {start_inclusive}->value, {end_exclusive}->value, text_length);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {start_inclusive}->value, {end_exclusive}->value, text_length);
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }} else if ({start_inclusive}->value > {end_exclusive}->value) {{
+                            char* message_format = \"Invalid range %ld..%ld: `start_inclusive` must be less than or equal to `end_exclusive`.\";
+                            int length = snprintf(NULL, 0, message_format, {start_inclusive}->value, {end_exclusive}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {start_inclusive}->value, {end_exclusive}->value);
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        size_t length = {end_exclusive}->value - {start_inclusive}->value;\n\
+                        char* result = malloc(length + 1);\n\
+                        memcpy(result, {text}->value + {start_inclusive}->value, length);\n\
+                        Text* result_pointer = malloc(sizeof(Text));
+                        result_pointer->value = result;
+                        return result_pointer;",
+                        text = function.parameters[0].id,
+                        start_inclusive = function.parameters[1].id,
+                        end_exclusive = function.parameters[2].id,
+                    )),
                 }
             }
             BodyOrBuiltin::Body(body) => self.lower_body(body),

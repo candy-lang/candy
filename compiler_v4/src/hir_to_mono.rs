@@ -1,6 +1,6 @@
 use crate::{
     ast_to_hir::TypeUnifier,
-    hir::{self, Hir, NamedType, ParameterType, Type},
+    hir::{self, BuiltinFunction, Hir, NamedType, ParameterType, Type},
     id::IdGenerator,
     mono::{self, Mono},
     type_solver::{goals::SolverSolution, values::SolverVariable},
@@ -32,6 +32,7 @@ impl<'h> Context<'h> {
             functions: FxHashMap::default(),
         };
         let main_function = context.lower_function(hir.main_function_id, &FxHashMap::default());
+        context.lower_function(BuiltinFunction::Panic.id(), &FxHashMap::default());
         Mono {
             type_declarations: context
                 .type_declarations
