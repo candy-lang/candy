@@ -346,12 +346,16 @@ impl NamedType {
 
     // Standard library types
     #[must_use]
-    pub fn nothing() -> Self {
-        Self::new("Nothing", [])
+    pub fn maybe(t: impl Into<Type>) -> Self {
+        Self::new("Maybe", [t.into()])
     }
     #[must_use]
     pub fn never() -> Self {
         Self::new("Never", [])
+    }
+    #[must_use]
+    pub fn nothing() -> Self {
+        Self::new("Nothing", [])
     }
     #[must_use]
     pub fn ordering() -> Self {
@@ -715,6 +719,7 @@ pub enum BuiltinFunction {
     IntSubtract,
     IntToText,
     ListFilled,
+    ListGet,
     ListLength,
     ListOf0,
     ListOf1,
@@ -780,6 +785,19 @@ impl BuiltinFunction {
                 ]
                 .into(),
                 return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListGet => BuiltinFunctionSignature {
+                name: "builtinListGet".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    (
+                        "list".into(),
+                        NamedType::list(ParameterType::new("T")).into(),
+                    ),
+                    ("index".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::maybe(ParameterType::new("T")).into(),
             },
             Self::ListLength => BuiltinFunctionSignature {
                 name: "builtinListLength".into(),

@@ -230,12 +230,26 @@ impl<'h> Context<'h> {
                         length = function.parameters[0].id,
                         item = function.parameters[1].id,
                     )),
+                    BuiltinFunction::ListGet => self.push(format!(
+                        "\
+                        {return_type}* result_pointer = malloc(sizeof({return_type}));
+                        if (0 <= {index}->value && {index}->value < {list}->length) {{
+                            result_pointer->variant = {return_type}_some;
+                            result_pointer->value.some = {list}->values[{index}->value];
+                        }} else {{
+                            result_pointer->variant = {return_type}_none;
+                        }}
+                        return result_pointer;",
+                        return_type = function.return_type,
+                        list = function.parameters[0].id,
+                        index = function.parameters[1].id,
+                    )),
                     BuiltinFunction::ListLength => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
-                        result_pointer->value = {array}->length;
+                        result_pointer->value = {list}->length;
                         return result_pointer;",
-                        array = function.parameters[0].id,
+                        list = function.parameters[0].id,
                     )),
                     BuiltinFunction::ListOf0 => self.push(format!(
                         "\

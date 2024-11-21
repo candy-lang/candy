@@ -133,6 +133,9 @@ fun listOf[T](item0: T, item1: T, item2: T, item3: T, item4: T) List[T] {
 fun length[T](list: List[T]) Int {
   builtinListLength(list)
 }
+fun get[T](list: List[T], index: Int) Maybe[T] {
+  builtinListGet(list, index)
+}
 
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
