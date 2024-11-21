@@ -730,6 +730,7 @@ pub enum BuiltinFunction {
     ListOf3,
     ListOf4,
     ListOf5,
+    ListRemoveAt,
     ListReplace,
     Panic,
     Print,
@@ -881,6 +882,19 @@ impl BuiltinFunction {
                     ("item2".into(), ParameterType::new("T").into()),
                     ("item3".into(), ParameterType::new("T").into()),
                     ("item4".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListRemoveAt => BuiltinFunctionSignature {
+                name: "builtinListRemoveAt".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    (
+                        "list".into(),
+                        NamedType::list(ParameterType::new("T")).into(),
+                    ),
+                    ("index".into(), NamedType::int().into()),
                 ]
                 .into(),
                 return_type: NamedType::list(ParameterType::new("T")).into(),

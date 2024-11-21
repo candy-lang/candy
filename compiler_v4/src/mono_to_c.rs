@@ -363,6 +363,30 @@ impl<'h> Context<'h> {
                         item3 = function.parameters[3].id,
                         item4 = function.parameters[4].id,
                     )),
+                    BuiltinFunction::ListRemoveAt => self.push(format!(
+                        "\
+                        if (0 > {index}->value || {index}->value >= {list}->length) {{
+                            char* message_format = \"Index out of bounds: Tried removing item at index %ld from list of length %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {index}->value, {list}->length);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {index}->value, {list}->length);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {list}->length - 1;
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
+                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}));
+                        memcpy(result_pointer->values + {index}->value, {list}->values + {index}->value + 1, ({list}->length - {index}->value - 1) * sizeof({item_type}));
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        list = function.parameters[0].id,
+                        index = function.parameters[1].id,
+                    )),
                     BuiltinFunction::ListReplace => self.push(format!(
                         "\
                         if (0 > {index}->value || {index}->value >= {list}->length) {{

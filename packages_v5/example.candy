@@ -164,6 +164,10 @@ fun append[T](list: List[T], item: T) List[T] {
 fun replace[T](list: List[T], index: Int, item: T) List[T] {
   builtinListReplace(list, index, item)
 }
+# TODO: list.update
+fun removeAt[T](list: List[T], index: Int) List[T] {
+  builtinListRemoveAt(list, index)
+}
 
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
@@ -283,7 +287,7 @@ fun main() Int {
   print(false)
   print("1.equals(2): {1.equals(2).toText()}")
 
-  let list = listOf(0, 1).insert(1, 2).replace(0, 3)
+  let list = listOf(0, 1).insert(1, 2).replace(0, 3).removeAt(2)
   print("Length: {list.length().toText()}")
   print("[{list.get(0).toText()}, {list.get(1).toText()}, {list.get(2).toText()}]")
   0
