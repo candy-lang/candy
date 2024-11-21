@@ -693,6 +693,12 @@ pub enum BuiltinFunction {
     IntToText,
     ListFilled,
     ListLength,
+    ListOf0,
+    ListOf1,
+    ListOf2,
+    ListOf3,
+    ListOf4,
+    ListOf5,
     Panic,
     Print,
     TextConcat,
@@ -761,6 +767,64 @@ impl BuiltinFunction {
                 )]
                 .into(),
                 return_type: NamedType::int().into(),
+            },
+            Self::ListOf0 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: Box::default(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf1 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [("item0".into(), ParameterType::new("T").into())].into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf2 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("item0".into(), ParameterType::new("T").into()),
+                    ("item1".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf3 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("item0".into(), ParameterType::new("T").into()),
+                    ("item1".into(), ParameterType::new("T").into()),
+                    ("item2".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf4 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("item0".into(), ParameterType::new("T").into()),
+                    ("item1".into(), ParameterType::new("T").into()),
+                    ("item2".into(), ParameterType::new("T").into()),
+                    ("item3".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf5 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("item0".into(), ParameterType::new("T").into()),
+                    ("item1".into(), ParameterType::new("T").into()),
+                    ("item2".into(), ParameterType::new("T").into()),
+                    ("item3".into(), ParameterType::new("T").into()),
+                    ("item4".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
             },
             Self::Panic => BuiltinFunctionSignature {
                 name: "builtinPanic".into(),

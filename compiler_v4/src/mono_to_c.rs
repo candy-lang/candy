@@ -218,14 +218,15 @@ impl<'h> Context<'h> {
                     )),
                     BuiltinFunction::ListFilled => self.push(format!(
                         "\
-                        {array_type}* result_pointer = malloc(sizeof({array_type}));
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {length}->value;
-                        result_pointer->values = malloc({length}->value * sizeof({array_type}));
+                        result_pointer->values = malloc({length}->value * sizeof({item_type}));
                         for (uint64_t i = 0; i < {length}->value; i++) {{
                             result_pointer->values[i] = {item};
                         }}
                         return result_pointer;",
-                        array_type = function.return_type,
+                        item_type = function.parameters[0].type_,
+                        list_type = function.return_type,
                         length = function.parameters[0].id,
                         item = function.parameters[1].id,
                     )),
@@ -235,6 +236,89 @@ impl<'h> Context<'h> {
                         result_pointer->value = {array}->length;
                         return result_pointer;",
                         array = function.parameters[0].id,
+                    )),
+                    BuiltinFunction::ListOf0 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 0;
+                        result_pointer->values = nullptr;
+                        return result_pointer;",
+                        list_type = function.return_type,
+                    )),
+                    BuiltinFunction::ListOf1 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 1;
+                        result_pointer->values = malloc(sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        return result_pointer;",
+                        item_type = function.parameters[0].type_,
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                    )),
+                    BuiltinFunction::ListOf2 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 2;
+                        result_pointer->values = malloc(2 * sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        result_pointer->values[1] = {item1};
+                        return result_pointer;",
+                        item_type = function.parameters[0].type_,
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                        item1 = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::ListOf3 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 3;
+                        result_pointer->values = malloc(3 * sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        result_pointer->values[1] = {item1};
+                        result_pointer->values[2] = {item2};
+                        return result_pointer;",
+                        item_type = function.parameters[0].type_,
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                        item1 = function.parameters[1].id,
+                        item2 = function.parameters[2].id,
+                    )),
+                    BuiltinFunction::ListOf4 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 4;
+                        result_pointer->values = malloc(4 * sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        result_pointer->values[1] = {item1};
+                        result_pointer->values[2] = {item2};
+                        result_pointer->values[3] = {item3};
+                        return result_pointer;",
+                        item_type = function.parameters[0].type_,
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                        item1 = function.parameters[1].id,
+                        item2 = function.parameters[2].id,
+                        item3 = function.parameters[3].id,
+                    )),
+                    BuiltinFunction::ListOf5 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 5;
+                        result_pointer->values = malloc(5 * sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        result_pointer->values[1] = {item1};
+                        result_pointer->values[2] = {item2};
+                        result_pointer->values[3] = {item3};
+                        result_pointer->values[4] = {item4};
+                        return result_pointer;",
+                        item_type = function.parameters[0].type_,
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                        item1 = function.parameters[1].id,
+                        item2 = function.parameters[2].id,
+                        item3 = function.parameters[3].id,
+                        item4 = function.parameters[4].id,
                     )),
                     BuiltinFunction::Panic => {
                         self.push(format!(

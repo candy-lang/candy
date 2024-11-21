@@ -104,6 +104,24 @@ struct List[T] = builtin
 fun listFilled[T](length: Int, item: T) List[T] {
   builtinListFilled(length, item)
 }
+fun listOf[T]() List[T] {
+  builtinListOf[T]()
+}
+fun listOf[T](item0: T) List[T] {
+  builtinListOf(item0)
+}
+fun listOf[T](item0: T, item1: T) List[T] {
+  builtinListOf(item0, item1)
+}
+fun listOf[T](item0: T, item1: T, item2) List[T] {
+  builtinListOf(item0, item1, item2)
+}
+fun listOf[T](item0: T, item1: T, item2: T, item3: T) List[T] {
+  builtinListOf(item0, item1, item2, item3)
+}
+fun listOf[T](item0: T, item1: T, item2: T, item3: T, item4: T) List[T] {
+  builtinListOf(item0, item1, item2, item3, item4)
+}
 fun length[T](list: List[T]) Int {
   builtinListLength(list)
 }
@@ -199,6 +217,7 @@ fun main() Int {
   print(Ordering.less)
   print(true)
   print(false)
+  print("Length: {listOf(true, false).length().toText()}")
   0
 }
 
