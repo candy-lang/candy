@@ -422,8 +422,10 @@ impl Type {
 
     #[must_use]
     pub fn equals_lenient(&self, other: &Self) -> bool {
+        #[allow(clippy::redundant_guards)]
         match (self, other) {
             (Self::Error, _) | (_, Self::Error) => true,
+            (Self::Named(NamedType { box name, .. }), _) if name == "Never" => true,
             (Self::Named(from), Self::Named(to)) => {
                 from.name == to.name
                     && from
