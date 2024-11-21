@@ -253,6 +253,17 @@ impl<'h> Context<'h> {
                             function.parameters[0].id,
                         ));
                     }
+                    BuiltinFunction::TextCompareTo => self.push(format!(
+                        "\
+                        int raw_result = strcmp({a}->value, {b}->value);
+                        Ordering* result_pointer = malloc(sizeof(Ordering));
+                        result_pointer->variant = raw_result < 0    ? Ordering_less
+                                                  : raw_result == 0 ? Ordering_equal
+                                                                    : Ordering_greater;
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                    )),
                     BuiltinFunction::TextConcat => self.push(format!(
                         "\
                         size_t lengthA = strlen({a}->value);\n\

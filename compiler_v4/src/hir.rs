@@ -718,6 +718,7 @@ pub enum BuiltinFunction {
     IntToText,
     Panic,
     Print,
+    TextCompareTo,
     TextConcat,
     TextGetRange,
     TextLength,
@@ -798,6 +799,16 @@ impl BuiltinFunction {
                 type_parameters: Box::default(),
                 parameters: [("message".into(), NamedType::text().into())].into(),
                 return_type: NamedType::nothing().into(),
+            },
+            Self::TextCompareTo => BuiltinFunctionSignature {
+                name: "builtinTextCompareTo".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("a".into(), NamedType::text().into()),
+                    ("b".into(), NamedType::text().into()),
+                ]
+                .into(),
+                return_type: NamedType::ordering().into(),
             },
             Self::TextConcat => BuiltinFunctionSignature {
                 name: "builtinTextConcat".into(),

@@ -116,6 +116,11 @@ impl Text: ToText {
     self
   }
 }
+impl Text: Compare {
+  fun compareTo(self: Text, other: Text) Ordering {
+    self.builtinTextCompareTo(other)
+  }
+}
 
 struct Array[T] = builtin
 fun arrayFilled[T](length: Int, item: T) Array[T] {
