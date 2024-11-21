@@ -82,12 +82,16 @@ impl<'h> Context<'h> {
         let function = self.hir.functions.get(&id).unwrap_or_else(|| {
             let impl_ = self.find_impl_for(id, &substitutions);
             let function = &impl_.functions[&id];
-            if let Type::Parameter(parameter_type) = &impl_.type_ {
-                let self_type = substitutions[&ParameterType::self_type()].clone();
-                substitutions
-                    .to_mut()
-                    .force_insert(parameter_type.clone(), self_type);
+
+            let mut unifier = TypeUnifier::new(&impl_.type_parameters);
+            assert!(unifier
+                .unify(&substitutions[&ParameterType::self_type()], &impl_.type_)
+                .unwrap());
+            let substitutions = substitutions.to_mut();
+            for (parameter_type, type_) in unifier.finish().unwrap() {
+                substitutions.force_insert(parameter_type, type_);
             }
+
             function
         });
 
