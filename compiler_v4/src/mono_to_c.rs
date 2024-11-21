@@ -77,14 +77,14 @@ impl<'h> Context<'h> {
                     type_arguments,
                 } => {
                     match name.as_ref() {
-                        "Array" => {
-                            assert_eq!(type_arguments.len(), 1);
-                            self.push("uint64_t length;\n");
-                            self.push(format!("{}** values;\n", type_arguments[0]));
-                        }
                         "Int" => {
                             assert!(type_arguments.is_empty());
                             self.push("uint64_t value;\n");
+                        }
+                        "List" => {
+                            assert_eq!(type_arguments.len(), 1);
+                            self.push("uint64_t length;\n");
+                            self.push(format!("{}** values;\n", type_arguments[0]));
                         }
                         "Text" => {
                             assert!(type_arguments.is_empty());
@@ -179,26 +179,6 @@ impl<'h> Context<'h> {
             BodyOrBuiltin::Builtin(builtin_function) => {
                 self.push("// builtin function\n");
                 match builtin_function {
-                    BuiltinFunction::ArrayFilled => self.push(format!(
-                        "\
-                        {array_type}* result_pointer = malloc(sizeof({array_type}));
-                        result_pointer->length = {length}->value;
-                        result_pointer->values = malloc({length}->value * sizeof({array_type}));
-                        for (uint64_t i = 0; i < {length}->value; i++) {{
-                            result_pointer->values[i] = {item};
-                        }}
-                        return result_pointer;",
-                        array_type = function.return_type,
-                        length = function.parameters[0].id,
-                        item = function.parameters[1].id,
-                    )),
-                    BuiltinFunction::ArrayLength => self.push(format!(
-                        "\
-                        Int* result_pointer = malloc(sizeof(Int));
-                        result_pointer->value = {array}->length;
-                        return result_pointer;",
-                        array = function.parameters[0].id,
-                    )),
                     BuiltinFunction::IntAdd => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
@@ -235,6 +215,26 @@ impl<'h> Context<'h> {
                         result_pointer->value = result;
                         return result_pointer;",
                         int = function.parameters[0].id,
+                    )),
+                    BuiltinFunction::ListFilled => self.push(format!(
+                        "\
+                        {array_type}* result_pointer = malloc(sizeof({array_type}));
+                        result_pointer->length = {length}->value;
+                        result_pointer->values = malloc({length}->value * sizeof({array_type}));
+                        for (uint64_t i = 0; i < {length}->value; i++) {{
+                            result_pointer->values[i] = {item};
+                        }}
+                        return result_pointer;",
+                        array_type = function.return_type,
+                        length = function.parameters[0].id,
+                        item = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::ListLength => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {array}->length;
+                        return result_pointer;",
+                        array = function.parameters[0].id,
                     )),
                     BuiltinFunction::Panic => {
                         self.push(format!(

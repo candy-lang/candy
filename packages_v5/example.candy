@@ -100,12 +100,12 @@ impl Text: ToText {
   }
 }
 
-struct Array[T] = builtin
-fun arrayFilled[T](length: Int, item: T) Array[T] {
-  builtinArrayFilled(length, item)
+struct List[T] = builtin
+fun listFilled[T](length: Int, item: T) List[T] {
+  builtinListFilled(length, item)
 }
-fun length[T](array: Array[T]) Int {
-  builtinArrayLength(array)
+fun length[T](list: List[T]) Int {
+  builtinListLength(list)
 }
 
 fun print[T: ToText](t: T) {
