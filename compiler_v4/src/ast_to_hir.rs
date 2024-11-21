@@ -9,8 +9,8 @@ use crate::{
     hir::{
         self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, ContainsError, Expression,
         ExpressionKind, Function, FunctionSignature, Hir, Id, Impl, NamedType, Parameter,
-        ParameterType, SliceOfTypeParameter, SwitchCase, Trait, TraitDefinition, TraitFunction,
-        Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
+        ParameterType, SliceOfTypeParameter, StructField, SwitchCase, Trait, TraitDefinition,
+        TraitFunction, Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
     position::Offset,
@@ -509,7 +509,10 @@ impl<'a> Context<'a> {
                             Some(&self_base_type),
                             field.type_.value(),
                         );
-                        Some((name.string.clone(), type_))
+                        Some(StructField {
+                            name: name.string.clone(),
+                            type_,
+                        })
                     })
                     .collect(),
             ),
@@ -1526,8 +1529,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             if let TypeDeclarationKind::Struct {
                                 fields: Some(fields),
                             } = &type_.kind
-                                && let Some((_, field_type)) =
-                                    fields.iter().find(|(name, _)| name == &key.string)
+                                && let Some(field) = fields.iter().find(|it| it.name == key.string)
                             {
                                 return self.push_lowered(
                                     None,
@@ -1535,7 +1537,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         struct_: receiver_id,
                                         field: key.string.clone(),
                                     },
-                                    field_type.substitute(&Type::build_environment(
+                                    field.type_.substitute(&Type::build_environment(
                                         &type_.type_parameters,
                                         &named_type.type_arguments,
                                     )),
@@ -1910,7 +1912,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         type_arguments: Option<&[Type]>,
         type_: &str,
         type_parameters: &[TypeParameter],
-        fields: &Option<Box<[(Box<str>, Type)]>>,
+        fields: &Option<Box<[StructField]>>,
     ) -> LoweredExpression {
         let Some(fields) = fields else {
             self.context.add_error(
@@ -1925,10 +1927,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         let result = self.match_signature(
             None,
             type_parameters,
-            &fields
-                .iter()
-                .map(|(_, type_)| type_.clone())
-                .collect::<Box<_>>(),
+            &fields.iter().map(|it| it.type_.clone()).collect::<Box<_>>(),
             type_arguments,
             &arguments
                 .iter()
