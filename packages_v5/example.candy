@@ -61,7 +61,15 @@ impl Ordering: ToText {
     }
   }
 }
-# TODO: `impl[T: Compare] T: Equal {}`
+impl[T: Compare] T: Equal {
+  fun equals(self: T, other: T) Bool {
+    switch self.compareTo(other) {
+      less => false,
+      equal => true,
+      greater => false,
+    }
+  }
+}
 
 trait Add {
   fun add(self: Self, other: Self) Self
@@ -218,6 +226,7 @@ fun main() Int {
   print(Ordering.less())
   print(true)
   print(false)
+  print("1.equals(2): {1.equals(2).toText()}")
   0
 }
 
