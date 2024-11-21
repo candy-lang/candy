@@ -7,10 +7,10 @@ use crate::{
     },
     error::CompilerError,
     hir::{
-        self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, Expression, ExpressionKind,
-        Function, FunctionSignature, Hir, Id, Impl, NamedType, Parameter, ParameterType,
-        SliceOfTypeParameter, SwitchCase, Trait, TraitDefinition, TraitFunction, Type,
-        TypeDeclaration, TypeDeclarationKind, TypeParameter,
+        self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, ContainsError, Expression,
+        ExpressionKind, Function, FunctionSignature, Hir, Id, Impl, NamedType, Parameter,
+        ParameterType, SliceOfTypeParameter, SwitchCase, Trait, TraitDefinition, TraitFunction,
+        Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
     position::Offset,
@@ -1343,13 +1343,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     .add_error(expression.span.clone(), "Type must be instantiated.");
                 (self.push_error(), Type::Error)
             }
-            LoweredExpression::EnumVariantReference { enum_, variant } => {
-                self.context.add_error(
-                    expression.span.clone(),
-                    format!("Enum variant `{enum_:?}.{variant}` must be instantiated."),
-                );
-                (self.push_error(), Type::Error)
-            }
             LoweredExpression::Error => (self.push_error(), Type::Error),
         }
     }
@@ -1433,20 +1426,45 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     AstExpressionKind::Navigation(navigation)
                         if let Some(key) = navigation.key.value() =>
                     {
-                        // bar.foo(baz)
-                        let receiver = self.lower_expression(&navigation.receiver, None);
-                        let arguments = Self::lower_arguments(
-                            self,
-                            call,
-                            expression.span.clone(),
-                            &call.arguments,
-                            None,
-                        )
-                        .unwrap();
-                        let arguments = iter::once(receiver)
-                            .chain(arguments.into_vec())
-                            .collect_vec();
-                        self.lower_call(key, type_arguments.as_deref(), &arguments)
+                        let receiver = self.lower_expression_raw(&navigation.receiver, None);
+                        match receiver {
+                            LoweredExpression::Expression { id, type_ } => {
+                                // bar.foo(baz)
+                                let arguments = Self::lower_arguments(self, &call.arguments);
+                                let arguments = iter::once((id, type_))
+                                    .chain(arguments.into_vec())
+                                    .collect_vec();
+                                self.lower_call(key, type_arguments.as_deref(), &arguments)
+                            }
+                            LoweredExpression::NamedTypeReference(type_) => {
+                                // Foo.blub(bar, baz)
+                                let type_declaration =
+                                    self.context.hir.type_declarations[&type_].clone();
+                                match &type_declaration.kind {
+                                    TypeDeclarationKind::Struct { .. } => {
+                                        self.context.add_error(
+                                            key.span.clone(),
+                                            format!(
+                                                "Struct type `{type_:?}` doesn't have a field `{}`",
+                                                key.string,
+                                            ),
+                                        );
+                                        LoweredExpression::Error
+                                    }
+                                    TypeDeclarationKind::Enum { variants } => self
+                                        .lower_enum_creation(
+                                            call,
+                                            type_arguments.as_deref(),
+                                            &type_,
+                                            key,
+                                            &type_declaration.type_parameters,
+                                            variants,
+                                        ),
+                                }
+                            }
+                            LoweredExpression::TypeParameterReference(_) => unreachable!(),
+                            LoweredExpression::Error => LoweredExpression::Error,
+                        }
                     }
                     AstExpressionKind::Identifier(identifier) => {
                         let Some(identifier) = identifier.identifier.value() else {
@@ -1455,14 +1473,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
                         if identifier.string.chars().next().unwrap().is_lowercase() {
                             // foo(bar, baz)
-                            let arguments = Self::lower_arguments(
-                                self,
-                                call,
-                                expression.span.clone(),
-                                &call.arguments,
-                                None,
-                            )
-                            .unwrap();
+                            let arguments = Self::lower_arguments(self, &call.arguments);
                             return self.lower_call(
                                 identifier,
                                 type_arguments.as_deref(),
@@ -1503,55 +1514,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 );
                                 LoweredExpression::Error
                             }
-                            LoweredExpression::EnumVariantReference {
-                                enum_: enum_type,
-                                variant,
-                            } => {
-                                let Type::Named(enum_named_type) = &enum_type else {
-                                    unreachable!();
-                                };
-                                let enum_ = self
-                                    .context
-                                    .hir
-                                    .type_declarations
-                                    .get(&enum_named_type.name)
-                                    .unwrap();
-                                let TypeDeclarationKind::Enum { variants } = &enum_.kind else {
-                                    unreachable!();
-                                };
-                                let variant_type = variants
-                                    .iter()
-                                    .find(|(name, _)| name == &variant)
-                                    .unwrap()
-                                    .1
-                                    .as_ref()
-                                    .unwrap()
-                                    .clone();
-                                let variant_type =
-                                    variant_type.substitute(&Type::build_environment(
-                                        &enum_.type_parameters,
-                                        &enum_named_type.type_arguments,
-                                    ));
-                                let parameter_types = [variant_type];
-                                let arguments = Self::lower_arguments(
-                                    self,
-                                    call,
-                                    expression.span.clone(),
-                                    &call.arguments,
-                                    Some(parameter_types.as_slice()),
-                                );
-                                arguments.map_or(LoweredExpression::Error, |arguments| {
-                                    self.push_lowered(
-                                        None,
-                                        ExpressionKind::CreateEnum {
-                                            enum_: enum_type.clone(),
-                                            variant,
-                                            value: arguments.first().map(|(id, _)| *id),
-                                        },
-                                        enum_type,
-                                    )
-                                })
-                            }
                             LoweredExpression::Error => LoweredExpression::Error,
                         }
                     }
@@ -1571,14 +1533,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         type_: receiver_type,
                     } => match &receiver_type {
                         Type::Named(named_type) => {
-                            let type_ = &self.context.hir.type_declarations.get(&named_type.name);
-                            if let Some(TypeDeclaration {
-                                type_parameters,
-                                kind:
-                                    TypeDeclarationKind::Struct {
-                                        fields: Some(fields),
-                                    },
-                            }) = type_
+                            let type_ = &self.context.hir.type_declarations[&named_type.name];
+                            if let TypeDeclarationKind::Struct {
+                                fields: Some(fields),
+                            } = &type_.kind
                                 && let Some((_, field_type)) =
                                     fields.iter().find(|(name, _)| name == &key.string)
                             {
@@ -1589,7 +1547,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                         field: key.string.clone(),
                                     },
                                     field_type.substitute(&Type::build_environment(
-                                        type_parameters,
+                                        &type_.type_parameters,
                                         &named_type.type_arguments,
                                     )),
                                 );
@@ -1630,34 +1588,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 LoweredExpression::Error
                             }
                             TypeDeclarationKind::Enum { variants } => {
-                                if !declaration.type_parameters.is_empty() {
-                                    todo!();
-                                }
-                                let type_ = NamedType {
-                                    name: type_.clone(),
-                                    type_arguments: Box::default(),
-                                }
-                                .into();
-
-                                if let Some((_, value_type)) =
-                                    variants.iter().find(|(name, _)| name == &key.string)
-                                {
-                                    if value_type.is_some() {
-                                        LoweredExpression::EnumVariantReference {
-                                            enum_: type_,
-                                            variant: key.string.clone(),
-                                        }
-                                    } else {
-                                        self.push_lowered(
-                                            None,
-                                            ExpressionKind::CreateEnum {
-                                                enum_: type_.clone(),
-                                                variant: key.string.clone(),
-                                                value: None,
-                                            },
-                                            type_,
-                                        )
-                                    }
+                                if variants.iter().any(|(name, _)| name == &key.string) {
+                                    self.context.add_error(
+                                        key.span.clone(),
+                                        format!(
+                                            "Enum variant `{type_:?}.{}` must be called to create it",
+                                            key.string,
+                                        ),
+                                    );
                                 } else {
                                     self.context.add_error(
                                         key.span.clone(),
@@ -1666,8 +1604,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                             key.string,
                                         ),
                                     );
-                                    LoweredExpression::Error
                                 }
+                                LoweredExpression::Error
                             }
                         }
                     }
@@ -1681,7 +1619,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         );
                         LoweredExpression::Error
                     }
-                    LoweredExpression::EnumVariantReference { .. } => todo!(),
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
             }
@@ -1886,6 +1823,10 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             .map(|(_, type_)| type_.clone())
             .collect::<Box<_>>();
 
+        if argument_types.iter().any(ContainsError::contains_error) {
+            return LoweredExpression::Error;
+        }
+
         let (mut matches, mismatches): (Vec<_>, Vec<_>) = matches
             .into_iter()
             .map(|(id, function, trait_)| {
@@ -1990,10 +1931,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             return LoweredExpression::Error;
         };
 
-        let arguments =
-            Self::lower_arguments(self, call, span.clone(), &call.arguments, None).unwrap();
+        let arguments = Self::lower_arguments(self, &call.arguments);
 
-        // TODO(lambdas): resolve local identifiers as well if not calling using instance syntax
         let result = self.match_signature(
             None,
             type_parameters,
@@ -2050,45 +1989,96 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             struct_type,
         )
     }
-    fn lower_arguments(
-        builder: &mut BodyBuilder,
+    fn lower_enum_creation(
+        &mut self,
         call: &AstCall,
-        fallback_span: Range<Offset>,
-        arguments: &AstResult<AstArguments>,
-        parameter_types: Option<&[Type]>,
-    ) -> Option<Box<[(Id, Type)]>> {
-        let arguments = arguments
-            .arguments_or_default()
-            .iter()
-            .enumerate()
-            .map(|(index, argument)| {
-                builder.lower_expression(
-                    &argument.value,
-                    parameter_types.and_then(|it| it.get(index)),
-                )
-            })
-            .collect::<Box<_>>();
-        if let Some(parameter_types) = parameter_types
-            && arguments.len() != parameter_types.len()
-        {
-            builder.context.add_error(
-                if arguments.len() < parameter_types.len() {
-                    call.arguments
-                        .value()
-                        .map_or(fallback_span, |it| it.opening_parenthesis_span.clone())
-                } else {
-                    let arguments = &call.arguments.value().unwrap().arguments;
-                    arguments[parameter_types.len()].span.start..arguments.last().unwrap().span.end
-                },
+        type_arguments: Option<&[Type]>,
+        type_: &str,
+        variant: &AstString,
+        type_parameters: &[TypeParameter],
+        variants: &[(Box<str>, Option<Type>)],
+    ) -> LoweredExpression {
+        let Some((_, variant_type)) = variants.iter().find(|(name, _)| name == &variant.string)
+        else {
+            self.context.add_error(
+                variant.span.clone(),
                 format!(
-                    "Expected {} argument(s), got {}.",
-                    parameter_types.len(),
-                    arguments.len(),
+                    "Enum `{type_:?}` doesn't have a variant `{}`",
+                    variant.string,
                 ),
             );
-            return None;
-        }
-        Some(arguments)
+            return LoweredExpression::Error;
+        };
+
+        let parameter_types = variant_type
+            .as_ref()
+            .map(|variant_type| vec![variant_type.clone()].into_boxed_slice())
+            .unwrap_or_default();
+        let arguments = Self::lower_arguments(self, &call.arguments);
+
+        let result = self.match_signature(
+            None,
+            type_parameters,
+            parameter_types.as_ref(),
+            type_arguments,
+            &arguments
+                .iter()
+                .map(|(_, type_)| type_.clone())
+                .collect::<Box<_>>(),
+        );
+        let substitutions = match result {
+            Ok(substitutions) => substitutions,
+            Err(error) => {
+                self.context.add_error(
+                    variant.span.clone(),
+                    format!(
+                        "Invalid enum variant creation: {}",
+                        match error {
+                            CallLikeLoweringError::TypeArgumentCount =>
+                                "Wrong number of type arguments".to_string(),
+                            CallLikeLoweringError::ArgumentCount =>
+                                "Wrong number of arguments".to_string(),
+                            CallLikeLoweringError::Unification(Some(error)) => error.into_string(),
+                            CallLikeLoweringError::Unification(None) =>
+                                "Mismatching types".to_string(),
+                            CallLikeLoweringError::FunctionReachableViaMultipleImpls =>
+                                unreachable!(),
+                            // TODO: more specific error message
+                            CallLikeLoweringError::TypeArgumentMismatch =>
+                                "Type arguments are not assignable".to_string(),
+                        },
+                    ),
+                );
+                return LoweredExpression::Error;
+            }
+        };
+
+        let enum_type = NamedType::new(
+            type_,
+            type_parameters
+                .iter()
+                .map(|it| substitutions[&it.type_()].clone())
+                .collect_vec(),
+        );
+        self.push_lowered(
+            None,
+            ExpressionKind::CreateEnum {
+                enum_: enum_type.clone(),
+                variant: variant.string.clone(),
+                value: arguments.first().map(|(id, _)| *id),
+            },
+            enum_type,
+        )
+    }
+    fn lower_arguments(
+        builder: &mut BodyBuilder,
+        arguments: &AstResult<AstArguments>,
+    ) -> Box<[(Id, Type)]> {
+        arguments
+            .arguments_or_default()
+            .iter()
+            .map(|argument| builder.lower_expression(&argument.value, None))
+            .collect::<Box<_>>()
     }
     fn match_signature(
         &mut self,
@@ -2279,7 +2269,6 @@ enum LoweredExpression {
     Expression { id: Id, type_: Type },
     NamedTypeReference(Box<str>),
     TypeParameterReference(ParameterType),
-    EnumVariantReference { enum_: Type, variant: Box<str> },
     Error,
 }
 // #[derive(Debug)]

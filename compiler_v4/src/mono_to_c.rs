@@ -332,7 +332,7 @@ impl<'h> Context<'h> {
                 ));
                 self.push(format!("{id}->variant = {enum_}_{variant};"));
                 if let Some(value) = value {
-                    self.push(format!("\n{id}->value = {value}"));
+                    self.push(format!("\n{id}->value.{variant} = {value};"));
                 }
             }
             // ExpressionKind::Lambda(lambda) => {

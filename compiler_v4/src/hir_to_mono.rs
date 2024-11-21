@@ -160,6 +160,12 @@ impl<'h> Context<'h> {
             &function.signature.name,
             &function
                 .signature
+                .type_parameters
+                .iter()
+                .map(|it| hir::Type::from(it.type_()).substitute(substitutions))
+                .collect_vec(),
+            &function
+                .signature
                 .parameters
                 .iter()
                 .map(|it| it.type_.substitute(substitutions))
@@ -194,7 +200,12 @@ impl<'h> Context<'h> {
         *self.functions.get_mut(&name).unwrap() = Some(function);
         name
     }
-    fn mangle_function(&mut self, name: &str, parameter_types: &[hir::Type]) -> Box<str> {
+    fn mangle_function(
+        &mut self,
+        name: &str,
+        type_parameters: &[hir::Type],
+        parameter_types: &[hir::Type],
+    ) -> Box<str> {
         let mut result = if name == "main" && parameter_types.is_empty() {
             // Avoid name clash with the main function in C.
             // It would be cleaner to do this in `mono_to_c`, but it's easier to do it here.
@@ -203,6 +214,11 @@ impl<'h> Context<'h> {
             name
         }
         .to_string();
+        for type_parameter in type_parameters {
+            result.push('$');
+            result.push_str(&self.lower_type(type_parameter));
+        }
+        result.push('$');
         for parameter_type in parameter_types {
             result.push('$');
             result.push_str(&self.lower_type(parameter_type));
@@ -366,13 +382,16 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
     fn add_parameter(&mut self, parameter: &hir::Parameter) {
         let id = self.id_generator.generate();
         self.id_mapping.force_insert(parameter.id, id);
+        let type_ = self.lower_type(&parameter.type_);
         self.parameters.push(mono::Parameter {
             id,
             name: parameter.name.clone(),
-            type_: self
-                .context
-                .lower_type(&parameter.type_.substitute(self.environment)),
+            type_,
         });
+    }
+
+    fn lower_type(&mut self, type_: &hir::Type) -> Box<str> {
+        self.context.lower_type(&type_.substitute(self.environment))
     }
 
     fn lower_expressions(&mut self, expressions: &[(hir::Id, Option<Box<str>>, hir::Expression)]) {
@@ -425,7 +444,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 variant,
                 value,
             } => {
-                let enum_ = self.context.lower_type(enum_);
+                let enum_ = self.lower_type(&enum_.clone().into());
                 let value = value.map(|it| self.lower_id(it));
                 self.push(
                     id,
@@ -473,7 +492,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 cases,
             } => {
                 let value = self.lower_id(*value);
-                let enum_ = self.context.lower_type(enum_);
+                let enum_ = self.lower_type(enum_);
                 let cases = cases
                     .iter()
                     .map(|case| mono::SwitchCase {
@@ -551,7 +570,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
         if let Some(hir_id) = hir_id.into() {
             self.id_mapping.force_insert(hir_id, id);
         }
-        let type_ = self.context.lower_type(&type_.substitute(self.environment));
+        let type_ = self.lower_type(type_);
         self.body
             .expressions
             .push((id, name.into(), mono::Expression { kind, type_ }));
