@@ -244,6 +244,32 @@ impl<'h> Context<'h> {
                         list = function.parameters[0].id,
                         index = function.parameters[1].id,
                     )),
+                    BuiltinFunction::ListInsert => self.push(format!(
+                        "\
+                        if (0 > {index}->value || {index}->value > {list}->length) {{
+                            char* message_format = \"Index out of bounds: Tried inserting at index %ld in list of length %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {index}->value, {list}->length);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {index}->value, {list}->length);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {list}->length + 1;
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
+                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}));
+                        result_pointer->values[{index}->value] = {item};
+                        memcpy(result_pointer->values + {index}->value + 1, {list}->values + {index}->value, ({list}->length - {index}->value) * sizeof({item_type}));
+                        return result_pointer;",
+                        item_type = function.parameters[2].type_,
+                        list_type = function.return_type,
+                        list = function.parameters[0].id,
+                        index = function.parameters[1].id,
+                        item = function.parameters[2].id,
+                    )),
                     BuiltinFunction::ListLength => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
@@ -333,6 +359,31 @@ impl<'h> Context<'h> {
                         item2 = function.parameters[2].id,
                         item3 = function.parameters[3].id,
                         item4 = function.parameters[4].id,
+                    )),
+                    BuiltinFunction::ListReplace => self.push(format!(
+                        "\
+                        if (0 > {index}->value || {index}->value >= {list}->length) {{
+                            char* message_format = \"Index out of bounds: Tried replacing index %ld in list of length %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {index}->value, {list}->length);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {index}->value, {list}->length);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {list}->length;
+                        result_pointer->values = malloc({list}->length * sizeof({item_type}));
+                        memcpy(result_pointer->values, {list}->values, {list}->length * sizeof({item_type}));
+                        result_pointer->values[{index}->value] = {new_item};
+                        return result_pointer;",
+                        item_type = function.parameters[2].type_,
+                        list_type = function.return_type,
+                        list = function.parameters[0].id,
+                        index = function.parameters[1].id,
+                        new_item = function.parameters[2].id,
                     )),
                     BuiltinFunction::Panic => {
                         self.push(format!(

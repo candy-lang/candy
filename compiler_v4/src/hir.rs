@@ -722,6 +722,7 @@ pub enum BuiltinFunction {
     IntToText,
     ListFilled,
     ListGet,
+    ListInsert,
     ListLength,
     ListOf0,
     ListOf1,
@@ -729,6 +730,7 @@ pub enum BuiltinFunction {
     ListOf3,
     ListOf4,
     ListOf5,
+    ListReplace,
     Panic,
     Print,
     TextConcat,
@@ -801,6 +803,20 @@ impl BuiltinFunction {
                 .into(),
                 return_type: NamedType::maybe(ParameterType::new("T")).into(),
             },
+            Self::ListInsert => BuiltinFunctionSignature {
+                name: "builtinListInsert".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    (
+                        "list".into(),
+                        NamedType::list(ParameterType::new("T")).into(),
+                    ),
+                    ("index".into(), NamedType::int().into()),
+                    ("item".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
             Self::ListLength => BuiltinFunctionSignature {
                 name: "builtinListLength".into(),
                 type_parameters: ["T".into()].into(),
@@ -865,6 +881,20 @@ impl BuiltinFunction {
                     ("item2".into(), ParameterType::new("T").into()),
                     ("item3".into(), ParameterType::new("T").into()),
                     ("item4".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListReplace => BuiltinFunctionSignature {
+                name: "builtinListReplace".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    (
+                        "list".into(),
+                        NamedType::list(ParameterType::new("T")).into(),
+                    ),
+                    ("index".into(), NamedType::int().into()),
+                    ("newItem".into(), ParameterType::new("T").into()),
                 ]
                 .into(),
                 return_type: NamedType::list(ParameterType::new("T")).into(),
