@@ -3,57 +3,33 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: daily
+      interval: weekly
     labels:
       - 'T: Build'
 
   - package-ecosystem: cargo
-    directory: /compiler/cli
+    directories:
+      - compiler/backend_inkwell
+      - compiler/cli
+      - compiler/formatter
+      - compiler/formatter/fuzz
+      - compiler/frontend
+      - compiler/fuzzer
+      - compiler/language_server
+      - compiler/vm
+      - compiler/vm/fuzz
     schedule:
-      interval: daily
-    labels:
-      - 'T: Build'
-  - package-ecosystem: cargo
-    directory: /compiler/formatter
-    schedule:
-      interval: daily
-    labels:
-      - 'T: Build'
-  - package-ecosystem: cargo
-    directory: /compiler/frontend
-    schedule:
-      interval: daily
-    labels:
-      - 'T: Build'
-  - package-ecosystem: cargo
-    directory: /compiler/fuzzer
-    schedule:
-      interval: daily
-    labels:
-      - 'T: Build'
-  - package-ecosystem: cargo
-    directory: /compiler/language_server
-    schedule:
-      interval: daily
-    labels:
-      - 'T: Build'
-  - package-ecosystem: cargo
-    directory: /compiler/vm
-    schedule:
-      interval: daily
-    labels:
-      - 'T: Build'
-  - package-ecosystem: cargo
-    directory: /compiler/vm/fuzz
-    schedule:
-      interval: daily
+      interval: weekly
     labels:
       - 'T: Build'
 
   - package-ecosystem: npm
-    directory: /vscode_extension
+    directories:
+      - /vscode_extension
     schedule:
       interval: weekly
+    labels:
+      - 'T: Build'
     groups:
       glob:
         patterns:
@@ -70,5 +46,3 @@ updates:
       typescript-eslint:
         patterns:
           - '@typescript-eslint/*'
-    labels:
-      - 'T: Build'
