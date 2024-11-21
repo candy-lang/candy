@@ -16,7 +16,7 @@ use crate::{
     position::Offset,
     type_solver::{
         goals::{Environment, SolverGoal, SolverRule, SolverSolution},
-        values::{SolverValue, SolverVariable},
+        values::{SolverType, SolverVariable},
     },
     utils::HashMapExtension,
 };
@@ -751,9 +751,7 @@ impl<'a> Context<'a> {
         };
         let trait_declaration = self.traits[&*trait_.name].clone();
 
-        if let Type::Named(type_) = &type_
-            && let Ok(solver_type) = SolverValue::try_from(type_.clone())
-        {
+        if let Ok(solver_type) = SolverType::try_from(type_.clone()) {
             let rule = SolverRule {
                 goal: SolverGoal {
                     trait_: trait_.name.clone(),
@@ -761,7 +759,7 @@ impl<'a> Context<'a> {
                         .type_parameters
                         .iter()
                         .map(|it| SolverVariable::new(it.type_()).into())
-                        .chain([solver_type.into()])
+                        .chain([solver_type])
                         .collect(),
                 },
                 subgoals: type_parameters

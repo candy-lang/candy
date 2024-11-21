@@ -8,7 +8,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use std::{collections::hash_map::Entry, mem};
+use std::{borrow::Cow, collections::hash_map::Entry, mem};
 
 pub fn hir_to_mono(hir: &Hir) -> Mono {
     Context::lower(hir)
@@ -78,8 +78,17 @@ impl<'h> Context<'h> {
         id: hir::Id,
         substitutions: &FxHashMap<ParameterType, Type>,
     ) -> Box<str> {
+        let mut substitutions = Cow::Borrowed(substitutions);
         let function = self.hir.functions.get(&id).unwrap_or_else(|| {
-            &self.find_impl_for(id, substitutions).functions[&id]
+            let impl_ = self.find_impl_for(id, &substitutions);
+            let function = &impl_.functions[&id];
+            if let Type::Parameter(parameter_type) = &impl_.type_ {
+                let self_type = substitutions[&ParameterType::self_type()].clone();
+                substitutions
+                    .to_mut()
+                    .force_insert(parameter_type.clone(), self_type);
+            }
+            function
         });
 
         let name = self.mangle_function(
@@ -88,13 +97,13 @@ impl<'h> Context<'h> {
                 .signature
                 .type_parameters
                 .iter()
-                .map(|it| hir::Type::from(it.type_()).substitute(substitutions))
+                .map(|it| hir::Type::from(it.type_()).substitute(&substitutions))
                 .collect_vec(),
             &function
                 .signature
                 .parameters
                 .iter()
-                .map(|it| it.type_.substitute(substitutions))
+                .map(|it| it.type_.substitute(&substitutions))
                 .collect_vec(),
         );
         match self.functions.entry(name.clone()) {
@@ -104,20 +113,20 @@ impl<'h> Context<'h> {
 
         let (parameters, body) = match &function.body {
             hir::BodyOrBuiltin::Body(body) => {
-                let (parameters, body) = BodyBuilder::build(self, substitutions, |builder| {
+                let (parameters, body) = BodyBuilder::build(self, &substitutions, |builder| {
                     builder.add_parameters(&function.signature.parameters);
                     builder.lower_expressions(&body.expressions);
                 });
                 (parameters, mono::BodyOrBuiltin::Body(body))
             }
             hir::BodyOrBuiltin::Builtin(builtin_function) => {
-                let (parameters, _) = BodyBuilder::build(self, substitutions, |builder| {
+                let (parameters, _) = BodyBuilder::build(self, &substitutions, |builder| {
                     builder.add_parameters(&function.signature.parameters);
                 });
                 (parameters, mono::BodyOrBuiltin::Builtin(*builtin_function))
             }
         };
-        let return_type = function.signature.return_type.substitute(substitutions);
+        let return_type = function.signature.return_type.substitute(&substitutions);
         let function = mono::Function {
             parameters,
             return_type: self.lower_type(&return_type),
