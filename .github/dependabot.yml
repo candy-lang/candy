@@ -9,6 +9,7 @@ updates:
 
   - package-ecosystem: cargo
     directories:
+      - compiler_v4
       - compiler/backend_inkwell
       - compiler/cli
       - compiler/formatter
@@ -26,6 +27,7 @@ updates:
   - package-ecosystem: npm
     directories:
       - /vscode_extension
+      - /vscode_extension_v4
     schedule:
       interval: weekly
     labels:
