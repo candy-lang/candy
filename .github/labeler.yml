@@ -19,6 +19,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - packages/Builtins/**/*
+'P: Compiler v4':
+  - changed-files:
+      - any-glob-to-any-file:
+          - compiler_v4/**/*
 'P: Compiler: CLI':
   - changed-files:
       - any-glob-to-any-file:
@@ -51,6 +55,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - vscode_extension/**/*
+'P: Compiler: VS Code Extension v4':
+  - changed-files:
+      - any-glob-to-any-file:
+          - vscode_extension_v4/**/*
 'P: ComplexNumber':
   - changed-files:
       - any-glob-to-any-file:
@@ -75,6 +83,10 @@
   - changed-files:
       - any-glob-to-any-file:
           - packages/Http/**/*
+'P: Packages v5':
+  - changed-files:
+      - any-glob-to-any-file:
+          - packages_v5/**/*
 'P: Parser':
   - changed-files:
       - any-glob-to-any-file:
