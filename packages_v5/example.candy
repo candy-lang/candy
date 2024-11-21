@@ -172,6 +172,12 @@ fun some[T](value: T) Maybe[T] {
 fun none[T]() Maybe[T] {
   Maybe.none[T]()
 }
+fun unwrap[T](self: Maybe[T]) T {
+  switch self {
+    some(value) => value,
+    none => panic("`unwrap()` called on `none()`"),
+  }
+}
 impl[T: ToText] Maybe[T]: ToText {
   fun toText(self: Maybe[T]) Text {
     switch self {
