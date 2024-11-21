@@ -16,7 +16,7 @@ use crate::{
     position::Offset,
     type_solver::{
         goals::{Environment, SolverGoal, SolverRule, SolverSolution},
-        values::{SolverValue, SolverVariable},
+        values::{SolverType, SolverVariable},
     },
     utils::HashMapExtension,
 };
@@ -81,12 +81,12 @@ impl<'a> TraitDeclaration<'a> {
                         .type_parameters
                         .iter()
                         .zip(trait_function.signature.type_parameters.iter())
-                        .all(|(function, signature)| {
-                            function.upper_bound
-                                == signature
-                                    .upper_bound
-                                    .as_ref()
-                                    .map(|it| it.as_ref().map(|it| it.substitute(substitutions)))
+                        .all(|(impl_type_parameter, trait_type_parameter)| {
+                            impl_type_parameter.name == trait_type_parameter.name
+                                && impl_type_parameter.upper_bound
+                                    == trait_type_parameter.upper_bound.as_ref().map(|it| {
+                                        it.as_ref().map(|it| it.substitute(substitutions))
+                                    })
                         })
                     && impl_function.signature.parameters.len()
                         == trait_function.signature.parameters.len()
@@ -95,8 +95,10 @@ impl<'a> TraitDeclaration<'a> {
                         .parameters
                         .iter()
                         .zip(trait_function.signature.parameters.iter())
-                        .all(|(function, signature)| {
-                            function.type_ == signature.type_.substitute(substitutions)
+                        .all(|(impl_parameter, trait_parameter)| {
+                            impl_parameter.name == trait_parameter.name
+                                && impl_parameter.type_
+                                    == trait_parameter.type_.substitute(substitutions)
                         })
                     && impl_function.signature.return_type
                         == trait_function
@@ -125,7 +127,6 @@ impl<'a> TraitDeclaration<'a> {
 struct ImplDeclaration<'a> {
     type_parameters: Box<[TypeParameter]>,
     type_: Type,
-    self_type: NamedType,
     trait_: Trait,
     functions: FxHashMap<Id, FunctionDeclaration<'a>>,
 }
@@ -451,12 +452,9 @@ impl<'a> Context<'a> {
         for trait_name in self.traits.keys().cloned().collect_vec() {
             let trait_ = &self.traits[&trait_name];
             let type_parameters = trait_.type_parameters.clone();
-            let self_type = NamedType {
-                name: trait_name.clone(),
-                type_arguments: type_parameters.type_(),
-            };
+            let self_base_type = NamedType::new(trait_name.clone(), type_parameters.type_()).into();
             for (id, mut function) in trait_.functions.clone() {
-                self.lower_function(Some(&self_type), &type_parameters, &mut function, true);
+                self.lower_function(Some(&self_base_type), &type_parameters, &mut function, true);
                 self.traits
                     .get_mut(&trait_name)
                     .unwrap()
@@ -468,9 +466,14 @@ impl<'a> Context<'a> {
         for index in 0..self.impls.len() {
             let impl_ = &self.impls[index];
             let type_parameters = impl_.type_parameters.clone();
-            let self_type = impl_.self_type.clone();
+            let self_base_type = impl_.type_.clone();
             for (id, mut function) in impl_.functions.clone() {
-                self.lower_function(Some(&self_type), &type_parameters, &mut function, false);
+                self.lower_function(
+                    Some(&self_base_type),
+                    &type_parameters,
+                    &mut function,
+                    false,
+                );
                 self.impls[index].functions.insert(id, function).unwrap();
             }
         }
@@ -491,10 +494,7 @@ impl<'a> Context<'a> {
 
         let type_parameters =
             self.lower_type_parameters(&[], None, struct_type.type_parameters.as_ref());
-        let self_type = NamedType {
-            name: name.string.clone(),
-            type_arguments: type_parameters.type_(),
-        };
+        let self_base_type = NamedType::new(name.string.clone(), type_parameters.type_()).into();
 
         let fields = match &struct_type.kind {
             AstStructKind::Builtin { .. } => None,
@@ -506,7 +506,7 @@ impl<'a> Context<'a> {
 
                         let type_ = self.lower_type(
                             &type_parameters,
-                            Some(&self_type),
+                            Some(&self_base_type),
                             field.type_.value(),
                         );
                         Some((name.string.clone(), type_))
@@ -544,10 +544,7 @@ impl<'a> Context<'a> {
 
         let type_parameters =
             self.lower_type_parameters(&[], None, enum_type.type_parameters.as_ref());
-        let self_type = NamedType {
-            name: name.string.clone(),
-            type_arguments: type_parameters.type_(),
-        };
+        let self_base_type = NamedType::new(name.string.clone(), type_parameters.type_()).into();
 
         let variants = enum_type
             .variants
@@ -558,7 +555,7 @@ impl<'a> Context<'a> {
                 let type_ = variant
                     .type_
                     .as_ref()
-                    .map(|it| self.lower_type(&type_parameters, Some(&self_type), it.value()));
+                    .map(|it| self.lower_type(&type_parameters, Some(&self_base_type), it.value()));
                 Some((name.string.clone(), type_))
             })
             .collect();
@@ -603,16 +600,13 @@ impl<'a> Context<'a> {
             .filter_map(|type_parameter| type_parameter.clone().try_into().ok())
             .collect();
 
-        let self_type = NamedType {
-            name: name.string.clone(),
-            type_arguments: type_parameters.type_(),
-        };
+        let self_base_type = NamedType::new(name.string.clone(), type_parameters.type_()).into();
         // TODO: check that functions accept self as first parameter
         let functions = trait_
             .functions
             .iter()
             .filter_map(|function| {
-                self.lower_function_signature(&type_parameters, Some(&self_type), function)
+                self.lower_function_signature(&type_parameters, Some(&self_base_type), function)
                     .map(|function| (self.id_generator.generate(), function))
             })
             .collect();
@@ -644,7 +638,7 @@ impl<'a> Context<'a> {
     fn lower_trait(
         &mut self,
         type_parameters: &[TypeParameter],
-        self_type: Option<&NamedType>,
+        self_base_type: Option<&Type>,
         type_: impl Into<Option<&AstType>>,
     ) -> hir::Result<Trait> {
         let type_: Option<&AstType> = type_.into();
@@ -675,7 +669,7 @@ impl<'a> Context<'a> {
             .map_or_else(Box::default, |it| {
                 it.arguments
                     .iter()
-                    .map(|it| self.lower_type(type_parameters, self_type, &it.type_))
+                    .map(|it| self.lower_type(type_parameters, self_base_type, &it.type_))
                     .collect::<Box<_>>()
             });
 
@@ -748,28 +742,16 @@ impl<'a> Context<'a> {
             return;
         };
         let type_ = self.lower_type(&type_parameters, None, ast_type);
-        let Type::Named(self_type) = type_.clone() else {
-            self.add_error(
-                ast_type
-                    .name
-                    .value()
-                    .map_or_else(|| Offset(0)..Offset(0), |it| it.span.clone()),
-                "Expected a named type.",
-            );
-            return;
-        };
 
         let Some(trait_) = impl_.trait_.value() else {
             return;
         };
-        let hir::Ok(trait_) = self.lower_trait(&type_parameters, Some(&self_type), trait_) else {
+        let hir::Ok(trait_) = self.lower_trait(&type_parameters, Some(&type_), trait_) else {
             return;
         };
         let trait_declaration = self.traits[&*trait_.name].clone();
 
-        if let Type::Named(type_) = &type_
-            && let Ok(solver_type) = SolverValue::try_from(type_.clone())
-        {
+        if let Ok(solver_type) = SolverType::try_from(type_.clone()) {
             let rule = SolverRule {
                 goal: SolverGoal {
                     trait_: trait_.name.clone(),
@@ -777,7 +759,7 @@ impl<'a> Context<'a> {
                         .type_parameters
                         .iter()
                         .map(|it| SolverVariable::new(it.type_()).into())
-                        .chain([solver_type.into()])
+                        .chain([solver_type])
                         .collect(),
                 },
                 subgoals: type_parameters
@@ -801,7 +783,7 @@ impl<'a> Context<'a> {
             .iter()
             .filter_map(|function| try {
                 let function =
-                    self.lower_function_signature(&type_parameters, Some(&self_type), function)?;
+                    self.lower_function_signature(&type_parameters, Some(&type_), function)?;
                 let Some(parent_function_id) =
                     trait_declaration.find_parent_function_of(&trait_substitutions, &function)
                 else {
@@ -832,7 +814,6 @@ impl<'a> Context<'a> {
         self.impls.push(ImplDeclaration {
             type_parameters,
             type_,
-            self_type,
             trait_,
             functions,
         });
@@ -841,7 +822,7 @@ impl<'a> Context<'a> {
     fn lower_type_parameters(
         &mut self,
         outer_type_parameters: &[TypeParameter],
-        self_type: Option<&NamedType>,
+        self_base_type: Option<&Type>,
         type_parameters: Option<&AstTypeParameters>,
     ) -> Box<[TypeParameter]> {
         type_parameters.map_or_else(Box::default, |it| {
@@ -864,7 +845,7 @@ impl<'a> Context<'a> {
                         .upper_bound
                         .as_ref()
                         .and_then(|it| it.value())
-                        .map(|it| self.lower_trait(outer_type_parameters, self_type, it));
+                        .map(|it| self.lower_trait(outer_type_parameters, self_base_type, it));
                     Some(TypeParameter {
                         name: name.string.clone(),
                         upper_bound,
@@ -876,7 +857,7 @@ impl<'a> Context<'a> {
     fn lower_type(
         &mut self,
         type_parameters: &[TypeParameter],
-        self_type: Option<&NamedType>,
+        self_base_type: Option<&Type>,
         type_: impl Into<Option<&AstType>>,
     ) -> Type {
         let type_: Option<&AstType> = type_.into();
@@ -889,7 +870,7 @@ impl<'a> Context<'a> {
         };
 
         if &*name.string == "Self" {
-            return self_type.map_or_else(
+            return self_base_type.map_or_else(
                 || {
                     self.add_error(
                         name.span.clone(),
@@ -897,8 +878,8 @@ impl<'a> Context<'a> {
                     );
                     Type::Error
                 },
-                |self_type| Type::Self_ {
-                    base_type: self_type.clone(),
+                |self_base_type| Type::Self_ {
+                    base_type: Box::new(self_base_type.clone()),
                 },
             );
         }
@@ -919,7 +900,7 @@ impl<'a> Context<'a> {
             .map_or_else(Box::default, |it| {
                 it.arguments
                     .iter()
-                    .map(|it| self.lower_type(type_parameters, self_type, &it.type_))
+                    .map(|it| self.lower_type(type_parameters, self_base_type, &it.type_))
                     .collect::<Box<_>>()
             });
 
@@ -1059,10 +1040,11 @@ impl<'a> Context<'a> {
     fn lower_top_level_function_signature(
         &mut self,
         outer_type_parameters: &[TypeParameter],
-        self_type: Option<&NamedType>,
+        self_base_type: Option<&Type>,
         function: &'a AstFunction,
     ) -> Option<(Id, FunctionDeclaration<'a>)> {
-        let function = self.lower_function_signature(outer_type_parameters, self_type, function)?;
+        let function =
+            self.lower_function_signature(outer_type_parameters, self_base_type, function)?;
         let id = self.id_generator.generate();
         match self.global_identifiers.entry(function.name.clone()) {
             Entry::Occupied(mut entry) => match entry.get_mut() {
@@ -1087,14 +1069,14 @@ impl<'a> Context<'a> {
     fn lower_function_signature(
         &mut self,
         outer_type_parameters: &[TypeParameter],
-        self_type: Option<&NamedType>,
+        self_base_type: Option<&Type>,
         function: &'a AstFunction,
     ) -> Option<FunctionDeclaration<'a>> {
         let name = function.name.value()?;
 
         let type_parameters = self.lower_type_parameters(
             outer_type_parameters,
-            self_type,
+            self_base_type,
             function.type_parameters.as_ref(),
         );
         let all_type_parameters = outer_type_parameters
@@ -1106,11 +1088,11 @@ impl<'a> Context<'a> {
         let parameters = function
             .parameters
             .value()
-            .map(|it| self.lower_parameters(&all_type_parameters, self_type, it))
+            .map(|it| self.lower_parameters(&all_type_parameters, self_base_type, it))
             .unwrap_or_default();
         let return_type = function.return_type.as_ref().map_or_else(
             || NamedType::nothing().into(),
-            |it| self.lower_type(&all_type_parameters, self_type, it),
+            |it| self.lower_type(&all_type_parameters, self_base_type, it),
         );
         Some(FunctionDeclaration {
             ast: Some(function),
@@ -1127,7 +1109,7 @@ impl<'a> Context<'a> {
     fn lower_parameters(
         &mut self,
         type_parameters: &[TypeParameter],
-        self_type: Option<&NamedType>,
+        self_base_type: Option<&Type>,
         parameters: &'a AstParameters,
     ) -> Box<[Parameter]> {
         let mut parameter_names = FxHashSet::default();
@@ -1144,7 +1126,8 @@ impl<'a> Context<'a> {
                     return None;
                 }
 
-                let type_ = self.lower_type(type_parameters, self_type, parameter.type_.value());
+                let type_ =
+                    self.lower_type(type_parameters, self_base_type, parameter.type_.value());
 
                 let id = self.id_generator.generate();
                 Parameter {
@@ -1157,7 +1140,7 @@ impl<'a> Context<'a> {
     }
     fn lower_function(
         &mut self,
-        self_type: Option<&NamedType>,
+        self_base_type: Option<&Type>,
         outer_type_parameters: &[TypeParameter],
         function: &mut FunctionDeclaration<'a>,
         body_is_optional: bool,
@@ -1173,7 +1156,7 @@ impl<'a> Context<'a> {
                 .cloned()
                 .chain(function.signature.type_parameters.iter().cloned())
                 .collect_vec(),
-            self_type,
+            self_base_type,
             |builder| {
                 for parameter in function.signature.parameters.iter() {
                     builder.push_parameter(parameter.clone());
@@ -1231,7 +1214,7 @@ struct BodyBuilder<'c, 'a> {
     context: &'c mut Context<'a>,
     global_assignment_dependencies: FxHashSet<Id>,
     type_parameters: &'c [TypeParameter],
-    self_type: Option<&'c NamedType>,
+    self_base_type: Option<&'c Type>,
     local_identifiers: Vec<(Box<str>, Id, Type)>,
     body: Body,
 }
@@ -1240,14 +1223,14 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     fn build(
         context: &'c mut Context<'a>,
         type_parameters: &'c [TypeParameter],
-        self_type: Option<&'c NamedType>,
+        self_base_type: Option<&'c Type>,
         fun: impl FnOnce(&mut BodyBuilder),
     ) -> (Body, FxHashSet<Id>) {
         let mut builder = Self {
             context,
             global_assignment_dependencies: FxHashSet::default(),
             type_parameters,
-            self_type,
+            self_base_type,
             local_identifiers: vec![],
             body: Body::default(),
         };
@@ -1259,7 +1242,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         BodyBuilder::build(
             self.context,
             self.type_parameters,
-            self.self_type,
+            self.self_base_type,
             |builder| {
                 builder.local_identifiers = self.local_identifiers.clone();
                 fun(builder);
@@ -1290,8 +1273,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     };
 
                     let type_ = assignment.type_.as_ref().map(|it| {
-                        self.context
-                            .lower_type(self.type_parameters, self.self_type, it.value())
+                        self.context.lower_type(
+                            self.type_parameters,
+                            self.self_base_type,
+                            it.value(),
+                        )
                     });
 
                     let (id, type_) = if let Some(value) = assignment.value.value() {
@@ -1417,8 +1403,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     it.arguments
                         .iter()
                         .map(|it| {
-                            self.context
-                                .lower_type(self.type_parameters, self.self_type, &it.type_)
+                            self.context.lower_type(
+                                self.type_parameters,
+                                self.self_base_type,
+                                &it.type_,
+                            )
                         })
                         .collect_vec()
                 });
@@ -2339,9 +2328,7 @@ impl<'h> TypeUnifier<'h> {
                 Ok(true)
             }
             (Type::Parameter { .. }, Type::Named { .. }) => Ok(true),
-            (Type::Self_ { base_type }, _) => {
-                self.unify(&Type::Named(base_type.clone()), parameter)
-            }
+            (Type::Self_ { base_type }, _) => self.unify(base_type, parameter),
             (_, Type::Self_ { base_type: _ }) => {
                 self.unify(argument, &ParameterType::self_type().into())
             }
