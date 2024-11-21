@@ -56,7 +56,11 @@ impl<'h> Context<'h> {
     }
 
     fn lower_assignment(&mut self, id: hir::Id) -> Box<str> {
-        let assignment = &self.hir.assignments[&id];
+        let assignment = &self
+            .hir
+            .assignments
+            .get(&id)
+            .unwrap_or_else(|| panic!("Unknown assignment: {id}"));
         let name = assignment.name.to_string().into_boxed_str();
         match self.assignments.entry(name.clone()) {
             Entry::Occupied(_) => return name.clone(),
