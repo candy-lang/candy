@@ -332,12 +332,12 @@ impl NamedType {
 
     // Builtin types
     #[must_use]
-    pub fn array(t: impl Into<Type>) -> Self {
-        Self::new("Array", [t.into()])
-    }
-    #[must_use]
     pub fn int() -> Self {
         Self::new("Int", [])
+    }
+    #[must_use]
+    pub fn list(t: impl Into<Type>) -> Self {
+        Self::new("List", [t.into()])
     }
     #[must_use]
     pub fn text() -> Self {
@@ -346,12 +346,16 @@ impl NamedType {
 
     // Standard library types
     #[must_use]
-    pub fn nothing() -> Self {
-        Self::new("Nothing", [])
+    pub fn maybe(t: impl Into<Type>) -> Self {
+        Self::new("Maybe", [t.into()])
     }
     #[must_use]
     pub fn never() -> Self {
         Self::new("Never", [])
+    }
+    #[must_use]
+    pub fn nothing() -> Self {
+        Self::new("Nothing", [])
     }
     #[must_use]
     pub fn ordering() -> Self {
@@ -418,8 +422,10 @@ impl Type {
 
     #[must_use]
     pub fn equals_lenient(&self, other: &Self) -> bool {
+        #[allow(clippy::redundant_guards)]
         match (self, other) {
             (Self::Error, _) | (_, Self::Error) => true,
+            (Self::Named(NamedType { box name, .. }), _) if name == "Never" => true,
             (Self::Named(from), Self::Named(to)) => {
                 from.name == to.name
                     && from
@@ -710,12 +716,22 @@ pub struct SwitchCase {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
 #[strum(serialize_all = "camelCase")]
 pub enum BuiltinFunction {
-    ArrayFilled,
-    ArrayLength,
     IntAdd,
     IntCompareTo,
     IntSubtract,
     IntToText,
+    ListFilled,
+    ListGet,
+    ListInsert,
+    ListLength,
+    ListOf0,
+    ListOf1,
+    ListOf2,
+    ListOf3,
+    ListOf4,
+    ListOf5,
+    ListRemoveAt,
+    ListReplace,
     Panic,
     Print,
     TextConcat,
@@ -729,26 +745,6 @@ impl BuiltinFunction {
     #[must_use]
     pub fn signature(self) -> BuiltinFunctionSignature {
         match self {
-            Self::ArrayFilled => BuiltinFunctionSignature {
-                name: "builtinArrayFilled".into(),
-                type_parameters: ["T".into()].into(),
-                parameters: [
-                    ("length".into(), NamedType::int().into()),
-                    ("item".into(), ParameterType::new("T").into()),
-                ]
-                .into(),
-                return_type: NamedType::array(ParameterType::new("T")).into(),
-            },
-            Self::ArrayLength => BuiltinFunctionSignature {
-                name: "builtinArrayLength".into(),
-                type_parameters: ["T".into()].into(),
-                parameters: [(
-                    "array".into(),
-                    NamedType::array(ParameterType::new("T")).into(),
-                )]
-                .into(),
-                return_type: NamedType::int().into(),
-            },
             Self::IntAdd => BuiltinFunctionSignature {
                 name: "builtinIntAdd".into(),
                 type_parameters: Box::default(),
@@ -784,6 +780,138 @@ impl BuiltinFunction {
                 type_parameters: Box::default(),
                 parameters: [("int".into(), NamedType::int().into())].into(),
                 return_type: NamedType::text().into(),
+            },
+            Self::ListFilled => BuiltinFunctionSignature {
+                name: "builtinListFilled".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("length".into(), NamedType::int().into()),
+                    ("item".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListGet => BuiltinFunctionSignature {
+                name: "builtinListGet".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    (
+                        "list".into(),
+                        NamedType::list(ParameterType::new("T")).into(),
+                    ),
+                    ("index".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::maybe(ParameterType::new("T")).into(),
+            },
+            Self::ListInsert => BuiltinFunctionSignature {
+                name: "builtinListInsert".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    (
+                        "list".into(),
+                        NamedType::list(ParameterType::new("T")).into(),
+                    ),
+                    ("index".into(), NamedType::int().into()),
+                    ("item".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListLength => BuiltinFunctionSignature {
+                name: "builtinListLength".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [(
+                    "list".into(),
+                    NamedType::list(ParameterType::new("T")).into(),
+                )]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
+            Self::ListOf0 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: Box::default(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf1 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [("item0".into(), ParameterType::new("T").into())].into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf2 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("item0".into(), ParameterType::new("T").into()),
+                    ("item1".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf3 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("item0".into(), ParameterType::new("T").into()),
+                    ("item1".into(), ParameterType::new("T").into()),
+                    ("item2".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf4 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("item0".into(), ParameterType::new("T").into()),
+                    ("item1".into(), ParameterType::new("T").into()),
+                    ("item2".into(), ParameterType::new("T").into()),
+                    ("item3".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListOf5 => BuiltinFunctionSignature {
+                name: "builtinListOf".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("item0".into(), ParameterType::new("T").into()),
+                    ("item1".into(), ParameterType::new("T").into()),
+                    ("item2".into(), ParameterType::new("T").into()),
+                    ("item3".into(), ParameterType::new("T").into()),
+                    ("item4".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListRemoveAt => BuiltinFunctionSignature {
+                name: "builtinListRemoveAt".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    (
+                        "list".into(),
+                        NamedType::list(ParameterType::new("T")).into(),
+                    ),
+                    ("index".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListReplace => BuiltinFunctionSignature {
+                name: "builtinListReplace".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    (
+                        "list".into(),
+                        NamedType::list(ParameterType::new("T")).into(),
+                    ),
+                    ("index".into(), NamedType::int().into()),
+                    ("newItem".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
             },
             Self::Panic => BuiltinFunctionSignature {
                 name: "builtinPanic".into(),
