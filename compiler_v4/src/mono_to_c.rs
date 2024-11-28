@@ -190,6 +190,30 @@ impl<'h> Context<'h> {
                         a = function.parameters[0].id,
                         b = function.parameters[1].id,
                     )),
+                    BuiltinFunction::IntBitwiseAnd => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {a}->value & {b}->value;
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntBitwiseOr => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {a}->value | {b}->value;
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntBitwiseXor => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {a}->value ^ {b}->value;
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                    )),
                     BuiltinFunction::IntCompareTo => self.push(format!(
                         "\
                         Ordering* result_pointer = malloc(sizeof(Ordering));
@@ -200,13 +224,80 @@ impl<'h> Context<'h> {
                         a = function.parameters[0].id,
                         b = function.parameters[1].id,
                     )),
+                    BuiltinFunction::IntDivideTruncating => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {dividend}->value / {divisor}->value;
+                        return result_pointer;",
+                        dividend = function.parameters[0].id,
+                        divisor = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntMultiply => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {factorA}->value * {factorB}->value;
+                        return result_pointer;",
+                        factorA = function.parameters[0].id,
+                        factorB = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntParse => self.push(format!(
+                        "\
+                        {return_type}* result_pointer = malloc(sizeof({return_type}));
+                        char *end_pointer;
+                        uint64_t value = strtol({text}->value, &end_pointer, 10);
+                        if (end_pointer == {text}->value) {{
+                            result_pointer->variant = {return_type}_error;
+                            result_pointer->value.error = malloc(sizeof(Text));
+                            result_pointer->value.error->value = \"Text is empty\";
+                        }} else if (*end_pointer != '\0') {{
+                            char* message_format = \"Non-numeric character \"%c\" at index %ld.\";
+                            int length = snprintf(NULL, 0, message_format, *end_pointer, end_pointer - {text}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, *end_pointer, end_pointer - {text}->value);
+                        
+                            result_pointer->variant = {return_type}_error;
+                            result_pointer->value.error = malloc(sizeof(Text));
+                            result_pointer->value.error->value = message;
+                        }} else {{
+                            result_pointer->variant = {return_type}_ok;
+                            result_pointer->value.ok = malloc(sizeof(Int));
+                            result_pointer->value.ok ->value = value;
+                        }}
+                        return result_pointer;",
+                        text = function.parameters[0].id,
+                        return_type = function.return_type,
+                    )),
+                    BuiltinFunction::IntRemainder => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {dividend}->value % {divisor}->value;
+                        return result_pointer;",
+                        dividend = function.parameters[0].id,
+                        divisor = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntShiftLeft => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {value}->value << {amount}->value;
+                        return result_pointer;",
+                        value = function.parameters[0].id,
+                        amount = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntShiftRight => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {value}->value >> {amount}->value;
+                        return result_pointer;",
+                        value = function.parameters[0].id,
+                        amount = function.parameters[1].id,
+                    )),
                     BuiltinFunction::IntSubtract => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
-                        result_pointer->value = {a}->value - {b}->value;
+                        result_pointer->value = {minuend}->value - {subtrahend}->value;
                         return result_pointer;",
-                        a = function.parameters[0].id,
-                        b = function.parameters[1].id,
+                        minuend = function.parameters[0].id,
+                        subtrahend = function.parameters[1].id,
                     )),
                     BuiltinFunction::IntToText => self.push(format!(
                         "\

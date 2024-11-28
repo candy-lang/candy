@@ -121,6 +121,86 @@ impl Int: Subtract {
 fun negate(self: Int) Int {
   0.subtract(self)
 }
+fun multiply(self: Int, other: Int) Int {
+  self.builtinIntMultiply(other)
+}
+fun square(self: Int) Int {
+  self.multiply(self)
+}
+fun divideTruncating(dividend: Int, divisor: Int) Int {
+  needs(divisor.equals(0).not())
+
+  dividend.builtinIntDivideTruncating(divisor)
+}
+fun remainder(dividend: Int, divisor: Int) Int {
+  # Returns the remainder you get when dividing the `dividend` by the `divisor`.
+  #
+  # The result has the same sign as the `dividend`.
+  #
+  # | `dividend` | `divisor` | `dividend.remainder(divisor)` |
+  # |-----------:|----------:|---------------------------:|
+  # |          6 |         3 |                          0 |
+  # |          5 |         3 |                          2 |
+  # |         -5 |         3 |                         -2 |
+  # |          5 |        -3 |                          2 |
+  # |         -5 |        -3 |                         -2 |
+  needs(divisor.equals(0).not())
+
+  dividend.builtinIntRemainder(divisor)
+}
+fun modulo(dividend: Int, divisor: Int) Int {
+  # Returns `dividend` % `divisor`.
+  #
+  # The result of a modulo operation is the smallest possible number $x$ such
+  # that there exists a $y$ with $dividend = y * divisor + x$.
+  #
+  # | `dividend` | `divisor` | `dividend.modulo(divisor)` |
+  # |-----------:|----------:|---------------------------:|
+  # |          6 |         3 |                          0 |
+  # |          5 |         3 |                          2 |
+  # |          5 |        -3 |                          2 |
+  # |         -5 |         3 |                          1 |
+  # |         -5 |        -3 |                          1 |
+  needs(divisor.equals(0).not())
+
+  let remainder = dividend.remainder(divisor)
+  switch remainder.isNegative() {
+    true => switch divisor.isNegative() {
+      true => remainder.subtract(divisor),
+      false => remainder.add(divisor),
+    },
+    false => remainder,
+  }
+}
+fun shiftLeft(value: Int, amount: Int) Int {
+  value.builtinIntShiftLeft(amount)
+}
+fun shiftRight(value: Int, amount: Int) Int {
+  value.builtinIntShiftRight(amount)
+}
+fun bitwiseAnd(self: Int, other: Int) Int {
+  self.builtinIntBitwiseAnd(other)
+}
+fun bitwiseOr(self: Int, other: Int) Int {
+  self.builtinIntBitwiseOr(other)
+}
+fun bitwiseXor(self: Int, other: Int) Int {
+  self.builtinIntBitwiseXor(other)
+}
+fun isEven(self: Int) Bool {
+  self.remainder(2).equals(0)
+}
+fun isOdd(self: Int) Bool {
+  self.remainder(2).equals(1)
+}
+fun lowestBits(value: Int, bitCount: Int) Int {
+  needs(bitCount.isNonNegative())
+  let mask = 1.shiftLeft(bitCount).subtract(1)
+  value.bitwiseAnd(mask)
+}
+fun parseInt(text: Text) Result[Int, Text] {
+  text.builtinIntParse()
+}
 
 trait HasLength {
   fun length(self: Self) Int
@@ -138,6 +218,7 @@ impl Text: HasLength {
 fun concat(self: Text, other: Text) Text {
   self.builtinTextConcat(other)
 }
+# TODO: Support ranges when we have them.
 fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
   self.builtinTextGetRange(startInclusive, endExclusive)
 }
