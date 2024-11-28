@@ -361,25 +361,7 @@ impl[T: ToText] Maybe[T]: ToText {
   }
 }
 
-enum MyEnum {
-  foo: Int,
-  bar,
-}
-
 # function type: `Fun[Int, Text, Int]`, later `Fun (Int, Text) Int`
-
-# Expressions
-let intExpression: Int = 42
-let textExpression: Text = "Hello, World!"
-# let textExpressionWithInterpolation = "The answer is {intExpression}!"
-let identifierExpression: Int = intExpression
-# let parenthesizedExpression = (intExpression)
-let structExpression: MyStruct = MyStruct("Banana", 12345)
-# let lambdaExpression = (x: Int) { x }
-
-# Assignments
-let valueWithExplicitType: Int = 42
-let valueWithoutExplicitType = 42
 
 # Uniform Function Call Syntax
 # Functions can also be overloaded
@@ -392,15 +374,6 @@ let valueWithoutExplicitType = 42
 #   )
 # }
 # aDate.add(Duration(days: 1)) # is equivalent to `add(aDate, Duration(days: 1))`
-
-# fun twar() Int {
-#  foo
-#     bar
-#       fds
-#  % True: foo
-#      fff
-#    False: blub
-#}
 
 fun fibonacci(n: Int) Int {
   switch n.isLessThan(2) {
