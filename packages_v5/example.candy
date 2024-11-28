@@ -90,6 +90,24 @@ impl Int: Compare {
     self.builtinIntCompareTo(other)
   }
 }
+fun isPositive(self: Int) Bool {
+  self.isGreaterThan(0)
+}
+fun isNonPositive(self: Int) Bool {
+  self.isLessThanOrEqualTo(0)
+}
+fun isNegative(self: Int) Bool {
+  self.isLessThan(0)
+}
+fun isNonNegative(self: Int) Bool {
+  self.isGreaterThanOrEqualTo(0)
+}
+fun absolute(self: Int) Int {
+  switch self.isNegative() {
+    true => self.negate(),
+    false => self,
+  }
+}
 impl Int: Add {
   fun add(self: Int, other: Int) Int {
     self.builtinIntAdd(other)
@@ -99,6 +117,9 @@ impl Int: Subtract {
   fun subtract(self: Int, other: Int) Int {
     self.builtinIntSubtract(other)
   }
+}
+fun negate(self: Int) Int {
+  0.subtract(self)
 }
 
 trait HasLength {
