@@ -363,6 +363,51 @@ impl[T: ToText] Maybe[T]: ToText {
   }
 }
 
+enum Result[T, E] {
+  ok: T,
+  error: E,
+}
+fun ok[T, E](value: T) Result[T, E] {
+  Result.ok[T, E](value)
+}
+fun error[T, E](value: E) Result[T, E] {
+  Result.error[T, E](value)
+}
+fun unwrap[T, E](self: Result[T, E]) T {
+  switch self {
+    ok(value) => value,
+    error(value) => panic("`unwrap()` called on `error()`"),
+  }
+}
+fun isOk[T, E](self: Result[T, E]) Bool {
+  switch self {
+    ok(value) => true,
+    error(value) => false,
+  }
+}
+fun isError[T, E](self: Result[T, E]) Bool {
+  switch self {
+    ok(value) => false,
+    error(value) => true,
+  }
+}
+# impl[T: ToText, E: ToText] Result[T, E]: ToText {
+#   fun toText(self: Result[T, E]) Text {
+#     switch self {
+#       ok(value) => "ok({value.toText()})",
+#       error(error) => "error({error.toText()})",
+#     }
+#   }
+# }
+impl[T: ToText] Result[T, Text]: ToText {
+  fun toText(self: Result[T, Text]) Text {
+    switch self {
+      ok(value) => "ok({value.toText()})",
+      error(error) => "error({error})",
+    }
+  }
+}
+
 # function type: `Fun[Int, Text, Int]`, later `Fun (Int, Text) Int`
 
 # Uniform Function Call Syntax

@@ -367,6 +367,10 @@ impl NamedType {
     pub fn ordering() -> Self {
         Self::new("Ordering", [])
     }
+    #[must_use]
+    pub fn result(t: impl Into<Type>, e: impl Into<Type>) -> Self {
+        Self::new("Result", [t.into(), e.into()])
+    }
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ParameterType {
