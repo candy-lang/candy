@@ -172,6 +172,13 @@ fun removeSuffix(self: Text, suffix: Text) Text {
     true => self.getRange(self.length().subtract(suffix.length()), self.length()),
   }
 }
+
+fun indexOf(self: Text, other: Text) Maybe[Int] {
+  self.builtinTextIndexOf(other)
+}
+fun contains(self: Text, other: Text) Bool {
+  self.indexOf(other).isSome()
+}
 impl Text: ToText {
   fun toText(self: Text) Text {
     self

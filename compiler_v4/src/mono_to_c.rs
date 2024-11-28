@@ -309,6 +309,21 @@ impl<'h> Context<'h> {
                         start_inclusive = function.parameters[1].id,
                         end_exclusive = function.parameters[2].id,
                     )),
+                    BuiltinFunction::TextIndexOf => self.push(format!(
+                        "\
+                        {return_type} result_pointer = malloc(sizeof({return_type}));
+                        char* result = strstr({a}->value, {b}->value);
+                        if (result == nullptr) {{
+                            result_pointer->variant = {return_type}_none;
+                        }} else {{
+                            result_pointer->variant = {return_type}_some;
+                            result_pointer->value.some = result - {a}->value;
+                        }}
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                        return_type = function.return_type,
+                    )),
                     BuiltinFunction::TextLength => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));

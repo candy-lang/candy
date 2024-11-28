@@ -721,6 +721,7 @@ pub enum BuiltinFunction {
     TextCompareTo,
     TextConcat,
     TextGetRange,
+    TextIndexOf,
     TextLength,
 }
 impl BuiltinFunction {
@@ -830,6 +831,16 @@ impl BuiltinFunction {
                 ]
                 .into(),
                 return_type: NamedType::text().into(),
+            },
+            Self::TextIndexOf => BuiltinFunctionSignature {
+                name: "builtinTextIndexOf".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("a".into(), NamedType::text().into()),
+                    ("b".into(), NamedType::text().into()),
+                ]
+                .into(),
+                return_type: NamedType::maybe(NamedType::int()).into(),
             },
             Self::TextLength => BuiltinFunctionSignature {
                 name: "builtinTextLength".into(),
