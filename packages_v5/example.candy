@@ -194,16 +194,6 @@ fun panic(message: Text) Never {
   builtinPanic(message)
 }
 
-struct Array[T] = builtin
-fun arrayFilled[T](length: Int, item: T) Array[T] {
-  builtinArrayFilled(length, item)
-}
-impl[T] Array[T]: HasLength {
-  fun length(self: Array[T]) Int {
-    builtinArrayLength(self)
-  }
-}
-
 struct List[T] = builtin
 fun listFilled[T](length: Int, item: T) List[T] {
   builtinListFilled(length, item)
@@ -227,11 +217,10 @@ fun listOf[T](item0: T, item1: T, item2: T, item3: T) List[T] {
 fun listOf[T](item0: T, item1: T, item2: T, item3: T, item4: T) List[T] {
   builtinListOf(item0, item1, item2, item3, item4)
 }
-fun length[T](list: List[T]) Int {
-  builtinListLength(list)
-}
-fun isEmpty[T](list: List[T]) Bool {
-  list.length().equals(0)
+impl[T] List[T]: HasLength {
+  fun length(self: List[T]) Int {
+    builtinListLength(self)
+  }
 }
 fun lastIndex[T](list: List[T]) Maybe[Int] {
   switch list.isEmpty() {
