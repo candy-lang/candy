@@ -101,9 +101,18 @@ impl Int: Subtract {
   }
 }
 
+trait HasLength {
+  fun length(self: Self) Int
+}
+fun isEmpty[T: HasLength](t: T) Bool {
+  t.length().equals(0)
+}
+
 struct Text = builtin
-fun length(self: Text) Int {
-  self.builtinTextLength()
+impl Text: HasLength {
+  fun length(self: Text) Int {
+    self.builtinTextLength()
+  }
 }
 fun concat(self: Text, other: Text) Text {
   self.builtinTextConcat(other)
@@ -138,8 +147,10 @@ struct Array[T] = builtin
 fun arrayFilled[T](length: Int, item: T) Array[T] {
   builtinArrayFilled(length, item)
 }
-fun length[T](array: Array[T]) Int {
-  builtinArrayLength(array)
+impl[T] Array[T]: HasLength {
+  fun length(self: Array[T]) Int {
+    builtinArrayLength(self)
+  }
 }
 
 fun print[T: ToText](t: T) {
@@ -285,6 +296,7 @@ fun main() Int {
   print(true)
   print(false)
   print("1.equals(2): {1.equals(2).toText()}")
+  print("orld!".endsWith("World!").toText().isEmpty())
   0
 }
 
