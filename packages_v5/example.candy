@@ -141,6 +141,13 @@ fun concat(self: Text, other: Text) Text {
 fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
   self.builtinTextGetRange(startInclusive, endExclusive)
 }
+fun characterAt(self: Text, index: Int) Maybe[Text] {
+  switch index.isNonNegative().and(index.isLessThan(self.length())) {
+    false => none[Text](),
+    true => some(self.getRange(index, index.add(1))),
+  }
+}
+
 fun startsWith(self: Text, prefix: Text) Bool {
   switch self.length().isGreaterThanOrEqualTo(prefix.length()) {
     false => false,
