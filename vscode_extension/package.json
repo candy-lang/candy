@@ -255,10 +255,10 @@
     "@typescript-eslint/parser": "^7.0.2",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-prettier": "^5.2.1",
     "glob": "^10.3.10",
     "mocha": "^10.8.2",
-    "prettier": "^3.2.5",
+    "prettier": "^3.4.1",
     "typescript": "^5.4.5",
     "vscode-test": "^1.4.0"
   },
