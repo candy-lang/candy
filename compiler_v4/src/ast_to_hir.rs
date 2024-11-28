@@ -412,7 +412,12 @@ impl<'a> Context<'a> {
                 },
             );
             self.global_identifiers
-                .force_insert(signature.name, Named::Functions(vec![id]));
+                .entry(signature.name)
+                .and_modify(|it| match it {
+                    Named::Assignment(_) => panic!(),
+                    Named::Functions(function_ids) => function_ids.push(id),
+                })
+                .or_insert_with(|| Named::Functions(vec![id]));
         }
     }
 

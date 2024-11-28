@@ -7,7 +7,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/candy-lang/candy.git",
-    "directory": "new-new-packages/vscode_extension"
+    "directory": "vscode_extension"
   },
   "//": "Keep in sync with `devDependencies.@types/vscode`",
   "//": "https://github.com/ewanharris/vscode-versions",
@@ -243,7 +243,7 @@
     "test": "node ./out/test/runTest.js"
   },
   "dependencies": {
-    "@vscode/debugadapter": "^1.64.0",
+    "@vscode/debugadapter": "^1.65.0",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
@@ -259,7 +259,7 @@
     "glob": "^10.3.10",
     "mocha": "^10.3.0",
     "prettier": "^3.2.5",
-    "typescript": "^5.3.3",
+    "typescript": "^5.4.5",
     "vscode-test": "^1.4.0"
   },
   "eslintConfig": {

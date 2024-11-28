@@ -46,7 +46,7 @@ pub struct Assignment {
     pub body: Body,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Function {
     pub parameters: Box<[Parameter]>,
     pub return_type: Box<str>,
@@ -59,10 +59,13 @@ pub struct Parameter {
     pub type_: Box<str>,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BodyOrBuiltin {
     Body(Body),
-    Builtin(BuiltinFunction),
+    Builtin {
+        builtin_function: BuiltinFunction,
+        substitutions: FxHashMap<Box<str>, Box<str>>,
+    },
 }
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Body {
