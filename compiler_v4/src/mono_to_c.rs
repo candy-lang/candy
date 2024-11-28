@@ -487,13 +487,15 @@ impl<'h> Context<'h> {
                     )),
                     BuiltinFunction::TextIndexOf => self.push(format!(
                         "\
-                        {return_type} result_pointer = malloc(sizeof({return_type}));
+                        {return_type}* result_pointer = malloc(sizeof({return_type}));
                         char* result = strstr({a}->value, {b}->value);
-                        if (result == nullptr) {{
+                        if (result == NULL) {{
                             result_pointer->variant = {return_type}_none;
                         }} else {{
                             result_pointer->variant = {return_type}_some;
-                            result_pointer->value.some = result - {a}->value;
+                            Int* index_pointer = malloc(sizeof(Int));
+                            index_pointer->value = result - {a}->value;
+                            result_pointer->value.some = index_pointer;
                         }}
                         return result_pointer;",
                         a = function.parameters[0].id,
