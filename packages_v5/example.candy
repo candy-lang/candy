@@ -237,6 +237,18 @@ fun some[T](value: T) Maybe[T] {
 fun none[T]() Maybe[T] {
   Maybe.none[T]()
 }
+fun isSome[T](self: Maybe[T]) Bool {
+  switch self {
+    some(value) => true,
+    none => false,
+  }
+}
+fun isNone[T](self: Maybe[T]) Bool {
+  switch self {
+    some(value) => false,
+    none => true,
+  }
+}
 # impl[T] Maybe[T]: ToText {
 #   fun toText(self: Maybe[T]) Text {
 #     switch self {
