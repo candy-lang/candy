@@ -248,7 +248,7 @@
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.6",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^20.11.20",
     "@types/vscode": "^1.86.0",
     "@typescript-eslint/eslint-plugin": "^7.0.2",
@@ -257,7 +257,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.3",
     "glob": "^10.3.10",
-    "mocha": "^10.3.0",
+    "mocha": "^10.8.2",
     "prettier": "^3.2.5",
     "typescript": "^5.4.5",
     "vscode-test": "^1.4.0"
