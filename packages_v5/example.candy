@@ -111,6 +111,18 @@ fun concat(self: Text, other: Text) Text {
 fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
   self.builtinTextGetRange(startInclusive, endExclusive)
 }
+fun startsWith(self: Text, prefix: Text) Bool {
+  switch self.length().isGreaterThanOrEqualTo(prefix.length()) {
+    false => false,
+    true => self.getRange(0, prefix.length()).equals(prefix),
+  }
+}
+fun endsWith(self: Text, suffix: Text) Bool {
+  switch self.length().isGreaterThanOrEqualTo(suffix.length()) {
+    false => false,
+    true => self.getRange(self.length().subtract(suffix.length()), self.length()).equals(suffix),
+  }
+}
 impl Text: ToText {
   fun toText(self: Text) Text {
     self
