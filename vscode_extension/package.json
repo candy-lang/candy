@@ -7,7 +7,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/candy-lang/candy.git",
-    "directory": "new-new-packages/vscode_extension"
+    "directory": "vscode_extension"
   },
   "//": "Keep in sync with `devDependencies.@types/vscode`",
   "//": "https://github.com/ewanharris/vscode-versions",
