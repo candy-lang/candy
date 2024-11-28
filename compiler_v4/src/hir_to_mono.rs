@@ -57,7 +57,11 @@ impl<'h> Context<'h> {
     }
 
     fn lower_assignment(&mut self, id: hir::Id) -> Box<str> {
-        let assignment = &self.hir.assignments[&id];
+        let assignment = &self
+            .hir
+            .assignments
+            .get(&id)
+            .unwrap_or_else(|| panic!("Unknown assignment: {id}"));
         let name = assignment.name.to_string().into_boxed_str();
         match self.assignments.entry(name.clone()) {
             Entry::Occupied(_) => return name.clone(),
@@ -83,12 +87,16 @@ impl<'h> Context<'h> {
         let function = self.hir.functions.get(&id).unwrap_or_else(|| {
             let impl_ = self.find_impl_for(id, &substitutions);
             let function = &impl_.functions[&id];
-            if let Type::Parameter(parameter_type) = &impl_.type_ {
-                let self_type = substitutions[&ParameterType::self_type()].clone();
-                substitutions
-                    .to_mut()
-                    .force_insert(parameter_type.clone(), self_type);
+
+            let mut unifier = TypeUnifier::new(&impl_.type_parameters);
+            assert!(unifier
+                .unify(&substitutions[&ParameterType::self_type()], &impl_.type_)
+                .unwrap());
+            let substitutions = substitutions.to_mut();
+            for (parameter_type, type_) in unifier.finish().unwrap() {
+                substitutions.force_insert(parameter_type, type_);
             }
+
             function
         });
 
@@ -124,7 +132,18 @@ impl<'h> Context<'h> {
                 let (parameters, _) = BodyBuilder::build(self, &substitutions, |builder| {
                     builder.add_parameters(&function.signature.parameters);
                 });
-                (parameters, mono::BodyOrBuiltin::Builtin(*builtin_function))
+                (
+                    parameters,
+                    mono::BodyOrBuiltin::Builtin {
+                        builtin_function: *builtin_function,
+                        substitutions: substitutions
+                            .iter()
+                            .map(|(parameter_type, type_)| {
+                                (parameter_type.name.clone(), self.lower_type(type_))
+                            })
+                            .collect(),
+                    },
+                )
             }
         };
         let return_type = function.signature.return_type.substitute(&substitutions);
@@ -505,12 +524,20 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 let enum_ = self.lower_type(enum_);
                 let cases = cases
                     .iter()
-                    .map(|case| mono::SwitchCase {
-                        variant: case.variant.clone(),
-                        value_id: case.value_id.map(|id| self.lower_id(id)),
-                        body: BodyBuilder::build_inner(self, |builder| {
-                            builder.lower_expressions(&case.body.expressions);
-                        }),
+                    .map(|case| {
+                        let value_ids = case
+                            .value_id
+                            .map(|hir_id| (hir_id, self.id_generator.generate()));
+                        mono::SwitchCase {
+                            variant: case.variant.clone(),
+                            value_id: value_ids.map(|(_, mir_id)| mir_id),
+                            body: BodyBuilder::build_inner(self, |builder| {
+                                if let Some((hir_id, mir_id)) = value_ids {
+                                    builder.id_mapping.force_insert(hir_id, mir_id);
+                                }
+                                builder.lower_expressions(&case.body.expressions);
+                            }),
+                        }
                     })
                     .collect();
                 self.push(

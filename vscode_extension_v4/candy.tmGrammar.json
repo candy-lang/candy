@@ -1,0 +1,91 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "candy",
+  "scopeName": "source.candy",
+  "fileTypes": ["candy"],
+  "patterns": [{ "include": "#all" }],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line",
+          "match": "# (.*)  $",
+          "captures": {
+            "1": {
+              "name": "markup.bold"
+            }
+          }
+        },
+        {
+          "name": "comment.line",
+          "begin": "#",
+          "end": "$",
+          "patterns": [
+            {
+              "match": "\\bTODO\\b:?",
+              "name": "keyword.todo"
+            }
+          ]
+        }
+      ]
+    },
+    "all": {
+      "patterns": [
+        {
+          "name": "keyword",
+          "match": "\\b(let|fun|struct|enum|trait|impl)\\b"
+        },
+        {
+          "name": "keyword.control",
+          "match": "\\bswitch\\b"
+        },
+        {
+          "name": "keyword.control",
+          "match": "([a-zA-Z_0-9]*)(?=(?:\\(.*\\))?\\s*=>)",
+          "captures": {
+            "1": {
+              "name": "emphasis"
+            }
+          }
+        },
+        {
+          "name": "keyword.operator",
+          "match": "[=.]"
+        },
+        { "include": "#comments" },
+        {
+          "name": "string.quoted.double",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "begin": "{",
+              "end": "}",
+              "patterns": [{ "include": "#all" }]
+            },
+            {
+              "name": "constant.character.escape",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "constant.numeric",
+          "match": "\\b[0-9]+\\b"
+        },
+        {
+          "name": "entity.name.function",
+          "match": "([a-z][a-zA-Z_0-9]*)(?=\\s*(\\(|\\[))"
+        },
+        {
+          "name": "entity.name.type",
+          "match": "\\b[A-Z][a-zA-Z_0-9]*\\b"
+        },
+        {
+          "name": "variable",
+          "match": "\\b[a-z][a-zA-Z_0-9]*\\b"
+        }
+      ]
+    }
+  }
+}

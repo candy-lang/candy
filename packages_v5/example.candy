@@ -190,6 +190,10 @@ impl Text: Compare {
   }
 }
 
+fun panic(message: Text) Never {
+  builtinPanic(message)
+}
+
 struct Array[T] = builtin
 fun arrayFilled[T](length: Int, item: T) Array[T] {
   builtinArrayFilled(length, item)
@@ -200,6 +204,73 @@ impl[T] Array[T]: HasLength {
   }
 }
 
+struct List[T] = builtin
+fun listFilled[T](length: Int, item: T) List[T] {
+  builtinListFilled(length, item)
+}
+# TODO: listGenerate(…)
+fun listOf[T]() List[T] {
+  builtinListOf[T]()
+}
+fun listOf[T](item0: T) List[T] {
+  builtinListOf(item0)
+}
+fun listOf[T](item0: T, item1: T) List[T] {
+  builtinListOf(item0, item1)
+}
+fun listOf[T](item0: T, item1: T, item2) List[T] {
+  builtinListOf(item0, item1, item2)
+}
+fun listOf[T](item0: T, item1: T, item2: T, item3: T) List[T] {
+  builtinListOf(item0, item1, item2, item3)
+}
+fun listOf[T](item0: T, item1: T, item2: T, item3: T, item4: T) List[T] {
+  builtinListOf(item0, item1, item2, item3, item4)
+}
+fun length[T](list: List[T]) Int {
+  builtinListLength(list)
+}
+fun isEmpty[T](list: List[T]) Bool {
+  list.length().equals(0)
+}
+fun lastIndex[T](list: List[T]) Maybe[Int] {
+  switch list.isEmpty() {
+    true => none[Int](),
+    false => some(list.length().subtract(1)),
+  }
+}
+fun get[T](list: List[T], index: Int) Maybe[T] {
+  builtinListGet(list, index)
+}
+fun single[T](list: List[T]) Maybe[T] {
+  switch list.length().equals(1) {
+    true => list.get(0),
+    false => none[T](),
+  }
+}
+fun first[T](list: List[T]) Maybe[T] {
+  list.get(0)
+}
+fun last[T](list: List[T]) Maybe[T] {
+  list.get(list.length().subtract(1))
+}
+fun insert[T](list: List[T], index: Int, item: T) List[T] {
+  builtinListInsert(list, index, item)
+}
+fun prepend[T](list: List[T], item: T) List[T] {
+  insert(list, 0, item)
+}
+fun append[T](list: List[T], item: T) List[T] {
+  insert(list, list.length(), item)
+}
+fun replace[T](list: List[T], index: Int, item: T) List[T] {
+  builtinListReplace(list, index, item)
+}
+# TODO: list.update(…)
+fun removeAt[T](list: List[T], index: Int) List[T] {
+  builtinListRemoveAt(list, index)
+}
+# TODO: list.getRange(…), .concatenate(…), .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
 }
@@ -263,6 +334,12 @@ fun some[T](value: T) Maybe[T] {
 fun none[T]() Maybe[T] {
   Maybe.none[T]()
 }
+fun unwrap[T](self: Maybe[T]) T {
+  switch self {
+    some(value) => value,
+    none => panic("`unwrap()` called on `none()`"),
+  }
+}
 fun isSome[T](self: Maybe[T]) Bool {
   switch self {
     some(value) => true,
@@ -275,14 +352,14 @@ fun isNone[T](self: Maybe[T]) Bool {
     none => true,
   }
 }
-# impl[T] Maybe[T]: ToText {
-#   fun toText(self: Maybe[T]) Text {
-#     switch self {
-#       some(value) => "some({value.toText()})",
-#       none => "none()",
-#     }
-#   }
-# }
+impl[T: ToText] Maybe[T]: ToText {
+  fun toText(self: Maybe[T]) Text {
+    switch self {
+      some(value) => "some({value.toText()})",
+      none => "none()",
+    }
+  }
+}
 
 enum MyEnum {
   foo: Int,
@@ -355,6 +432,11 @@ fun main() Int {
   print(true)
   print(false)
   print("1.equals(2): {1.equals(2).toText()}")
+
+  let list = listOf(0, 1).insert(1, 2).replace(0, 3).removeAt(2)
+  print("Length: {list.length().toText()}")
+  print("[{list.get(0).toText()}, {list.get(1).toText()}, {list.get(2).toText()}]")
+
   print("orld!".endsWith("World!").toText().isEmpty())
   0
 }

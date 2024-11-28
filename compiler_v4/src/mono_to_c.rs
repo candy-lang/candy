@@ -77,14 +77,14 @@ impl<'h> Context<'h> {
                     type_arguments,
                 } => {
                     match name.as_ref() {
-                        "Array" => {
-                            assert_eq!(type_arguments.len(), 1);
-                            self.push("uint64_t length;\n");
-                            self.push(format!("{}** values;\n", type_arguments[0]));
-                        }
                         "Int" => {
                             assert!(type_arguments.is_empty());
                             self.push("uint64_t value;\n");
+                        }
+                        "List" => {
+                            assert_eq!(type_arguments.len(), 1);
+                            self.push("uint64_t length;\n");
+                            self.push(format!("{}** values;\n", type_arguments[0]));
                         }
                         "Text" => {
                             assert!(type_arguments.is_empty());
@@ -176,29 +176,12 @@ impl<'h> Context<'h> {
     }
     fn lower_body_or_builtin(&mut self, function: &Function) {
         match &function.body {
-            BodyOrBuiltin::Builtin(builtin_function) => {
+            BodyOrBuiltin::Builtin {
+                builtin_function,
+                substitutions,
+            } => {
                 self.push("// builtin function\n");
                 match builtin_function {
-                    BuiltinFunction::ArrayFilled => self.push(format!(
-                        "\
-                        {array_type}* result_pointer = malloc(sizeof({array_type}));
-                        result_pointer->length = {length}->value;
-                        result_pointer->values = malloc({length}->value * sizeof({array_type}));
-                        for (uint64_t i = 0; i < {length}->value; i++) {{
-                            result_pointer->values[i] = {item};
-                        }}
-                        return result_pointer;",
-                        array_type = function.return_type,
-                        length = function.parameters[0].id,
-                        item = function.parameters[1].id,
-                    )),
-                    BuiltinFunction::ArrayLength => self.push(format!(
-                        "\
-                        Int* result_pointer = malloc(sizeof(Int));
-                        result_pointer->value = {array}->length;
-                        return result_pointer;",
-                        array = function.parameters[0].id,
-                    )),
                     BuiltinFunction::IntAdd => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
@@ -235,6 +218,199 @@ impl<'h> Context<'h> {
                         result_pointer->value = result;
                         return result_pointer;",
                         int = function.parameters[0].id,
+                    )),
+                    BuiltinFunction::ListFilled => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {length}->value;
+                        result_pointer->values = malloc({length}->value * sizeof({item_type}));
+                        for (uint64_t i = 0; i < {length}->value; i++) {{
+                            result_pointer->values[i] = {item};
+                        }}
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        length = function.parameters[0].id,
+                        item = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::ListGet => self.push(format!(
+                        "\
+                        {return_type}* result_pointer = malloc(sizeof({return_type}));
+                        if (0 <= {index}->value && {index}->value < {list}->length) {{
+                            result_pointer->variant = {return_type}_some;
+                            result_pointer->value.some = {list}->values[{index}->value];
+                        }} else {{
+                            result_pointer->variant = {return_type}_none;
+                        }}
+                        return result_pointer;",
+                        return_type = function.return_type,
+                        list = function.parameters[0].id,
+                        index = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::ListInsert => self.push(format!(
+                        "\
+                        if (0 > {index}->value || {index}->value > {list}->length) {{
+                            char* message_format = \"Index out of bounds: Tried inserting at index %ld in list of length %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {index}->value, {list}->length);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {index}->value, {list}->length);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {list}->length + 1;
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
+                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}));
+                        result_pointer->values[{index}->value] = {item};
+                        memcpy(result_pointer->values + {index}->value + 1, {list}->values + {index}->value, ({list}->length - {index}->value) * sizeof({item_type}));
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        list = function.parameters[0].id,
+                        index = function.parameters[1].id,
+                        item = function.parameters[2].id,
+                    )),
+                    BuiltinFunction::ListLength => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {list}->length;
+                        return result_pointer;",
+                        list = function.parameters[0].id,
+                    )),
+                    BuiltinFunction::ListOf0 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 0;
+                        result_pointer->values = nullptr;
+                        return result_pointer;",
+                        list_type = function.return_type,
+                    )),
+                    BuiltinFunction::ListOf1 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 1;
+                        result_pointer->values = malloc(sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                    )),
+                    BuiltinFunction::ListOf2 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 2;
+                        result_pointer->values = malloc(2 * sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        result_pointer->values[1] = {item1};
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                        item1 = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::ListOf3 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 3;
+                        result_pointer->values = malloc(3 * sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        result_pointer->values[1] = {item1};
+                        result_pointer->values[2] = {item2};
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                        item1 = function.parameters[1].id,
+                        item2 = function.parameters[2].id,
+                    )),
+                    BuiltinFunction::ListOf4 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 4;
+                        result_pointer->values = malloc(4 * sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        result_pointer->values[1] = {item1};
+                        result_pointer->values[2] = {item2};
+                        result_pointer->values[3] = {item3};
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                        item1 = function.parameters[1].id,
+                        item2 = function.parameters[2].id,
+                        item3 = function.parameters[3].id,
+                    )),
+                    BuiltinFunction::ListOf5 => self.push(format!(
+                        "\
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = 5;
+                        result_pointer->values = malloc(5 * sizeof({item_type}));
+                        result_pointer->values[0] = {item0};
+                        result_pointer->values[1] = {item1};
+                        result_pointer->values[2] = {item2};
+                        result_pointer->values[3] = {item3};
+                        result_pointer->values[4] = {item4};
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        item0 = function.parameters[0].id,
+                        item1 = function.parameters[1].id,
+                        item2 = function.parameters[2].id,
+                        item3 = function.parameters[3].id,
+                        item4 = function.parameters[4].id,
+                    )),
+                    BuiltinFunction::ListRemoveAt => self.push(format!(
+                        "\
+                        if (0 > {index}->value || {index}->value >= {list}->length) {{
+                            char* message_format = \"Index out of bounds: Tried removing item at index %ld from list of length %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {index}->value, {list}->length);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {index}->value, {list}->length);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {list}->length - 1;
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
+                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}));
+                        memcpy(result_pointer->values + {index}->value, {list}->values + {index}->value + 1, ({list}->length - {index}->value - 1) * sizeof({item_type}));
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        list = function.parameters[0].id,
+                        index = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::ListReplace => self.push(format!(
+                        "\
+                        if (0 > {index}->value || {index}->value >= {list}->length) {{
+                            char* message_format = \"Index out of bounds: Tried replacing index %ld in list of length %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {index}->value, {list}->length);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {index}->value, {list}->length);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {list}->length;
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
+                        memcpy(result_pointer->values, {list}->values, {list}->length * sizeof({item_type}));
+                        result_pointer->values[{index}->value] = {new_item};
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        list = function.parameters[0].id,
+                        index = function.parameters[1].id,
+                        new_item = function.parameters[2].id,
                     )),
                     BuiltinFunction::Panic => {
                         self.push(format!(
@@ -448,7 +624,10 @@ impl<'h> Context<'h> {
                             .value_type
                             .as_ref()
                             .unwrap();
-                        self.push(format!("{variant_type}* {value_id} = {value}->value;\n"));
+                        self.push(format!(
+                            "{variant_type}* {value_id} = {value}->value.{};\n",
+                            case.variant,
+                        ));
                     }
 
                     self.lower_body_expressions(&case.body);
