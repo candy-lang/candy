@@ -35,6 +35,7 @@ impl TextBuilder {
         self.push("\n");
         self.push("  ".repeat(self.indentation));
     }
+    #[allow(dead_code)]
     pub fn push_children_multiline<'c, C>(&mut self, children: impl IntoIterator<Item = &'c C>)
     where
         C: ToText + 'c,
@@ -52,6 +53,7 @@ impl TextBuilder {
             builder.push_custom_multiline(children, push_child);
         });
     }
+    #[allow(dead_code)]
     pub fn push_multiline<'c, C>(&mut self, items: impl IntoIterator<Item = &'c C>)
     where
         C: ToText + 'c,
@@ -98,6 +100,7 @@ impl TextBuilder {
         }
     }
 
+    #[allow(dead_code)]
     pub fn push_comment_line(&mut self, text: impl AsRef<str>) {
         let text = text.as_ref();
         if text.is_empty() {

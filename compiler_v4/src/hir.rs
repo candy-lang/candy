@@ -80,12 +80,9 @@ impl ToText for Hir {
                     declaration.type_parameters.build_text(builder);
                     if let Some(fields) = fields {
                         builder.push(" {");
-                        builder.push_children_custom_multiline(
-                            fields.iter(),
-                            |builder, (name, type_)| {
-                                builder.push(format!("{name}: {type_},"));
-                            },
-                        );
+                        builder.push_children_custom_multiline(fields.iter(), |builder, it| {
+                            builder.push(format!("{}: {},", it.name, it.type_));
+                        });
                         if !fields.is_empty() {
                             builder.push_newline();
                         }
@@ -155,11 +152,16 @@ pub struct TypeDeclaration {
 pub enum TypeDeclarationKind {
     Struct {
         /// `None` if the struct is a builtin.
-        fields: Option<Box<[(Box<str>, Type)]>>,
+        fields: Option<Box<[StructField]>>,
     },
     Enum {
         variants: Box<[(Box<str>, Option<Type>)]>,
     },
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct StructField {
+    pub name: Box<str>,
+    pub type_: Type,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -391,6 +393,7 @@ impl ParameterType {
         }
     }
 
+    #[allow(dead_code)]
     #[must_use]
     pub fn is_self_type(&self) -> bool {
         self.name.as_ref() == Self::SELF_TYPE_NAME
@@ -567,6 +570,8 @@ pub struct Body {
     pub expressions: Vec<(Id, Option<Box<str>>, Expression)>,
 }
 impl Body {
+    #[allow(dead_code)]
+    #[must_use]
     pub fn return_value_id(&self) -> Id {
         self.expressions.last().unwrap().0
     }
@@ -596,6 +601,7 @@ pub struct Expression {
     pub type_: Type,
 }
 impl Expression {
+    #[allow(dead_code)]
     #[must_use]
     pub fn nothing() -> Self {
         Self {

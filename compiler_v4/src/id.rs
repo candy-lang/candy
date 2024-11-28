@@ -31,6 +31,7 @@ impl<T: CountableId> Default for IdGenerator<T> {
 pub trait CountableId {
     #[must_use]
     fn from_usize(id: usize) -> Self;
+    #[allow(dead_code)]
     #[must_use]
     fn to_usize(&self) -> usize;
 }
