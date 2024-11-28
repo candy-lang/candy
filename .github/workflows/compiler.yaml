@@ -49,5 +49,5 @@ jobs:
 
       - uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: vscode_extension/eslint-results.sarif
+          sarif_file: vscode_extension_v4/eslint-results.sarif
           wait-for-processing: true
