@@ -182,6 +182,9 @@ impl ToText for (&str, &TraitDefinition) {
                 .sorted_by_key(|(_, it)| it.signature.name.clone()),
             |builder, (id, function)| (*id, *function).build_text(builder),
         );
+        if !definition.functions.is_empty() {
+            builder.push_newline();
+        }
         builder.push("}");
     }
 }
@@ -252,6 +255,9 @@ impl ToText for Impl {
                 (*id, *function).build_text(builder);
             },
         );
+        if !self.functions.is_empty() {
+            builder.push_newline();
+        }
         builder.push("}");
     }
 }
