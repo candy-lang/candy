@@ -153,6 +153,18 @@ fun endsWith(self: Text, suffix: Text) Bool {
     true => self.getRange(self.length().subtract(suffix.length()), self.length()).equals(suffix),
   }
 }
+fun removePrefix(self: Text, prefix: Text) Text {
+  switch self.startsWith(prefix) {
+    false => self,
+    true => self.getRange(prefix.length(), self.length()),
+  }
+}
+fun removeSuffix(self: Text, suffix: Text) Text {
+  switch self.endsWith(suffix) {
+    false => self,
+    true => self.getRange(self.length().subtract(suffix.length()), self.length()),
+  }
+}
 impl Text: ToText {
   fun toText(self: Text) Text {
     self
