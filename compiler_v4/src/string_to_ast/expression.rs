@@ -15,7 +15,9 @@ use super::{
     word::{raw_identifier, word},
 };
 use crate::ast::{
-    AstArgument, AstArguments, AstBody, AstCall, AstError, AstExpression, AstExpressionKind, AstIdentifier, AstInt, AstLambda, AstNavigation, AstParenthesized, AstResult, AstStatement, AstSwitch, AstSwitchCase
+    AstArgument, AstArguments, AstBody, AstCall, AstError, AstExpression, AstExpressionKind,
+    AstIdentifier, AstInt, AstLambda, AstNavigation, AstParenthesized, AstResult, AstStatement,
+    AstSwitch, AstSwitchCase,
 };
 use replace_with::replace_with_or_abort;
 use tracing::instrument;
@@ -111,17 +113,10 @@ fn parenthesized<'a>(parser: Parser) -> Option<(Parser, AstParenthesized)> {
 }
 #[instrument(level = "trace")]
 fn lambda<'a>(parser: Parser) -> Option<(Parser, AstLambda)> {
-    let (parser, parameters) = parameters(parser)?
-        .and_trailing_whitespace();
+    let (parser, parameters) = parameters(parser)?.and_trailing_whitespace();
     let (parser, body) = body(parser)?;
 
-    Some((
-        parser,
-        AstLambda {
-            parameters,
-            body,
-        },
-    ))
+    Some((parser, AstLambda { parameters, body }))
 }
 #[instrument(level = "trace")]
 pub fn body<'a>(parser: Parser) -> Option<(Parser, AstBody)> {

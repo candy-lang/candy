@@ -281,10 +281,10 @@ impl<'h> Context<'h> {
                         if let Some(fields) = fields.as_ref() {
                             let fields = fields
                                 .iter()
-                                .map(|(name, type_)| {
+                                .map(|field| {
                                     (
-                                        name.clone(),
-                                        self.lower_type(&type_.substitute(&environment)),
+                                        field.name.clone(),
+                                        self.lower_type(&field.type_.substitute(&environment)),
                                     )
                                 })
                                 .collect();
