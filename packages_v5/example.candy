@@ -281,8 +281,8 @@ struct MyStruct {
 }
 
 enum Bool { true, false }
-let true = Bool.true()
-let false = Bool.false()
+let true: Bool = Bool.true()
+let false: Bool = Bool.false()
 fun not(value: Bool) Bool {
   switch value {
     true => false,
