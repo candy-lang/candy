@@ -982,10 +982,15 @@ impl<'a> Context<'a> {
 
         let id = self.id_generator.generate();
         // TODO: infer type
-        let type_ = assignment
-            .type_
-            .as_ref()
-            .map_or(Type::Error, |it| self.lower_type(&[], None, it.value()));
+        let type_ = if let Some(type_) = assignment.type_.as_ref() {
+            self.lower_type(&[], None, type_.value())
+        } else {
+            self.add_error(
+                assignment.display_span.clone(),
+                "Assignment is missing a type",
+            );
+            Type::Error
+        };
 
         match self.global_identifiers.entry(name.string.clone()) {
             Entry::Occupied(mut entry) => {
