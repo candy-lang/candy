@@ -25,6 +25,7 @@ impl<'h> Context<'h> {
     }
 
     fn lower_mono(&mut self) {
+        self.push("#include <errno.h>\n");
         self.push("#include <stdint.h>\n");
         self.push("#include <stdio.h>\n");
         self.push("#include <stdlib.h>\n");
@@ -244,13 +245,18 @@ impl<'h> Context<'h> {
                         "\
                         {return_type}* result_pointer = malloc(sizeof({return_type}));
                         char *end_pointer;
+                        errno = 0;
                         uint64_t value = strtol({text}->value, &end_pointer, 10);
-                        if (end_pointer == {text}->value) {{
+                        if (errno == ERANGE) {{
                             result_pointer->variant = {return_type}_error;
                             result_pointer->value.error = malloc(sizeof(Text));
-                            result_pointer->value.error->value = \"Text is empty\";
-                        }} else if (*end_pointer != '\0') {{
-                            char* message_format = \"Non-numeric character \"%c\" at index %ld.\";
+                            result_pointer->value.error->value = \"Value is out of range.\";
+                        }} else if (end_pointer == {text}->value) {{
+                            result_pointer->variant = {return_type}_error;
+                            result_pointer->value.error = malloc(sizeof(Text));
+                            result_pointer->value.error->value = \"Text is empty.\";
+                        }} else if (*end_pointer != '\\0') {{
+                            char* message_format = \"Non-numeric character \\\"%c\\\" at index %ld.\";
                             int length = snprintf(NULL, 0, message_format, *end_pointer, end_pointer - {text}->value);
                             char *message = malloc(length + 1);
                             snprintf(message, length + 1, message_format, *end_pointer, end_pointer - {text}->value);
