@@ -154,6 +154,38 @@ struct MyStruct {
 enum Bool { true, false }
 let true: Bool = Bool.true()
 let false: Bool = Bool.false()
+fun not(value: Bool) Bool {
+  switch value {
+    true => false,
+    false => true,
+  }
+}
+fun and(a: Bool, b: Bool) Bool {
+  switch a {
+    true => b,
+    false => false,
+  }
+}
+fun or(a: Bool, b: Bool) Bool {
+  switch a {
+    true => true,
+    false => b,
+  }
+}
+fun xor(a: Bool, b: Bool) Bool {
+  a.equals(b).not()
+}
+fun implies(a: Bool, b: Bool) Bool {
+  not(a).or(b)
+}
+impl Bool: Equal {
+  fun equals(self: Bool, other: Bool) Bool {
+    switch self {
+      true => other,
+      false => other.not(),
+    }
+  }
+}
 impl Bool: ToText {
   fun toText(self: Bool) Text {
     switch self {
