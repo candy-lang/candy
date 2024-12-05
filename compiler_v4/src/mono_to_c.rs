@@ -724,8 +724,7 @@ impl<'h> Context<'h> {
                     "{}* {id} = malloc(sizeof({}));",
                     &expression.type_, &expression.type_,
                 ));
-                // TODO: escape text
-                self.push(format!("{id}->value = \"{text}\";"));
+                self.push(format!("{id}->value = \"{}\";", text.escape_default()));
             }
             ExpressionKind::CreateStruct { struct_, fields } => {
                 let TypeDeclaration::Struct {

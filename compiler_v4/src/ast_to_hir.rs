@@ -1397,9 +1397,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     .parts
                     .iter()
                     .map::<Id, _>(|it| match it {
-                        AstTextPart::Text(text) => {
-                            self.push(None, ExpressionKind::Text(text.clone()), NamedType::text())
-                        }
+                        AstTextPart::Text(text) => self.push(
+                            None,
+                            ExpressionKind::Text(text.value().cloned().unwrap_or_default()),
+                            NamedType::text(),
+                        ),
                         AstTextPart::Interpolation { expression, .. } => {
                             if let Some(expression) = expression.value() {
                                 // TODO: accept impl ToText

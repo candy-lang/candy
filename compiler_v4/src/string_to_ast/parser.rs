@@ -51,10 +51,15 @@ impl<'s> Parser<'s> {
     pub fn string(self, start_offset: Offset) -> AstString {
         assert!(start_offset <= self.offset);
         AstString {
-            string: self.source[*start_offset..*self.offset].into(),
+            string: self.str(start_offset).into(),
             file: self.file.to_path_buf(),
             span: start_offset..self.offset,
         }
+    }
+    #[must_use]
+    pub fn str(self, start_offset: Offset) -> &'s str {
+        assert!(start_offset <= self.offset);
+        &self.source[*start_offset..*self.offset]
     }
 
     #[must_use]
@@ -104,7 +109,7 @@ impl<'s> Parser<'s> {
         (self, self.string(start_offset))
     }
     #[must_use]
-    fn consume_char(self) -> Option<(Parser<'s>, char)> {
+    pub fn consume_char(self) -> Option<(Parser<'s>, char)> {
         self.next_char().map(|c| {
             (
                 Parser {
