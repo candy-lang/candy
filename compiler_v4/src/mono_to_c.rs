@@ -193,7 +193,7 @@ impl<'h> Context<'h> {
 
             self.push(format!("struct {declaration_name}$lambda{id}_closure {{"));
             for (id, type_) in &closure {
-                self.push(format!("{type_} {id}; "));
+                self.push(format!("{type_}* {id}; "));
             }
             self.push("};\n");
 
