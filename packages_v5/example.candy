@@ -400,6 +400,14 @@ fun map[T, R](list: List[T], transform: (T) R) List[R] {
     result.append(transform(item))
   })
 }
+impl[T: ToText] List[T]: ToText {
+  fun toText(self: List[T]) Text {
+    let items = self.map((item: T) { item.toText() })
+      .reduce((result: Text, item: Text) { "{result}, {item}" })
+      .unwrapOr("")
+    "[{items}]"
+  }
+}
 
 struct MyStruct {
   name: Text,
@@ -610,6 +618,8 @@ fun main() Int {
   print("addCaptured(1) = {addCaptured(1).toText()}")
 
   repeat(3, () { print("Hello, World!") })
+
+  print(listOf(1, 2, 3).map((x: Int) { x.multiply(2) }))
 
   0
 }
