@@ -292,6 +292,16 @@ fun loop(body: () Nothing) {
   body()
   loop(body)
 }
+fun repeat(times: Int, body: () Nothing) {
+  needs(times.isNonNegative())
+  switch times.isGreaterThan(0) {
+    false => {},
+    true => {
+      body()
+      repeat(times.subtract(1), body)
+    },
+  }
+}
 
 struct List[T] = builtin
 fun listFilled[T](length: Int, item: T) List[T] {
@@ -548,6 +558,8 @@ fun main() Int {
   let foo = 123
   let addCaptured = (x: Int) { x.add(foo) }
   print("addCaptured(1) = {addCaptured(1).toText()}")
+
+  repeat(3, () { print("Hello, World!") })
 
   0
 }
