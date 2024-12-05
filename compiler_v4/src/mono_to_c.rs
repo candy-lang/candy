@@ -1,7 +1,7 @@
 use crate::{
     hir::BuiltinFunction,
     mono::{
-        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Lambda, Mono,
+        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Lambda, Mono, Parameter,
         TypeDeclaration,
     },
 };
@@ -145,7 +145,7 @@ impl<'h> Context<'h> {
     }
     fn lower_assignment_definitions(&mut self) {
         for (name, assignment) in &self.mono.assignments {
-            self.lower_lambda_definitions_in(name, &assignment.body);
+            self.lower_lambda_definitions_in(name, &[], &assignment.body);
 
             self.push(format!("void {name}$init() {{\n"));
             self.lower_body_expressions(name, &assignment.body);
@@ -179,7 +179,7 @@ impl<'h> Context<'h> {
     fn lower_function_definitions(&mut self) {
         for (name, function) in &self.mono.functions {
             if let BodyOrBuiltin::Body(body) = &function.body {
-                self.lower_lambda_definitions_in(name, body);
+                self.lower_lambda_definitions_in(name, &function.parameters, body);
             }
 
             self.lower_function_signature(name, function);
@@ -188,9 +188,14 @@ impl<'h> Context<'h> {
             self.push("}\n\n");
         }
     }
-    fn lower_lambda_definitions_in(&mut self, declaration_name: &str, body: &'h Body) {
+    fn lower_lambda_definitions_in(
+        &mut self,
+        declaration_name: &str,
+        declaration_parameters: &[Parameter],
+        body: &'h Body,
+    ) {
         Self::visit_lambdas_inside_body(body, &mut |id, lambda| {
-            let closure = lambda.closure_with_types(body);
+            let closure = lambda.closure_with_types(declaration_parameters, body);
 
             self.push(format!("struct {declaration_name}$lambda{id}_closure {{"));
             for (id, type_) in &closure {
