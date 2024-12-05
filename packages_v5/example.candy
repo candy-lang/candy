@@ -433,9 +433,20 @@ fun none[T]() Maybe[T] {
   Maybe.none[T]()
 }
 fun unwrap[T](self: Maybe[T]) T {
+  # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+  # self.unwrapOrElse(() { panic("`unwrap()` called on `none()`") })
   switch self {
     some(value) => value,
     none => panic("`unwrap()` called on `none()`"),
+  }
+}
+fun unwrapOr[T](self: Maybe[T], defaultValue: T) T {
+  self.unwrapOrElse(() { defaultValue })
+}
+fun unwrapOrElse[T](self: Maybe[T], getDefaultValue: () T) T {
+  switch self {
+    some(value) => value,
+    none => getDefaultValue(),
   }
 }
 fun isSome[T](self: Maybe[T]) Bool {
@@ -470,9 +481,20 @@ fun error[T, E](value: E) Result[T, E] {
   Result.error[T, E](value)
 }
 fun unwrap[T, E](self: Result[T, E]) T {
+  # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+  # self.unwrapOrElse((error: E) { panic("`unwrap()` called on `error()`") })
   switch self {
     ok(value) => value,
-    error(value) => panic("`unwrap()` called on `error()`"),
+    error(error) => panic("`unwrap()` called on `error()`"),
+  }
+}
+fun unwrapOr[T, E](self: Result[T, E], defaultValue: T) T {
+  self.unwrapOrElse((error: E) { defaultValue })
+}
+fun unwrapOrElse[T, E](self: Result[T, E], getDefaultValue: (E) T) T {
+  switch self {
+    ok(value) => value,
+    error(error) => getDefaultValue(error),
   }
 }
 fun isOk[T, E](self: Result[T, E]) Bool {
