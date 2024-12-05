@@ -205,6 +205,7 @@ impl<'h> Context<'h> {
             for (id, type_) in &closure {
                 self.push(format!("{type_}* {id} = closure->{id};\n"));
             }
+            self.lower_body(declaration_name, &lambda.body);
             self.push("}\n");
         });
     }
@@ -587,13 +588,6 @@ impl<'h> Context<'h> {
                     self.push(format!("\n{id}->value.{variant} = {value};"));
                 }
             }
-            // ExpressionKind::Lambda(lambda) => {
-            //     self.push("{ .closure = {");
-            //     for id in lambda.closure().iter().sorted() {
-            //         self.push(format!(".{id} = {id}; "));
-            //     }
-            //     self.push(format!("}}, .function = {id}_function }};"));
-            // }
             ExpressionKind::GlobalAssignmentReference(assignment) => {
                 self.push(format!("{}* {id} = {assignment};", &expression.type_));
             }
