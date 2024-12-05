@@ -1,6 +1,9 @@
 use crate::{
     hir::BuiltinFunction,
-    mono::{Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Mono, TypeDeclaration},
+    mono::{
+        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Lambda, Mono,
+        TypeDeclaration,
+    },
 };
 use itertools::Itertools;
 
@@ -117,19 +120,34 @@ impl<'h> Context<'h> {
                     }
                     self.push("} value;\n};\n");
                 }
+                TypeDeclaration::Function {
+                    parameter_types,
+                    return_type,
+                } => {
+                    self.push("void* closure;\n");
+                    self.push(format!("{return_type}* (*function)(void*"));
+                    for parameter_type in parameter_types.iter() {
+                        self.push(format!(", {parameter_type}*"));
+                    }
+                    self.push(");\n");
+                    self.push("};\n");
+                }
             }
         }
     }
 
     fn lower_assignment_declarations(&mut self) {
         for (name, assignment) in &self.mono.assignments {
+            self.lower_lambda_declarations_in(name, &assignment.body);
             self.push(format!("{}* {name};\n", &assignment.type_));
         }
     }
     fn lower_assignment_definitions(&mut self) {
         for (name, assignment) in &self.mono.assignments {
+            self.lower_lambda_definitions_in(name, &assignment.body);
+
             self.push(format!("void {name}$init() {{\n"));
-            self.lower_body_expressions(&assignment.body);
+            self.lower_body_expressions(name, &assignment.body);
             self.push(format!(
                 "{name} = {};\n}}\n\n",
                 assignment.body.return_value_id(),
@@ -139,30 +157,56 @@ impl<'h> Context<'h> {
 
     fn lower_function_declarations(&mut self) {
         for (name, function) in &self.mono.functions {
+            if let BodyOrBuiltin::Body(body) = &function.body {
+                self.lower_lambda_declarations_in(name, body);
+            }
+
             self.lower_function_signature(name, function);
             self.push(";\n");
-
-            // self.lower_type(&Type::Function {
-            //     parameter_types: function
-            //         .parameters
-            //         .iter()
-            //         .map(|it| it.type_.clone())
-            //         .collect(),
-            //     return_type: Box::new(function.return_type.clone()),
-            // });
-            // self.push(format!(
-            //     " {id} = {{ .closure = NULL, .function = {id}_function }};",
-            // ));
-            // self.push("\n");
         }
+    }
+    fn lower_lambda_declarations_in(&mut self, declaration_name: &str, body: &'h Body) {
+        Self::visit_lambdas_inside_body(body, &mut |id, lambda| {
+            self.push(format!(
+                "typedef struct {declaration_name}$lambda{id}_closure {declaration_name}$lambda{id}_closure;\n",
+            ));
+
+            self.lower_lambda_signature(declaration_name, id, lambda);
+            self.push(";\n");
+        });
     }
     fn lower_function_definitions(&mut self) {
         for (name, function) in &self.mono.functions {
+            if let BodyOrBuiltin::Body(body) = &function.body {
+                self.lower_lambda_definitions_in(name, body);
+            }
+
             self.lower_function_signature(name, function);
             self.push(" {\n");
-            self.lower_body_or_builtin(function);
+            self.lower_body_or_builtin(name, function);
             self.push("}\n\n");
         }
+    }
+    fn lower_lambda_definitions_in(&mut self, declaration_name: &str, body: &'h Body) {
+        Self::visit_lambdas_inside_body(body, &mut |id, lambda| {
+            let closure = lambda.closure_with_types(body);
+
+            self.push(format!("struct {declaration_name}$lambda{id}_closure {{"));
+            for (id, type_) in &closure {
+                self.push(format!("{type_} {id}; "));
+            }
+            self.push("};\n");
+
+            self.lower_lambda_signature(declaration_name, id, lambda);
+            self.push(" {\n");
+            self.push(format!(
+                "{declaration_name}$lambda{id}_closure* closure = raw_closure;\n"
+            ));
+            for (id, type_) in &closure {
+                self.push(format!("{type_}* {id} = closure->{id};\n"));
+            }
+            self.push("}\n");
+        });
     }
     fn lower_function_signature(&mut self, name: &str, function: &Function) {
         self.push(format!("{}* {name}(", &function.return_type));
@@ -174,7 +218,39 @@ impl<'h> Context<'h> {
         }
         self.push(")");
     }
-    fn lower_body_or_builtin(&mut self, function: &Function) {
+    fn lower_lambda_signature(&mut self, declaration_name: &str, id: Id, lambda: &Lambda) {
+        self.push(format!(
+            "{}* {declaration_name}$lambda{id}_function(void* raw_closure",
+            &lambda.body.return_type()
+        ));
+        for parameter in lambda.parameters.iter() {
+            self.push(format!(", {}* {}", &parameter.type_, parameter.id));
+        }
+        self.push(")");
+    }
+
+    fn visit_lambdas_inside_body(body: &'h Body, visitor: &mut impl FnMut(Id, &'h Lambda)) {
+        for (id, _, expression) in &body.expressions {
+            match &expression.kind {
+                ExpressionKind::Int(_)
+                | ExpressionKind::Text(_)
+                | ExpressionKind::CreateStruct { .. }
+                | ExpressionKind::StructAccess { .. }
+                | ExpressionKind::CreateEnum { .. }
+                | ExpressionKind::GlobalAssignmentReference(_)
+                | ExpressionKind::LocalReference(_)
+                | ExpressionKind::CallFunction { .. }
+                | ExpressionKind::CallLambda { .. }
+                | ExpressionKind::Switch { .. } => {}
+                ExpressionKind::Lambda(lambda) => {
+                    Self::visit_lambdas_inside_body(&lambda.body, visitor);
+                    visitor(*id, lambda);
+                }
+            }
+        }
+    }
+
+    fn lower_body_or_builtin(&mut self, declaration_name: &str, function: &Function) {
         match &function.body {
             BodyOrBuiltin::Builtin {
                 builtin_function,
@@ -444,24 +520,24 @@ impl<'h> Context<'h> {
                     )),
                 }
             }
-            BodyOrBuiltin::Body(body) => self.lower_body(body),
+            BodyOrBuiltin::Body(body) => self.lower_body(declaration_name, body),
         }
     }
-    fn lower_body(&mut self, body: &Body) {
-        self.lower_body_expressions(body);
+    fn lower_body(&mut self, declaration_name: &str, body: &Body) {
+        self.lower_body_expressions(declaration_name, body);
         self.push(format!("return {};", body.return_value_id()));
     }
-    fn lower_body_expressions(&mut self, body: &Body) {
+    fn lower_body_expressions(&mut self, declaration_name: &str, body: &Body) {
         for (id, name, expression) in &body.expressions {
             if let Some(name) = name {
                 self.push(format!("// {name}\n"));
             }
 
-            self.lower_expression(*id, expression);
+            self.lower_expression(declaration_name, *id, expression);
             self.push("\n");
         }
     }
-    fn lower_expression(&mut self, id: Id, expression: &Expression) {
+    fn lower_expression(&mut self, declaration_name: &str, id: Id, expression: &Expression) {
         match &expression.kind {
             ExpressionKind::Int(int) => {
                 self.push(format!(
@@ -524,7 +600,7 @@ impl<'h> Context<'h> {
             ExpressionKind::LocalReference(referenced_id) => {
                 self.push(format!("{}* {id} = {referenced_id};", &expression.type_));
             }
-            ExpressionKind::Call {
+            ExpressionKind::CallFunction {
                 function,
                 arguments,
             } => {
@@ -534,6 +610,16 @@ impl<'h> Context<'h> {
                         self.push(", ");
                     }
                     self.push(format!("{argument}"));
+                }
+                self.push(");");
+            }
+            ExpressionKind::CallLambda { lambda, arguments } => {
+                self.push(format!(
+                    "{}* {id} = {lambda}->function({lambda}->closure",
+                    &expression.type_
+                ));
+                for argument in arguments.iter() {
+                    self.push(format!(", {argument}"));
                 }
                 self.push(");");
             }
@@ -565,13 +651,29 @@ impl<'h> Context<'h> {
                         ));
                     }
 
-                    self.lower_body_expressions(&case.body);
+                    self.lower_body_expressions(declaration_name, &case.body);
 
                     self.push(format!("{id} = {};\n", case.body.return_value_id()));
 
                     self.push("break;");
                 }
                 self.push("}");
+            }
+            ExpressionKind::Lambda(lambda) => {
+                self.push(format!("{declaration_name}$lambda{id}_closure* {id}_closure = malloc(sizeof({declaration_name}$lambda{id}_closure));\n",));
+                for referenced_id in lambda.closure().iter().sorted() {
+                    self.push(format!(
+                        "{id}_closure->{referenced_id} = {referenced_id};\n"
+                    ));
+                }
+                self.push(format!(
+                    "{type_}* {id} = malloc(sizeof({type_}));",
+                    type_ = &expression.type_,
+                ));
+                self.push(format!("{id}->closure = {id}_closure;"));
+                self.push(format!(
+                    "{id}->function = {declaration_name}$lambda{id}_function;",
+                ));
             }
         }
     }

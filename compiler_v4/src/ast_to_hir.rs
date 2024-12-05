@@ -8,9 +8,9 @@ use crate::{
     error::CompilerError,
     hir::{
         self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, ContainsError, Expression,
-        ExpressionKind, Function, FunctionSignature, Hir, Id, Impl, NamedType, Parameter,
-        ParameterType, SliceOfTypeParameter, StructField, SwitchCase, Trait, TraitDefinition,
-        TraitFunction, Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
+        ExpressionKind, Function, FunctionSignature, FunctionType, Hir, Id, Impl, NamedType,
+        Parameter, ParameterType, SliceOfTypeParameter, StructField, SwitchCase, Trait,
+        TraitDefinition, TraitFunction, Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
     position::Offset,
@@ -1572,6 +1572,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             LoweredExpression::Error
                         }
                         Type::Self_ { .. } => todo!(),
+                        Type::Function(type_) => {
+                            self.context.add_error(
+                                key.span.clone(),
+                                format!(
+                                    "Navigation on value of function type `{type_}` is not supported yet."
+                                ),
+                            );
+                            LoweredExpression::Error
+                        }
                         Type::Error => todo!(),
                     },
                     LoweredExpression::NamedTypeReference(type_) => {
@@ -1622,8 +1631,36 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
             }
-            AstExpressionKind::Lambda(AstLambda { .. }) => {
-                todo!()
+            AstExpressionKind::Lambda(AstLambda { parameters, body }) => {
+                let parameters = self.context.lower_parameters(
+                    self.type_parameters,
+                    self.self_base_type,
+                    parameters,
+                );
+
+                let body = self.build_inner(|builder| {
+                    for parameter in parameters.iter() {
+                        builder.push_parameter(parameter.clone());
+                    }
+
+                    // TODO: pass context_type
+                    builder.lower_statements(
+                        &body.statements,
+                        if let Some(Type::Function(FunctionType {
+                            box return_type, ..
+                        })) = context_type
+                        {
+                            Some(return_type)
+                        } else {
+                            None
+                        },
+                    );
+                });
+                let type_ = FunctionType::new(
+                    parameters.iter().map(|it| it.type_.clone()).collect_vec(),
+                    body.return_type().clone(),
+                );
+                self.push_lowered(None, ExpressionKind::Lambda { parameters, body }, type_)
             }
             AstExpressionKind::Body(AstBody { statements, .. }) => {
                 let (id, type_) = self.lower_statements(statements, context_type);
@@ -1668,11 +1705,21 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     Type::Parameter(type_) => {
                         self.context.add_error(
                             expression.span.clone(),
-                            format!("Can't switch over type parameter `{}`", type_.name),
+                            format!(
+                                "Can't switch over value of type parameter type `{}`",
+                                type_.name
+                            ),
                         );
                         return LoweredExpression::Error;
                     }
                     Type::Self_ { .. } => todo!(),
+                    Type::Function(type_) => {
+                        self.context.add_error(
+                            expression.span.clone(),
+                            format!("Can't switch over value of function type `{type_}`"),
+                        );
+                        return LoweredExpression::Error;
+                    }
                     Type::Error => return LoweredExpression::Error,
                 };
 
@@ -1799,7 +1846,75 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         type_arguments: Option<&[Type]>,
         arguments: &[(Id, Type)],
     ) -> LoweredExpression {
-        // TODO(lambdas): resolve local identifiers as well if not calling using instance syntax
+        let argument_types = arguments
+            .iter()
+            .map(|(_, type_)| type_.clone())
+            .collect::<Box<_>>();
+
+        if let Some((_, id, type_)) = self
+            .local_identifiers
+            .iter()
+            .find(|(it, _, _)| it == &name.string)
+        {
+            // Local lambda call
+            let Type::Function(type_) = type_ else {
+                self.context.add_error(
+                    name.span.clone(),
+                    format!("`{}` is not a function", name.string),
+                );
+                return LoweredExpression::Error;
+            };
+            let id = *id;
+            let type_ = type_.clone();
+
+            let result = self.match_signature(
+                None,
+                &[],
+                &type_.parameter_types,
+                type_arguments,
+                &argument_types,
+            );
+            return match result {
+                Ok(substitutions) => {
+                    assert!(substitutions.is_empty());
+                    self.push_lowered(
+                        name.string.clone(),
+                        ExpressionKind::Call {
+                            function: id,
+                            substitutions,
+                            arguments: arguments.iter().map(|(id, _)| *id).collect(),
+                        },
+                        *type_.return_type,
+                    )
+                }
+                Err(error) => {
+                    self.context.add_error(
+                        name.span.clone(),
+                        match error {
+                            CallLikeLoweringError::TypeArgumentCount => {
+                                "Wrong number of type arguments".to_string()
+                            }
+                            CallLikeLoweringError::ArgumentCount => {
+                                "Wrong number of arguments".to_string()
+                            }
+                            CallLikeLoweringError::Unification(Some(error)) => error.into_string(),
+                            CallLikeLoweringError::Unification(None) => {
+                                "Mismatching types".to_string()
+                            }
+                            CallLikeLoweringError::FunctionReachableViaMultipleImpls => {
+                                "Function is reachable via multiple impls".to_string()
+                            }
+                            // TODO: more specific error message
+                            CallLikeLoweringError::TypeArgumentMismatch => {
+                                "Type arguments are not assignable".to_string()
+                            }
+                        },
+                    );
+                    LoweredExpression::Error
+                }
+            };
+        }
+
         let matches = self
             .context
             .get_all_functions_matching_name(&name.string)
@@ -1817,11 +1932,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             );
             return LoweredExpression::Error;
         }
-
-        let argument_types = arguments
-            .iter()
-            .map(|(_, type_)| type_.clone())
-            .collect::<Box<_>>();
 
         if argument_types.iter().any(ContainsError::contains_error) {
             return LoweredExpression::Error;
@@ -2334,6 +2444,23 @@ impl<'h> TypeUnifier<'h> {
             }
             (Type::Parameter { .. }, Type::Named { .. }) => Ok(true),
             (Type::Self_ { base_type }, _) => self.unify(base_type, parameter),
+            (Type::Function(argument), Type::Function(parameter)) => {
+                if argument.parameter_types.len() != parameter.parameter_types.len() {
+                    return Ok(false);
+                }
+                for (argument, parameter) in argument
+                    .parameter_types
+                    .iter()
+                    .zip_eq(parameter.parameter_types.iter())
+                {
+                    if !self.unify(argument, parameter)? {
+                        return Ok(false);
+                    }
+                }
+
+                self.unify(&argument.return_type, &parameter.return_type)
+            }
+            (Type::Function(_), _) | (_, Type::Function(_)) => Ok(false),
             (_, Type::Self_ { base_type: _ }) => {
                 self.unify(argument, &ParameterType::self_type().into())
             }

@@ -147,7 +147,7 @@ impl TryFrom<Type> for SolverType {
             Type::Named(named_type) => SolverValue::try_from(named_type).map(SolverType::Value),
             Type::Parameter(parameter_type) => Ok(SolverVariable::from(parameter_type).into()),
             Type::Self_ { .. } => todo!(),
-            Type::Error => Err(()),
+            Type::Function(_) | Type::Error => Err(()),
         }
     }
 }

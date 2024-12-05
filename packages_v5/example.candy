@@ -300,6 +300,9 @@ fun main() Int {
   let list = listOf(0, 1).insert(1, 2).replace(0, 3).removeAt(2)
   print("Length: {list.length().toText()}")
   print("[{list.get(0).toText()}, {list.get(1).toText()}, {list.get(2).toText()}]")
+
+  let localAdd = (x: Int, y: Int) { x.add(y) }
+  print("add(1, 2) = {localAdd(1, 2).toText()}")
   0
 }
 
