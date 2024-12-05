@@ -373,6 +373,34 @@ fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
 }
 
+fun fold[T, R](list: List[T], initial: R, combine: (R, T) R) R {
+  list.foldHelper(0, initial, combine)
+}
+fun foldHelper[T, R](list: List[T], index: Int, current: R, combine: (R, T) R) R {
+  switch index.isLessThan(list.length()) {
+    true => list.foldHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
+    false => current,
+  }
+}
+fun reduce[T](list: List[T], combine: (T, T) T) Maybe[T] {
+  switch list.isEmpty() {
+    true => none[T](),
+    false => some(list.reduceHelper(1, list.get(0).unwrap(), combine)),
+  }
+}
+fun reduceHelper[T](list: List[T], index: Int, current: T, combine: (T, T) T) T {
+  switch index.isLessThan(list.length()) {
+    true => list.reduceHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
+    false => current,
+  }
+}
+
+fun map[T, R](list: List[T], transform: (T) R) List[R] {
+  list.fold(listOf[R](), (result: List[R], item: T) {
+    result.append(transform(item))
+  })
+}
+
 struct MyStruct {
   name: Text,
   color: Int,
