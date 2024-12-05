@@ -184,6 +184,9 @@ impl ToText for (&str, &TraitDefinition) {
                 .sorted_by_key(|(_, it)| it.signature.name.clone()),
             |builder, (id, function)| (*id, *function).build_text(builder),
         );
+        if !definition.functions.is_empty() {
+            builder.push_newline();
+        }
         builder.push("}");
     }
 }
@@ -254,6 +257,9 @@ impl ToText for Impl {
                 (*id, *function).build_text(builder);
             },
         );
+        if !self.functions.is_empty() {
+            builder.push_newline();
+        }
         builder.push("}");
     }
 }
@@ -364,6 +370,10 @@ impl NamedType {
     #[must_use]
     pub fn ordering() -> Self {
         Self::new("Ordering", [])
+    }
+    #[must_use]
+    pub fn result(t: impl Into<Type>, e: impl Into<Type>) -> Self {
+        Self::new("Result", [t.into(), e.into()])
     }
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -783,7 +793,16 @@ pub struct SwitchCase {
 #[strum(serialize_all = "camelCase")]
 pub enum BuiltinFunction {
     IntAdd,
+    IntBitwiseAnd,
+    IntBitwiseOr,
+    IntBitwiseXor,
     IntCompareTo,
+    IntDivideTruncating,
+    IntMultiply,
+    IntParse,
+    IntRemainder,
+    IntShiftLeft,
+    IntShiftRight,
     IntSubtract,
     IntToText,
     ListFilled,
@@ -800,7 +819,11 @@ pub enum BuiltinFunction {
     ListReplace,
     Panic,
     Print,
+    TextCompareTo,
     TextConcat,
+    TextGetRange,
+    TextIndexOf,
+    TextLength,
 }
 impl BuiltinFunction {
     #[must_use]
@@ -821,6 +844,36 @@ impl BuiltinFunction {
                 .into(),
                 return_type: NamedType::int().into(),
             },
+            Self::IntBitwiseAnd => BuiltinFunctionSignature {
+                name: "builtinIntBitwiseAnd".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("a".into(), NamedType::int().into()),
+                    ("b".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
+            Self::IntBitwiseOr => BuiltinFunctionSignature {
+                name: "builtinIntBitwiseOr".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("a".into(), NamedType::int().into()),
+                    ("b".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
+            Self::IntBitwiseXor => BuiltinFunctionSignature {
+                name: "builtinIntBitwiseXor".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("a".into(), NamedType::int().into()),
+                    ("b".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
             Self::IntCompareTo => BuiltinFunctionSignature {
                 name: "builtinIntCompareTo".into(),
                 type_parameters: Box::default(),
@@ -831,12 +884,68 @@ impl BuiltinFunction {
                 .into(),
                 return_type: NamedType::ordering().into(),
             },
+            Self::IntDivideTruncating => BuiltinFunctionSignature {
+                name: "builtinIntDivideTruncating".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("dividend".into(), NamedType::int().into()),
+                    ("divisor".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
+            Self::IntMultiply => BuiltinFunctionSignature {
+                name: "builtinIntMultiply".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("factorA".into(), NamedType::int().into()),
+                    ("factorB".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
+            Self::IntParse => BuiltinFunctionSignature {
+                name: "builtinIntParse".into(),
+                type_parameters: Box::default(),
+                parameters: [("text".into(), NamedType::text().into())].into(),
+                return_type: NamedType::result(NamedType::int(), NamedType::text()).into(),
+            },
+            Self::IntRemainder => BuiltinFunctionSignature {
+                name: "builtinIntRemainder".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("dividend".into(), NamedType::int().into()),
+                    ("divisor".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
+            Self::IntShiftLeft => BuiltinFunctionSignature {
+                name: "builtinIntShiftLeft".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("value".into(), NamedType::int().into()),
+                    ("amount".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
+            Self::IntShiftRight => BuiltinFunctionSignature {
+                name: "builtinIntShiftRight".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("value".into(), NamedType::int().into()),
+                    ("amount".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::int().into(),
+            },
             Self::IntSubtract => BuiltinFunctionSignature {
                 name: "builtinIntSubtract".into(),
                 type_parameters: Box::default(),
                 parameters: [
-                    ("a".into(), NamedType::int().into()),
-                    ("b".into(), NamedType::int().into()),
+                    ("minuend".into(), NamedType::int().into()),
+                    ("subtrahend".into(), NamedType::int().into()),
                 ]
                 .into(),
                 return_type: NamedType::int().into(),
@@ -991,6 +1100,16 @@ impl BuiltinFunction {
                 parameters: [("message".into(), NamedType::text().into())].into(),
                 return_type: NamedType::nothing().into(),
             },
+            Self::TextCompareTo => BuiltinFunctionSignature {
+                name: "builtinTextCompareTo".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("a".into(), NamedType::text().into()),
+                    ("b".into(), NamedType::text().into()),
+                ]
+                .into(),
+                return_type: NamedType::ordering().into(),
+            },
             Self::TextConcat => BuiltinFunctionSignature {
                 name: "builtinTextConcat".into(),
                 type_parameters: Box::default(),
@@ -1000,6 +1119,33 @@ impl BuiltinFunction {
                 ]
                 .into(),
                 return_type: NamedType::text().into(),
+            },
+            Self::TextGetRange => BuiltinFunctionSignature {
+                name: "builtinTextGetRange".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("text".into(), NamedType::text().into()),
+                    ("startInclusive".into(), NamedType::int().into()),
+                    ("endExclusive".into(), NamedType::int().into()),
+                ]
+                .into(),
+                return_type: NamedType::text().into(),
+            },
+            Self::TextIndexOf => BuiltinFunctionSignature {
+                name: "builtinTextIndexOf".into(),
+                type_parameters: Box::default(),
+                parameters: [
+                    ("a".into(), NamedType::text().into()),
+                    ("b".into(), NamedType::text().into()),
+                ]
+                .into(),
+                return_type: NamedType::maybe(NamedType::int()).into(),
+            },
+            Self::TextLength => BuiltinFunctionSignature {
+                name: "builtinTextLength".into(),
+                type_parameters: Box::default(),
+                parameters: [("text".into(), NamedType::text().into())].into(),
+                return_type: NamedType::int().into(),
             },
         }
     }

@@ -285,11 +285,14 @@ fn impl_<'a>(parser: Parser) -> Option<(Parser, AstImpl)> {
 
 #[instrument(level = "trace")]
 pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
+    let let_keyword_start = parser.offset();
     let parser = let_keyword(parser)?.and_trailing_whitespace();
+    let let_keyword_span = let_keyword_start..parser.offset();
 
     let (parser, name) = raw_identifier(parser)
         .and_trailing_whitespace()
         .unwrap_or_ast_error_result(parser, "This assignment is missing a name.");
+    let display_span = name.value().map_or(let_keyword_span, |it| it.span.clone());
 
     let (parser, type_) =
         colon(parser)
@@ -312,6 +315,7 @@ pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
     Some((
         parser,
         AstAssignment {
+            display_span,
             name,
             type_,
             equals_sign_error,

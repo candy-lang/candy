@@ -131,6 +131,7 @@ pub struct AstImpl {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstAssignment {
+    pub display_span: Range<Offset>,
     pub name: AstResult<AstString>,
     pub type_: Option<AstResult<AstType>>,
     pub equals_sign_error: Option<AstError>,
