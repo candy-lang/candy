@@ -1904,18 +1904,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 &argument_types,
             );
             return match result {
-                Ok(substitutions) => {
-                    assert!(substitutions.is_empty());
-                    self.push_lowered(
-                        None,
-                        ExpressionKind::Call {
-                            function: id,
-                            substitutions,
-                            arguments: arguments.iter().map(|(id, _)| *id).collect(),
-                        },
-                        *type_.return_type,
-                    )
-                }
+                Ok(substitutions) => self.push_lowered(
+                    None,
+                    ExpressionKind::Call {
+                        function: id,
+                        substitutions,
+                        arguments: arguments.iter().map(|(id, _)| *id).collect(),
+                    },
+                    *type_.return_type,
+                ),
                 Err(error) => {
                     self.context.add_error(
                         name.span.clone(),
