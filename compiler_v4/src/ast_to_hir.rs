@@ -1357,7 +1357,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 {
                     self.context.add_error(
                         expression.span.clone(),
-                        format!("Expected type `{context_type:?}`, got `{type_:?}`."),
+                        format!("Expected type `{context_type}`, got `{type_}`."),
                     );
                     (self.push_error(), Type::Error)
                 } else {
