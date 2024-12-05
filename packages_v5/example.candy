@@ -254,6 +254,26 @@ fun removeSuffix(self: Text, suffix: Text) Text {
   }
 }
 
+fun split(self: Text, character: Text) List[Text] {
+  self.splitIf((char: Text) { char.equals(character) })
+}
+fun splitIf(self: Text, predicate: (Text) Bool) List[Text] {
+  self.splitIfHelper(predicate, 0, 0 listOf[Text]())
+}
+fun splitIfHelper(self: Text, predicate: (Text) Bool, currentStartOffset: Int, offset: Int, result: List[Text]) List[Text] {
+  switch self.characterAt(offset) {
+    none => result.append(self.getRange(currentStartOffset, offset)),
+    some(char) => switch predicate(char) {
+      true => {
+        let nextOffset = offset.add(1)
+        let nextResult = result.append(self.getRange(currentStartOffset, offset))
+        self.splitIfHelper(predicate, nextOffset, nextOffset, nextResult)
+      },
+      false => self.splitIfHelper(predicate, currentStartOffset, offset.add(1), result),
+    },
+  }
+}
+
 fun indexOf(self: Text, other: Text) Maybe[Int] {
   self.builtinTextIndexOf(other)
 }
