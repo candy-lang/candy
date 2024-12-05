@@ -1023,7 +1023,7 @@ impl<'a> Context<'a> {
     }
     fn lower_assignment(&mut self, id: Id) {
         let declaration = self.assignments.get(&id).unwrap();
-        let value = declaration.ast.value.clone();
+        let value = &declaration.ast.value;
         let type_ = declaration.type_.clone();
         let graph_index = declaration.graph_index;
 
@@ -1232,7 +1232,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         context: &'c mut Context<'a>,
         type_parameters: &'c [TypeParameter],
         self_base_type: Option<&'c Type>,
-        fun: impl FnOnce(&mut BodyBuilder),
+        fun: impl FnOnce(&mut Self),
     ) -> (Body, FxHashSet<Id>) {
         let mut builder = Self {
             context,
@@ -1246,8 +1246,12 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         (builder.body, builder.global_assignment_dependencies)
     }
     #[must_use]
-    fn build_inner(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
-        BodyBuilder::build(
+    fn build_inner<'s, 'cc>(&'s mut self, fun: impl FnOnce(&mut BodyBuilder<'cc, 'a>)) -> Body
+    where
+        'c: 'cc,
+        's: 'cc,
+    {
+        BodyBuilder::<'cc, 'a>::build(
             self.context,
             self.type_parameters,
             self.self_base_type,
@@ -1263,7 +1267,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
     fn lower_statements(
         &mut self,
-        statements: &[AstStatement],
+        statements: &'a [AstStatement],
         context_type: Option<&Type>,
     ) -> (Id, Type) {
         let mut last_expression = None;
@@ -1314,7 +1318,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
     fn lower_expression(
         &mut self,
-        expression: &AstExpression,
+        expression: &'a AstExpression,
         context_type: Option<&Type>,
     ) -> (Id, Type) {
         match self.lower_expression_raw(expression, context_type) {
@@ -1342,7 +1346,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     }
     fn lower_expression_raw(
         &mut self,
-        expression: &AstExpression,
+        expression: &'a AstExpression,
         context_type: Option<&Type>,
     ) -> LoweredExpression {
         match &expression.kind {
@@ -1427,7 +1431,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         match receiver {
                             LoweredExpression::Expression { id, type_ } => {
                                 // bar.foo(baz)
-                                let arguments = Self::lower_arguments(self, &call.arguments);
+                                let arguments = self.lower_arguments(&call.arguments);
                                 let arguments = iter::once((id, type_))
                                     .chain(arguments.into_vec())
                                     .collect_vec();
@@ -1470,7 +1474,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
                         if identifier.string.chars().next().unwrap().is_lowercase() {
                             // foo(bar, baz)
-                            let arguments = Self::lower_arguments(self, &call.arguments);
+                            let arguments = self.lower_arguments(&call.arguments);
                             return self.lower_call(
                                 identifier,
                                 type_arguments.as_deref(),
@@ -1913,7 +1917,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     fn lower_struct_creation(
         &mut self,
         span: Range<Offset>,
-        call: &AstCall,
+        call: &'a AstCall,
         type_arguments: Option<&[Type]>,
         type_: &str,
         type_parameters: &[TypeParameter],
@@ -1927,7 +1931,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             return LoweredExpression::Error;
         };
 
-        let arguments = Self::lower_arguments(self, &call.arguments);
+        let arguments = self.lower_arguments(&call.arguments);
 
         let result = self.match_signature(
             None,
@@ -1984,7 +1988,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     }
     fn lower_enum_creation(
         &mut self,
-        call: &AstCall,
+        call: &'a AstCall,
         type_arguments: Option<&[Type]>,
         type_: &str,
         variant: &AstString,
@@ -2007,7 +2011,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             .as_ref()
             .map(|variant_type| vec![variant_type.clone()].into_boxed_slice())
             .unwrap_or_default();
-        let arguments = Self::lower_arguments(self, &call.arguments);
+        let arguments = self.lower_arguments(&call.arguments);
 
         let result = self.match_signature(
             None,
@@ -2063,14 +2067,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             enum_type,
         )
     }
-    fn lower_arguments(
-        builder: &mut BodyBuilder,
-        arguments: &AstResult<AstArguments>,
-    ) -> Box<[(Id, Type)]> {
+    fn lower_arguments(&mut self, arguments: &'a AstResult<AstArguments>) -> Box<[(Id, Type)]> {
         arguments
             .arguments_or_default()
             .iter()
-            .map(|argument| builder.lower_expression(&argument.value, None))
+            .map(|argument| self.lower_expression(&argument.value, None))
             .collect::<Box<_>>()
     }
     fn match_signature(
