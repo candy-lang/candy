@@ -317,7 +317,7 @@ fun listOf[T](item0: T) List[T] {
 fun listOf[T](item0: T, item1: T) List[T] {
   builtinListOf(item0, item1)
 }
-fun listOf[T](item0: T, item1: T, item2) List[T] {
+fun listOf[T](item0: T, item1: T, item2: T) List[T] {
   builtinListOf(item0, item1, item2)
 }
 fun listOf[T](item0: T, item1: T, item2: T, item3: T) List[T] {
