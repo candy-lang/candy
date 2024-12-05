@@ -534,7 +534,7 @@ impl<'h> Context<'h> {
             }
 
             self.lower_expression(declaration_name, *id, expression);
-            self.push("\n");
+            self.push("\n\n");
         }
     }
     fn lower_expression(&mut self, declaration_name: &str, id: Id, expression: &Expression) {
