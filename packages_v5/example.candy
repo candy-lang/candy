@@ -288,6 +288,11 @@ fun needs(condition: Bool, message: Text) {
   }
 }
 
+fun loop(body: () Nothing) {
+  body()
+  loop(body)
+}
+
 struct List[T] = builtin
 fun listFilled[T](length: Int, item: T) List[T] {
   builtinListFilled(length, item)
