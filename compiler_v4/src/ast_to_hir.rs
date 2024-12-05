@@ -1547,7 +1547,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             LoweredExpression::Error => LoweredExpression::Error,
                         }
                     }
-                    _ => todo!("Support calling other expressions"),
+                    receiver => todo!("Support calling other expressions: {receiver:?}"),
                 }
             }
             AstExpressionKind::Navigation(navigation) => {
