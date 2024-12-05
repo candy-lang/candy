@@ -463,7 +463,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 0;
-                        result_pointer->values = nullptr;
+                        result_pointer->values = NULL;
                         return result_pointer;",
                         list_type = function.return_type,
                     )),
