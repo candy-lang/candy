@@ -104,13 +104,14 @@ fn debug(options: DebugOptions) -> ProgramResult {
         DebugOptions::Hir(options) => {
             let source = fs::read_to_string(&options.path).unwrap();
             let (hir, errors) = compile_hir(&options.path, &source);
+            println!("{}", hir.to_text(true));
+
             if !errors.is_empty() {
                 for error in errors {
                     error!("{}", error.to_string_with_location(&source));
                 }
                 return Err(Exit::CodeContainsErrors);
             }
-            println!("{}", hir.to_text(true));
         }
         DebugOptions::Mono(options) => {
             let source = fs::read_to_string(&options.path).unwrap();
