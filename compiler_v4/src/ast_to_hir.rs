@@ -654,6 +654,13 @@ impl<'a> Context<'a> {
             return hir::Err;
         };
 
+        let type_ = match type_ {
+            AstType::Named(type_) => type_,
+            AstType::Function(function_type) => {
+                self.add_error(function_type.span.clone(), "Function type is not a trait");
+                return hir::Err;
+            }
+        };
         let Some(name) = type_.name.value() else {
             return hir::Err;
         };
@@ -873,6 +880,23 @@ impl<'a> Context<'a> {
             return Type::Error;
         };
 
+        let type_ = match type_ {
+            AstType::Named(type_) => type_,
+            AstType::Function(type_) => {
+                return Type::Function(FunctionType {
+                    parameter_types: type_
+                        .parameter_types
+                        .iter()
+                        .map(|it| self.lower_type(type_parameters, self_base_type, &*it.type_))
+                        .collect(),
+                    return_type: Box::new(self.lower_type(
+                        type_parameters,
+                        self_base_type,
+                        type_.return_type.value().map(AsRef::as_ref),
+                    )),
+                })
+            }
+        };
         let Some(name) = type_.name.value() else {
             return Type::Error;
         };
@@ -1523,7 +1547,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             LoweredExpression::Error => LoweredExpression::Error,
                         }
                     }
-                    _ => todo!("Support calling other expressions"),
+                    receiver => todo!("Support calling other expressions: {receiver:?}"),
                 }
             }
             AstExpressionKind::Navigation(navigation) => {
@@ -1880,18 +1904,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 &argument_types,
             );
             return match result {
-                Ok(substitutions) => {
-                    assert!(substitutions.is_empty());
-                    self.push_lowered(
-                        name.string.clone(),
-                        ExpressionKind::Call {
-                            function: id,
-                            substitutions,
-                            arguments: arguments.iter().map(|(id, _)| *id).collect(),
-                        },
-                        *type_.return_type,
-                    )
-                }
+                Ok(substitutions) => self.push_lowered(
+                    None,
+                    ExpressionKind::Call {
+                        function: id,
+                        substitutions,
+                        arguments: arguments.iter().map(|(id, _)| *id).collect(),
+                    },
+                    *type_.return_type,
+                ),
                 Err(error) => {
                     self.context.add_error(
                         name.span.clone(),

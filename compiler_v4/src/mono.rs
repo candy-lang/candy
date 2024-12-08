@@ -199,10 +199,32 @@ pub struct Lambda {
 }
 impl Lambda {
     #[must_use]
-    pub fn closure_with_types(&self, function_body: &Body) -> FxHashMap<Id, Box<str>> {
+    pub fn closure_with_types(
+        &self,
+        declaration_parameters: &[Parameter],
+        declaration_body: &Body,
+    ) -> FxHashMap<Id, Box<str>> {
         self.closure()
             .into_iter()
-            .map(|id| (id, function_body.find_expression(id).unwrap().type_.clone()))
+            .map(|id| {
+                (
+                    id,
+                    declaration_parameters.iter().find(|it| it.id == id).map_or_else(
+                        || {
+                            declaration_body
+                                .find_expression(id)
+                                .unwrap_or_else(|| {
+                                    panic!(
+                                        "Couldn't find expression {id} in declaration body {declaration_body:?}"
+                                    )
+                                })
+                                .type_
+                                .clone()
+                        },
+                        |it| it.type_.clone(),
+                    )
+                )
+            })
             .collect()
     }
     #[must_use]

@@ -288,6 +288,21 @@ fun needs(condition: Bool, message: Text) {
   }
 }
 
+fun loop(body: () Nothing) {
+  body()
+  loop(body)
+}
+fun repeat(times: Int, body: () Nothing) {
+  needs(times.isNonNegative())
+  switch times.isGreaterThan(0) {
+    false => {},
+    true => {
+      body()
+      repeat(times.subtract(1), body)
+    },
+  }
+}
+
 struct List[T] = builtin
 fun listFilled[T](length: Int, item: T) List[T] {
   builtinListFilled(length, item)
@@ -302,7 +317,7 @@ fun listOf[T](item0: T) List[T] {
 fun listOf[T](item0: T, item1: T) List[T] {
   builtinListOf(item0, item1)
 }
-fun listOf[T](item0: T, item1: T, item2) List[T] {
+fun listOf[T](item0: T, item1: T, item2: T) List[T] {
   builtinListOf(item0, item1, item2)
 }
 fun listOf[T](item0: T, item1: T, item2: T, item3: T) List[T] {
@@ -356,6 +371,42 @@ fun removeAt[T](list: List[T], index: Int) List[T] {
 # TODO: list.getRange(…), .concatenate(…), .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
+}
+
+fun fold[T, R](list: List[T], initial: R, combine: (R, T) R) R {
+  list.foldHelper(0, initial, combine)
+}
+fun foldHelper[T, R](list: List[T], index: Int, current: R, combine: (R, T) R) R {
+  switch index.isLessThan(list.length()) {
+    true => list.foldHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
+    false => current,
+  }
+}
+fun reduce[T](list: List[T], combine: (T, T) T) Maybe[T] {
+  switch list.isEmpty() {
+    true => none[T](),
+    false => some(list.reduceHelper(1, list.get(0).unwrap(), combine)),
+  }
+}
+fun reduceHelper[T](list: List[T], index: Int, current: T, combine: (T, T) T) T {
+  switch index.isLessThan(list.length()) {
+    true => list.reduceHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
+    false => current,
+  }
+}
+
+fun map[T, R](list: List[T], transform: (T) R) List[R] {
+  list.fold(listOf[R](), (result: List[R], item: T) {
+    result.append(transform(item))
+  })
+}
+impl[T: ToText] List[T]: ToText {
+  fun toText(self: List[T]) Text {
+    let items = self.map((item: T) { item.toText() })
+      .reduce((result: Text, item: Text) { "{result}, {item}" })
+      .unwrapOr("")
+    "[{items}]"
+  }
 }
 
 struct MyStruct {
@@ -418,9 +469,20 @@ fun none[T]() Maybe[T] {
   Maybe.none[T]()
 }
 fun unwrap[T](self: Maybe[T]) T {
+  # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+  # self.unwrapOrElse(() { panic("`unwrap()` called on `none()`") })
   switch self {
     some(value) => value,
     none => panic("`unwrap()` called on `none()`"),
+  }
+}
+fun unwrapOr[T](self: Maybe[T], defaultValue: T) T {
+  self.unwrapOrElse(() { defaultValue })
+}
+fun unwrapOrElse[T](self: Maybe[T], getDefaultValue: () T) T {
+  switch self {
+    some(value) => value,
+    none => getDefaultValue(),
   }
 }
 fun isSome[T](self: Maybe[T]) Bool {
@@ -455,9 +517,20 @@ fun error[T, E](value: E) Result[T, E] {
   Result.error[T, E](value)
 }
 fun unwrap[T, E](self: Result[T, E]) T {
+  # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+  # self.unwrapOrElse((error: E) { panic("`unwrap()` called on `error()`") })
   switch self {
     ok(value) => value,
-    error(value) => panic("`unwrap()` called on `error()`"),
+    error(error) => panic("`unwrap()` called on `error()`"),
+  }
+}
+fun unwrapOr[T, E](self: Result[T, E], defaultValue: T) T {
+  self.unwrapOrElse((error: E) { defaultValue })
+}
+fun unwrapOrElse[T, E](self: Result[T, E], getDefaultValue: (E) T) T {
+  switch self {
+    ok(value) => value,
+    error(error) => getDefaultValue(error),
   }
 }
 fun isOk[T, E](self: Result[T, E]) Bool {
@@ -538,11 +611,16 @@ fun main() Int {
   print("Length: {list.length().toText()}")
   print("[{list.get(0).toText()}, {list.get(1).toText()}, {list.get(2).toText()}]")
 
+  print("orld!".endsWith("World!").toText().isEmpty())
+
   let foo = 123
   let addCaptured = (x: Int) { x.add(foo) }
   print("addCaptured(1) = {addCaptured(1).toText()}")
 
-  print("orld!".endsWith("World!").toText().isEmpty())
+  repeat(3, () { print("Hello, World!") })
+
+  print(listOf(1, 2, 3).map((x: Int) { x.multiply(2) }))
+
   0
 }
 
