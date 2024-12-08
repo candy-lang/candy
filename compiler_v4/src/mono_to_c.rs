@@ -28,6 +28,7 @@ impl<'h> Context<'h> {
     }
 
     fn lower_mono(&mut self) {
+        self.push("#include <errno.h>\n");
         self.push("#include <stdint.h>\n");
         self.push("#include <stdio.h>\n");
         self.push("#include <stdlib.h>\n");
@@ -267,6 +268,30 @@ impl<'h> Context<'h> {
                         a = function.parameters[0].id,
                         b = function.parameters[1].id,
                     )),
+                    BuiltinFunction::IntBitwiseAnd => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {a}->value & {b}->value;
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntBitwiseOr => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {a}->value | {b}->value;
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntBitwiseXor => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {a}->value ^ {b}->value;
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                    )),
                     BuiltinFunction::IntCompareTo => self.push(format!(
                         "\
                         Ordering* result_pointer = malloc(sizeof(Ordering));
@@ -277,13 +302,85 @@ impl<'h> Context<'h> {
                         a = function.parameters[0].id,
                         b = function.parameters[1].id,
                     )),
+                    BuiltinFunction::IntDivideTruncating => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {dividend}->value / {divisor}->value;
+                        return result_pointer;",
+                        dividend = function.parameters[0].id,
+                        divisor = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntMultiply => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {factorA}->value * {factorB}->value;
+                        return result_pointer;",
+                        factorA = function.parameters[0].id,
+                        factorB = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntParse => self.push(format!(
+                        "\
+                        {return_type}* result_pointer = malloc(sizeof({return_type}));
+                        char *end_pointer;
+                        errno = 0;
+                        uint64_t value = strtol({text}->value, &end_pointer, 10);
+                        if (errno == ERANGE) {{
+                            result_pointer->variant = {return_type}_error;
+                            result_pointer->value.error = malloc(sizeof(Text));
+                            result_pointer->value.error->value = \"Value is out of range.\";
+                        }} else if (end_pointer == {text}->value) {{
+                            result_pointer->variant = {return_type}_error;
+                            result_pointer->value.error = malloc(sizeof(Text));
+                            result_pointer->value.error->value = \"Text is empty.\";
+                        }} else if (*end_pointer != '\\0') {{
+                            char* message_format = \"Non-numeric character \\\"%c\\\" at index %ld.\";
+                            int length = snprintf(NULL, 0, message_format, *end_pointer, end_pointer - {text}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, *end_pointer, end_pointer - {text}->value);
+                        
+                            result_pointer->variant = {return_type}_error;
+                            result_pointer->value.error = malloc(sizeof(Text));
+                            result_pointer->value.error->value = message;
+                        }} else {{
+                            result_pointer->variant = {return_type}_ok;
+                            result_pointer->value.ok = malloc(sizeof(Int));
+                            result_pointer->value.ok ->value = value;
+                        }}
+                        return result_pointer;",
+                        text = function.parameters[0].id,
+                        return_type = function.return_type,
+                    )),
+                    BuiltinFunction::IntRemainder => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {dividend}->value % {divisor}->value;
+                        return result_pointer;",
+                        dividend = function.parameters[0].id,
+                        divisor = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntShiftLeft => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {value}->value << {amount}->value;
+                        return result_pointer;",
+                        value = function.parameters[0].id,
+                        amount = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::IntShiftRight => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = {value}->value >> {amount}->value;
+                        return result_pointer;",
+                        value = function.parameters[0].id,
+                        amount = function.parameters[1].id,
+                    )),
                     BuiltinFunction::IntSubtract => self.push(format!(
                         "\
                         Int* result_pointer = malloc(sizeof(Int));
-                        result_pointer->value = {a}->value - {b}->value;
+                        result_pointer->value = {minuend}->value - {subtrahend}->value;
                         return result_pointer;",
-                        a = function.parameters[0].id,
-                        b = function.parameters[1].id,
+                        minuend = function.parameters[0].id,
+                        subtrahend = function.parameters[1].id,
                     )),
                     BuiltinFunction::IntToText => self.push(format!(
                         "\
@@ -506,6 +603,17 @@ impl<'h> Context<'h> {
                             function.parameters[0].id,
                         ));
                     }
+                    BuiltinFunction::TextCompareTo => self.push(format!(
+                        "\
+                        int raw_result = strcmp({a}->value, {b}->value);
+                        Ordering* result_pointer = malloc(sizeof(Ordering));
+                        result_pointer->variant = raw_result < 0    ? Ordering_less
+                                                  : raw_result == 0 ? Ordering_equal
+                                                                    : Ordering_greater;
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                    )),
                     BuiltinFunction::TextConcat => self.push(format!(
                         "\
                         size_t lengthA = strlen({a}->value);\n\
@@ -518,6 +626,62 @@ impl<'h> Context<'h> {
                         return result_pointer;",
                         a = function.parameters[0].id,
                         b = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::TextGetRange => self.push(format!(
+                        "\
+                        size_t text_length = strlen({text}->value);
+                        if (0 > {start_inclusive}->value || {start_inclusive}->value > text_length
+                            || 0 > {end_exclusive}->value || {end_exclusive}->value > text_length) {{
+                            char* message_format = \"Index out of bounds: Tried getting range %ld..%ld from text that is only %ld long.\";
+                            int length = snprintf(NULL, 0, message_format, {start_inclusive}->value, {end_exclusive}->value, text_length);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {start_inclusive}->value, {end_exclusive}->value, text_length);
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }} else if ({start_inclusive}->value > {end_exclusive}->value) {{
+                            char* message_format = \"Invalid range %ld..%ld: `start_inclusive` must be less than or equal to `end_exclusive`.\";
+                            int length = snprintf(NULL, 0, message_format, {start_inclusive}->value, {end_exclusive}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {start_inclusive}->value, {end_exclusive}->value);
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        size_t length = {end_exclusive}->value - {start_inclusive}->value;\n\
+                        char* result = malloc(length + 1);\n\
+                        memcpy(result, {text}->value + {start_inclusive}->value, length);\n\
+                        Text* result_pointer = malloc(sizeof(Text));
+                        result_pointer->value = result;
+                        return result_pointer;",
+                        text = function.parameters[0].id,
+                        start_inclusive = function.parameters[1].id,
+                        end_exclusive = function.parameters[2].id,
+                    )),
+                    BuiltinFunction::TextIndexOf => self.push(format!(
+                        "\
+                        {return_type}* result_pointer = malloc(sizeof({return_type}));
+                        char* result = strstr({a}->value, {b}->value);
+                        if (result == NULL) {{
+                            result_pointer->variant = {return_type}_none;
+                        }} else {{
+                            result_pointer->variant = {return_type}_some;
+                            Int* index_pointer = malloc(sizeof(Int));
+                            index_pointer->value = result - {a}->value;
+                            result_pointer->value.some = index_pointer;
+                        }}
+                        return result_pointer;",
+                        a = function.parameters[0].id,
+                        b = function.parameters[1].id,
+                        return_type = function.return_type,
+                    )),
+                    BuiltinFunction::TextLength => self.push(format!(
+                        "\
+                        Int* result_pointer = malloc(sizeof(Int));
+                        result_pointer->value = strlen({text}->value);
+                        return result_pointer;",
+                        text = function.parameters[0].id,
                     )),
                 }
             }

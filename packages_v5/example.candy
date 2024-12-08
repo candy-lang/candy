@@ -90,6 +90,24 @@ impl Int: Compare {
     self.builtinIntCompareTo(other)
   }
 }
+fun isPositive(self: Int) Bool {
+  self.isGreaterThan(0)
+}
+fun isNonPositive(self: Int) Bool {
+  self.isLessThanOrEqualTo(0)
+}
+fun isNegative(self: Int) Bool {
+  self.isLessThan(0)
+}
+fun isNonNegative(self: Int) Bool {
+  self.isGreaterThanOrEqualTo(0)
+}
+fun absolute(self: Int) Int {
+  switch self.isNegative() {
+    true => self.negate(),
+    false => self,
+  }
+}
 impl Int: Add {
   fun add(self: Int, other: Int) Int {
     self.builtinIntAdd(other)
@@ -100,16 +118,174 @@ impl Int: Subtract {
     self.builtinIntSubtract(other)
   }
 }
+fun negate(self: Int) Int {
+  0.subtract(self)
+}
+fun multiply(self: Int, other: Int) Int {
+  self.builtinIntMultiply(other)
+}
+fun square(self: Int) Int {
+  self.multiply(self)
+}
+fun divideTruncating(dividend: Int, divisor: Int) Int {
+  needs(divisor.equals(0).not())
+
+  dividend.builtinIntDivideTruncating(divisor)
+}
+fun remainder(dividend: Int, divisor: Int) Int {
+  # Returns the remainder you get when dividing the `dividend` by the `divisor`.
+  #
+  # The result has the same sign as the `dividend`.
+  #
+  # | `dividend` | `divisor` | `dividend.remainder(divisor)` |
+  # |-----------:|----------:|---------------------------:|
+  # |          6 |         3 |                          0 |
+  # |          5 |         3 |                          2 |
+  # |         -5 |         3 |                         -2 |
+  # |          5 |        -3 |                          2 |
+  # |         -5 |        -3 |                         -2 |
+  needs(divisor.equals(0).not())
+
+  dividend.builtinIntRemainder(divisor)
+}
+fun modulo(dividend: Int, divisor: Int) Int {
+  # Returns `dividend` % `divisor`.
+  #
+  # The result of a modulo operation is the smallest non-negative number $x$
+  # such that there exists a $y$ with $dividend = y * divisor + x$.
+  #
+  # | `dividend` | `divisor` | `dividend.modulo(divisor)` |
+  # |-----------:|----------:|---------------------------:|
+  # |          6 |         3 |                          0 |
+  # |          5 |         3 |                          2 |
+  # |          5 |        -3 |                          2 |
+  # |         -5 |         3 |                          1 |
+  # |         -5 |        -3 |                          1 |
+  needs(divisor.equals(0).not())
+
+  let remainder = dividend.remainder(divisor)
+  switch remainder.isNegative() {
+    true => switch divisor.isNegative() {
+      true => remainder.subtract(divisor),
+      false => remainder.add(divisor),
+    },
+    false => remainder,
+  }
+}
+fun shiftLeft(value: Int, amount: Int) Int {
+  value.builtinIntShiftLeft(amount)
+}
+fun shiftRight(value: Int, amount: Int) Int {
+  value.builtinIntShiftRight(amount)
+}
+fun bitwiseAnd(self: Int, other: Int) Int {
+  self.builtinIntBitwiseAnd(other)
+}
+fun bitwiseOr(self: Int, other: Int) Int {
+  self.builtinIntBitwiseOr(other)
+}
+fun bitwiseXor(self: Int, other: Int) Int {
+  self.builtinIntBitwiseXor(other)
+}
+fun isEven(self: Int) Bool {
+  self.remainder(2).equals(0)
+}
+fun isOdd(self: Int) Bool {
+  self.remainder(2).equals(1)
+}
+fun lowestBits(value: Int, bitCount: Int) Int {
+  needs(bitCount.isNonNegative())
+  let mask = 1.shiftLeft(bitCount).subtract(1)
+  value.bitwiseAnd(mask)
+}
+fun parseInt(text: Text) Result[Int, Text] {
+  text.builtinIntParse()
+}
+
+trait HasLength {
+  fun length(self: Self) Int
+}
+fun isEmpty[T: HasLength](t: T) Bool {
+  t.length().equals(0)
+}
 
 struct Text = builtin
+impl Text: HasLength {
+  fun length(self: Text) Int {
+    self.builtinTextLength()
+  }
+}
+fun concat(self: Text, other: Text) Text {
+  self.builtinTextConcat(other)
+}
+# TODO: Support ranges when we have them.
+fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
+  self.builtinTextGetRange(startInclusive, endExclusive)
+}
+fun characterAt(self: Text, index: Int) Maybe[Text] {
+  switch index.isNonNegative().and(index.isLessThan(self.length())) {
+    false => none[Text](),
+    true => some(self.getRange(index, index.add(1))),
+  }
+}
+
+fun startsWith(self: Text, prefix: Text) Bool {
+  switch self.length().isGreaterThanOrEqualTo(prefix.length()) {
+    false => false,
+    true => self.getRange(0, prefix.length()).equals(prefix),
+  }
+}
+fun endsWith(self: Text, suffix: Text) Bool {
+  switch self.length().isGreaterThanOrEqualTo(suffix.length()) {
+    false => false,
+    true => self.getRange(self.length().subtract(suffix.length()), self.length()).equals(suffix),
+  }
+}
+fun removePrefix(self: Text, prefix: Text) Text {
+  switch self.startsWith(prefix) {
+    false => self,
+    true => self.getRange(prefix.length(), self.length()),
+  }
+}
+fun removeSuffix(self: Text, suffix: Text) Text {
+  switch self.endsWith(suffix) {
+    false => self,
+    true => self.getRange(self.length().subtract(suffix.length()), self.length()),
+  }
+}
+
+fun indexOf(self: Text, other: Text) Maybe[Int] {
+  self.builtinTextIndexOf(other)
+}
+fun contains(self: Text, other: Text) Bool {
+  self.indexOf(other).isSome()
+}
 impl Text: ToText {
   fun toText(self: Text) Text {
     self
   }
 }
+impl Text: Compare {
+  fun compareTo(self: Text, other: Text) Ordering {
+    self.builtinTextCompareTo(other)
+  }
+}
 
 fun panic(message: Text) Never {
   builtinPanic(message)
+}
+# TODO: build this into the language; fuzzing
+fun needs(condition: Bool) {
+  switch condition {
+    true => Nothing(),
+    false => panic("Needs not fulfilled"),
+  }
+}
+fun needs(condition: Bool, message: Text) {
+  switch condition {
+    true => Nothing(),
+    false => panic("Needs not fulfilled: {message}"),
+  }
 }
 
 struct List[T] = builtin
@@ -135,11 +311,10 @@ fun listOf[T](item0: T, item1: T, item2: T, item3: T) List[T] {
 fun listOf[T](item0: T, item1: T, item2: T, item3: T, item4: T) List[T] {
   builtinListOf(item0, item1, item2, item3, item4)
 }
-fun length[T](list: List[T]) Int {
-  builtinListLength(list)
-}
-fun isEmpty[T](list: List[T]) Bool {
-  list.length().equals(0)
+impl[T] List[T]: HasLength {
+  fun length(self: List[T]) Int {
+    builtinListLength(self)
+  }
 }
 fun lastIndex[T](list: List[T]) Maybe[Int] {
   switch list.isEmpty() {
@@ -191,6 +366,38 @@ struct MyStruct {
 enum Bool { true, false }
 let true: Bool = Bool.true()
 let false: Bool = Bool.false()
+fun not(value: Bool) Bool {
+  switch value {
+    true => false,
+    false => true,
+  }
+}
+fun and(a: Bool, b: Bool) Bool {
+  switch a {
+    true => b,
+    false => false,
+  }
+}
+fun or(a: Bool, b: Bool) Bool {
+  switch a {
+    true => true,
+    false => b,
+  }
+}
+fun xor(a: Bool, b: Bool) Bool {
+  a.equals(b).not()
+}
+fun implies(a: Bool, b: Bool) Bool {
+  not(a).or(b)
+}
+impl Bool: Equal {
+  fun equals(self: Bool, other: Bool) Bool {
+    switch self {
+      true => other,
+      false => other.not(),
+    }
+  }
+}
 impl Bool: ToText {
   fun toText(self: Bool) Text {
     switch self {
@@ -216,6 +423,18 @@ fun unwrap[T](self: Maybe[T]) T {
     none => panic("`unwrap()` called on `none()`"),
   }
 }
+fun isSome[T](self: Maybe[T]) Bool {
+  switch self {
+    some(value) => true,
+    none => false,
+  }
+}
+fun isNone[T](self: Maybe[T]) Bool {
+  switch self {
+    some(value) => false,
+    none => true,
+  }
+}
 impl[T: ToText] Maybe[T]: ToText {
   fun toText(self: Maybe[T]) Text {
     switch self {
@@ -225,25 +444,52 @@ impl[T: ToText] Maybe[T]: ToText {
   }
 }
 
-enum MyEnum {
-  foo: Int,
-  bar,
+enum Result[T, E] {
+  ok: T,
+  error: E,
+}
+fun ok[T, E](value: T) Result[T, E] {
+  Result.ok[T, E](value)
+}
+fun error[T, E](value: E) Result[T, E] {
+  Result.error[T, E](value)
+}
+fun unwrap[T, E](self: Result[T, E]) T {
+  switch self {
+    ok(value) => value,
+    error(value) => panic("`unwrap()` called on `error()`"),
+  }
+}
+fun isOk[T, E](self: Result[T, E]) Bool {
+  switch self {
+    ok(value) => true,
+    error(value) => false,
+  }
+}
+fun isError[T, E](self: Result[T, E]) Bool {
+  switch self {
+    ok(value) => false,
+    error(value) => true,
+  }
+}
+# impl[T: ToText, E: ToText] Result[T, E]: ToText {
+#   fun toText(self: Result[T, E]) Text {
+#     switch self {
+#       ok(value) => "ok({value.toText()})",
+#       error(error) => "error({error.toText()})",
+#     }
+#   }
+# }
+impl[T: ToText] Result[T, Text]: ToText {
+  fun toText(self: Result[T, Text]) Text {
+    switch self {
+      ok(value) => "ok({value.toText()})",
+      error(error) => "error({error})",
+    }
+  }
 }
 
 # function type: `Fun[Int, Text, Int]`, later `Fun (Int, Text) Int`
-
-# Expressions
-let intExpression: Int = 42
-let textExpression: Text = "Hello, World!"
-# let textExpressionWithInterpolation = "The answer is {intExpression}!"
-let identifierExpression: Int = intExpression
-# let parenthesizedExpression = (intExpression)
-let structExpression: MyStruct = MyStruct("Banana", 12345)
-# let lambdaExpression = (x: Int) { x }
-
-# Assignments
-let valueWithExplicitType: Int = 42
-let valueWithoutExplicitType = 42
 
 # Uniform Function Call Syntax
 # Functions can also be overloaded
@@ -256,15 +502,6 @@ let valueWithoutExplicitType = 42
 #   )
 # }
 # aDate.add(Duration(days: 1)) # is equivalent to `add(aDate, Duration(days: 1))`
-
-# fun twar() Int {
-#  foo
-#     bar
-#       fds
-#  % True: foo
-#      fff
-#    False: blub
-#}
 
 fun fibonacci(n: Int) Int {
   switch n.isLessThan(2) {
@@ -304,6 +541,8 @@ fun main() Int {
   let foo = 123
   let addCaptured = (x: Int) { x.add(foo) }
   print("addCaptured(1) = {addCaptured(1).toText()}")
+
+  print("orld!".endsWith("World!").toText().isEmpty())
   0
 }
 
