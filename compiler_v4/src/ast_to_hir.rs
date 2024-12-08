@@ -8,9 +8,9 @@ use crate::{
     error::CompilerError,
     hir::{
         self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, ContainsError, Expression,
-        ExpressionKind, Function, FunctionSignature, Hir, Id, Impl, NamedType, Parameter,
-        ParameterType, SliceOfTypeParameter, StructField, SwitchCase, Trait, TraitDefinition,
-        TraitFunction, Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
+        ExpressionKind, Function, FunctionSignature, FunctionType, Hir, Id, Impl, NamedType,
+        Parameter, ParameterType, SliceOfTypeParameter, StructField, SwitchCase, Trait,
+        TraitDefinition, TraitFunction, Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
     position::Offset,
@@ -1028,7 +1028,7 @@ impl<'a> Context<'a> {
     }
     fn lower_assignment(&mut self, id: Id) {
         let declaration = self.assignments.get(&id).unwrap();
-        let value = declaration.ast.value.clone();
+        let value = &declaration.ast.value;
         let type_ = declaration.type_.clone();
         let graph_index = declaration.graph_index;
 
@@ -1237,7 +1237,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         context: &'c mut Context<'a>,
         type_parameters: &'c [TypeParameter],
         self_base_type: Option<&'c Type>,
-        fun: impl FnOnce(&mut BodyBuilder),
+        fun: impl FnOnce(&mut Self),
     ) -> (Body, FxHashSet<Id>) {
         let mut builder = Self {
             context,
@@ -1251,8 +1251,12 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         (builder.body, builder.global_assignment_dependencies)
     }
     #[must_use]
-    fn build_inner(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> Body {
-        BodyBuilder::build(
+    fn build_inner<'s, 'cc>(&'s mut self, fun: impl FnOnce(&mut BodyBuilder<'cc, 'a>)) -> Body
+    where
+        'c: 'cc,
+        's: 'cc,
+    {
+        BodyBuilder::<'cc, 'a>::build(
             self.context,
             self.type_parameters,
             self.self_base_type,
@@ -1268,7 +1272,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
     fn lower_statements(
         &mut self,
-        statements: &[AstStatement],
+        statements: &'a [AstStatement],
         context_type: Option<&Type>,
     ) -> (Id, Type) {
         let mut last_expression = None;
@@ -1319,7 +1323,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
     fn lower_expression(
         &mut self,
-        expression: &AstExpression,
+        expression: &'a AstExpression,
         context_type: Option<&Type>,
     ) -> (Id, Type) {
         match self.lower_expression_raw(expression, context_type) {
@@ -1347,7 +1351,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     }
     fn lower_expression_raw(
         &mut self,
-        expression: &AstExpression,
+        expression: &'a AstExpression,
         context_type: Option<&Type>,
     ) -> LoweredExpression {
         match &expression.kind {
@@ -1432,7 +1436,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                         match receiver {
                             LoweredExpression::Expression { id, type_ } => {
                                 // bar.foo(baz)
-                                let arguments = Self::lower_arguments(self, &call.arguments);
+                                let arguments = self.lower_arguments(&call.arguments);
                                 let arguments = iter::once((id, type_))
                                     .chain(arguments.into_vec())
                                     .collect_vec();
@@ -1475,7 +1479,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
 
                         if identifier.string.chars().next().unwrap().is_lowercase() {
                             // foo(bar, baz)
-                            let arguments = Self::lower_arguments(self, &call.arguments);
+                            let arguments = self.lower_arguments(&call.arguments);
                             return self.lower_call(
                                 identifier,
                                 type_arguments.as_deref(),
@@ -1573,6 +1577,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             LoweredExpression::Error
                         }
                         Type::Self_ { .. } => todo!(),
+                        Type::Function(type_) => {
+                            self.context.add_error(
+                                key.span.clone(),
+                                format!(
+                                    "Navigation on value of function type `{type_}` is not supported yet."
+                                ),
+                            );
+                            LoweredExpression::Error
+                        }
                         Type::Error => todo!(),
                     },
                     LoweredExpression::NamedTypeReference(type_) => {
@@ -1623,8 +1636,36 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     LoweredExpression::Error => LoweredExpression::Error,
                 }
             }
-            AstExpressionKind::Lambda(AstLambda { .. }) => {
-                todo!()
+            AstExpressionKind::Lambda(AstLambda { parameters, body }) => {
+                let parameters = self.context.lower_parameters(
+                    self.type_parameters,
+                    self.self_base_type,
+                    parameters,
+                );
+
+                let body = self.build_inner(|builder| {
+                    for parameter in parameters.iter() {
+                        builder.push_parameter(parameter.clone());
+                    }
+
+                    // TODO: pass context_type
+                    builder.lower_statements(
+                        &body.statements,
+                        if let Some(Type::Function(FunctionType {
+                            box return_type, ..
+                        })) = context_type
+                        {
+                            Some(return_type)
+                        } else {
+                            None
+                        },
+                    );
+                });
+                let type_ = FunctionType::new(
+                    parameters.iter().map(|it| it.type_.clone()).collect_vec(),
+                    body.return_type().clone(),
+                );
+                self.push_lowered(None, ExpressionKind::Lambda { parameters, body }, type_)
             }
             AstExpressionKind::Body(AstBody { statements, .. }) => {
                 let (id, type_) = self.lower_statements(statements, context_type);
@@ -1669,11 +1710,21 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     Type::Parameter(type_) => {
                         self.context.add_error(
                             expression.span.clone(),
-                            format!("Can't switch over type parameter `{}`", type_.name),
+                            format!(
+                                "Can't switch over value of type parameter type `{}`",
+                                type_.name
+                            ),
                         );
                         return LoweredExpression::Error;
                     }
                     Type::Self_ { .. } => todo!(),
+                    Type::Function(type_) => {
+                        self.context.add_error(
+                            expression.span.clone(),
+                            format!("Can't switch over value of function type `{type_}`"),
+                        );
+                        return LoweredExpression::Error;
+                    }
                     Type::Error => return LoweredExpression::Error,
                 };
 
@@ -1800,7 +1851,75 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
         type_arguments: Option<&[Type]>,
         arguments: &[(Id, Type)],
     ) -> LoweredExpression {
-        // TODO(lambdas): resolve local identifiers as well if not calling using instance syntax
+        let argument_types = arguments
+            .iter()
+            .map(|(_, type_)| type_.clone())
+            .collect::<Box<_>>();
+
+        if let Some((_, id, type_)) = self
+            .local_identifiers
+            .iter()
+            .find(|(it, _, _)| it == &name.string)
+        {
+            // Local lambda call
+            let Type::Function(type_) = type_ else {
+                self.context.add_error(
+                    name.span.clone(),
+                    format!("`{}` is not a function", name.string),
+                );
+                return LoweredExpression::Error;
+            };
+            let id = *id;
+            let type_ = type_.clone();
+
+            let result = self.match_signature(
+                None,
+                &[],
+                &type_.parameter_types,
+                type_arguments,
+                &argument_types,
+            );
+            return match result {
+                Ok(substitutions) => {
+                    assert!(substitutions.is_empty());
+                    self.push_lowered(
+                        name.string.clone(),
+                        ExpressionKind::Call {
+                            function: id,
+                            substitutions,
+                            arguments: arguments.iter().map(|(id, _)| *id).collect(),
+                        },
+                        *type_.return_type,
+                    )
+                }
+                Err(error) => {
+                    self.context.add_error(
+                        name.span.clone(),
+                        match error {
+                            CallLikeLoweringError::TypeArgumentCount => {
+                                "Wrong number of type arguments".to_string()
+                            }
+                            CallLikeLoweringError::ArgumentCount => {
+                                "Wrong number of arguments".to_string()
+                            }
+                            CallLikeLoweringError::Unification(Some(error)) => error.into_string(),
+                            CallLikeLoweringError::Unification(None) => {
+                                "Mismatching types".to_string()
+                            }
+                            CallLikeLoweringError::FunctionReachableViaMultipleImpls => {
+                                "Function is reachable via multiple impls".to_string()
+                            }
+                            // TODO: more specific error message
+                            CallLikeLoweringError::TypeArgumentMismatch => {
+                                "Type arguments are not assignable".to_string()
+                            }
+                        },
+                    );
+                    LoweredExpression::Error
+                }
+            };
+        }
+
         let matches = self
             .context
             .get_all_functions_matching_name(&name.string)
@@ -1818,11 +1937,6 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             );
             return LoweredExpression::Error;
         }
-
-        let argument_types = arguments
-            .iter()
-            .map(|(_, type_)| type_.clone())
-            .collect::<Box<_>>();
 
         if argument_types.iter().any(ContainsError::contains_error) {
             return LoweredExpression::Error;
@@ -1918,7 +2032,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     fn lower_struct_creation(
         &mut self,
         span: Range<Offset>,
-        call: &AstCall,
+        call: &'a AstCall,
         type_arguments: Option<&[Type]>,
         type_: &str,
         type_parameters: &[TypeParameter],
@@ -1932,7 +2046,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             return LoweredExpression::Error;
         };
 
-        let arguments = Self::lower_arguments(self, &call.arguments);
+        let arguments = self.lower_arguments(&call.arguments);
 
         let result = self.match_signature(
             None,
@@ -1989,7 +2103,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
     }
     fn lower_enum_creation(
         &mut self,
-        call: &AstCall,
+        call: &'a AstCall,
         type_arguments: Option<&[Type]>,
         type_: &str,
         variant: &AstString,
@@ -2012,7 +2126,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             .as_ref()
             .map(|variant_type| vec![variant_type.clone()].into_boxed_slice())
             .unwrap_or_default();
-        let arguments = Self::lower_arguments(self, &call.arguments);
+        let arguments = self.lower_arguments(&call.arguments);
 
         let result = self.match_signature(
             None,
@@ -2068,14 +2182,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
             enum_type,
         )
     }
-    fn lower_arguments(
-        builder: &mut BodyBuilder,
-        arguments: &AstResult<AstArguments>,
-    ) -> Box<[(Id, Type)]> {
+    fn lower_arguments(&mut self, arguments: &'a AstResult<AstArguments>) -> Box<[(Id, Type)]> {
         arguments
             .arguments_or_default()
             .iter()
-            .map(|argument| builder.lower_expression(&argument.value, None))
+            .map(|argument| self.lower_expression(&argument.value, None))
             .collect::<Box<_>>()
     }
     fn match_signature(
@@ -2338,6 +2449,23 @@ impl<'h> TypeUnifier<'h> {
             }
             (Type::Parameter { .. }, Type::Named { .. }) => Ok(true),
             (Type::Self_ { base_type }, _) => self.unify(base_type, parameter),
+            (Type::Function(argument), Type::Function(parameter)) => {
+                if argument.parameter_types.len() != parameter.parameter_types.len() {
+                    return Ok(false);
+                }
+                for (argument, parameter) in argument
+                    .parameter_types
+                    .iter()
+                    .zip_eq(parameter.parameter_types.iter())
+                {
+                    if !self.unify(argument, parameter)? {
+                        return Ok(false);
+                    }
+                }
+
+                self.unify(&argument.return_type, &parameter.return_type)
+            }
+            (Type::Function(_), _) | (_, Type::Function(_)) => Ok(false),
             (_, Type::Self_ { base_type: _ }) => {
                 self.unify(argument, &ParameterType::self_type().into())
             }

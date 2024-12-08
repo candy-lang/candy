@@ -220,7 +220,10 @@ impl<'h> Context<'h> {
                             .solve(&subgoal.substitute_all(&solver_substitutions), &[]);
                         match solution {
                             SolverSolution::Unique(solution) => Some(solution.used_rule),
-                            SolverSolution::Ambiguous => panic!(),
+                            SolverSolution::Ambiguous => panic!(
+                                "Ambiguous solver solution for {}",
+                                subgoal.substitute_all(&solver_substitutions),
+                            ),
                             SolverSolution::Impossible => None,
                         }
                     })
@@ -324,6 +327,19 @@ impl<'h> Context<'h> {
             hir::Type::Self_ { base_type } => {
                 panic!("Self type (base type: {base_type}) should have been monomorphized.")
             }
+            hir::Type::Function(hir::FunctionType {
+                parameter_types,
+                return_type,
+            }) => {
+                entry.insert(None);
+                mono::TypeDeclaration::Function {
+                    parameter_types: parameter_types
+                        .iter()
+                        .map(|it| self.lower_type(it))
+                        .collect(),
+                    return_type: self.lower_type(return_type),
+                }
+            }
             hir::Type::Error => unreachable!(),
         };
         *self.type_declarations.get_mut(&mangled_name).unwrap() = Some(declaration);
@@ -352,6 +368,19 @@ impl<'h> Context<'h> {
             }
             hir::Type::Self_ { base_type } => {
                 panic!("Self type (base type: {base_type}) should have been monomorphized.")
+            }
+            hir::Type::Function(type_) => {
+                result.push_str("$Fun$");
+                if !type_.parameter_types.is_empty() {
+                    result.push_str("of$");
+                    for type_ in type_.parameter_types.iter() {
+                        Self::mangle_type_helper(result, type_);
+                        result.push('$');
+                    }
+                    result.push_str("end$");
+                }
+                result.push_str("returns$");
+                Self::mangle_type_helper(result, &type_.return_type);
             }
             hir::Type::Error => result.push_str("Never"),
         }
@@ -384,7 +413,10 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
         (builder.parameters.into_boxed_slice(), builder.body)
     }
     #[must_use]
-    fn build_inner(&mut self, fun: impl FnOnce(&mut BodyBuilder)) -> mono::Body {
+    fn build_inner(
+        &mut self,
+        fun: impl FnOnce(&mut BodyBuilder),
+    ) -> (Box<[mono::Parameter]>, mono::Body) {
         let mut builder = BodyBuilder {
             context: self.context,
             environment: self.environment,
@@ -397,10 +429,9 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
         builder.id_generator = mem::take(&mut self.id_generator);
 
         fun(&mut builder);
-        assert!(builder.parameters.is_empty());
 
         self.id_generator = builder.id_generator;
-        builder.body
+        (builder.parameters.into_boxed_slice(), builder.body)
     }
 
     fn add_parameters(&mut self, parameters: &[hir::Parameter]) {
@@ -501,19 +532,22 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 substitutions,
                 arguments,
             } => {
-                let function = self
-                    .context
-                    .lower_function(*function, &self.merge_substitutions(substitutions));
                 let arguments = self.lower_ids(arguments);
-                self.push(
-                    id,
-                    name,
-                    mono::ExpressionKind::Call {
+                let expression_kind = if let Some(id) = self.id_mapping.get(function) {
+                    let lambda = *self.id_mapping.get(function).unwrap_or_else(|| {
+                        panic!("Unknown function: {function} (referenced from {id} ({name:?}))")
+                    });
+                    mono::ExpressionKind::CallLambda { lambda, arguments }
+                } else {
+                    let function = self
+                        .context
+                        .lower_function(*function, &self.merge_substitutions(substitutions));
+                    mono::ExpressionKind::CallFunction {
                         function,
                         arguments,
-                    },
-                    &expression.type_,
-                );
+                    }
+                };
+                self.push(id, name, expression_kind, &expression.type_);
             }
             hir::ExpressionKind::Switch {
                 value,
@@ -531,12 +565,14 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                         mono::SwitchCase {
                             variant: case.variant.clone(),
                             value_id: value_ids.map(|(_, mir_id)| mir_id),
-                            body: BodyBuilder::build_inner(self, |builder| {
-                                if let Some((hir_id, mir_id)) = value_ids {
-                                    builder.id_mapping.force_insert(hir_id, mir_id);
-                                }
-                                builder.lower_expressions(&case.body.expressions);
-                            }),
+                            body: self
+                                .build_inner(|builder| {
+                                    if let Some((hir_id, mir_id)) = value_ids {
+                                        builder.id_mapping.force_insert(hir_id, mir_id);
+                                    }
+                                    builder.lower_expressions(&case.body.expressions);
+                                })
+                                .1,
                         }
                     })
                     .collect();
@@ -548,6 +584,18 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                         enum_,
                         cases,
                     },
+                    &expression.type_,
+                );
+            }
+            hir::ExpressionKind::Lambda { parameters, body } => {
+                let (parameters, body) = self.build_inner(|builder| {
+                    builder.add_parameters(parameters);
+                    builder.lower_expressions(&body.expressions);
+                });
+                self.push(
+                    id,
+                    name,
+                    mono::ExpressionKind::Lambda(mono::Lambda { parameters, body }),
                     &expression.type_,
                 );
             }
@@ -592,6 +640,14 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                     .collect(),
             }),
             hir::Type::Parameter(parameter_type) => self.environment[parameter_type].clone(),
+            hir::Type::Function(function_type) => hir::Type::Function(hir::FunctionType {
+                parameter_types: function_type
+                    .parameter_types
+                    .iter()
+                    .map(|it| self.merge_substitution(it))
+                    .collect(),
+                return_type: Box::new(self.merge_substitution(&function_type.return_type)),
+            }),
             hir::Type::Self_ { .. } | hir::Type::Error => unreachable!(),
         }
     }

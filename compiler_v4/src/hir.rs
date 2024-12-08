@@ -322,6 +322,8 @@ pub enum Type {
     Self_ {
         base_type: Box<Type>,
     },
+    #[from]
+    Function(FunctionType),
     Error,
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -404,6 +406,30 @@ impl Display for ParameterType {
         write!(f, "{}", self.name)
     }
 }
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct FunctionType {
+    pub parameter_types: Box<[Type]>,
+    pub return_type: Box<Type>,
+}
+impl FunctionType {
+    #[must_use]
+    pub fn new(parameter_types: impl Into<Box<[Type]>>, return_type: impl Into<Type>) -> Self {
+        Self {
+            parameter_types: parameter_types.into(),
+            return_type: Box::new(return_type.into()),
+        }
+    }
+}
+impl Display for FunctionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "({}) {}",
+            self.parameter_types.iter().join(", "),
+            self.return_type,
+        )
+    }
+}
 impl Type {
     pub fn nothing() -> Self {
         NamedType::nothing().into()
@@ -429,6 +455,10 @@ impl Type {
             }),
             Self::Parameter (type_) => environment.get(type_).unwrap_or_else(|| panic!("Missing substitution for type parameter {type_} (environment: {environment:?})")).clone(),
             Self::Self_ { base_type } => environment.get(&ParameterType::self_type()).cloned().unwrap_or_else(|| Self::Self_ { base_type: base_type.clone() }),
+            Self::Function(FunctionType{parameter_types, return_type }) => Self::Function(FunctionType::new(
+                parameter_types.iter().map(|it| it.substitute(environment)).collect_vec(),
+                return_type.substitute(environment),
+            )),
             Self::Error => Self::Error,
         }
     }
@@ -459,6 +489,7 @@ impl Display for Type {
             Self::Named(type_) => write!(f, "{type_}"),
             Self::Parameter(ParameterType { name }) => write!(f, "{name}"),
             Self::Self_ { base_type } => write!(f, "Self<{base_type}>"),
+            Self::Function(type_) => write!(f, "{type_}"),
             Self::Error => write!(f, "<error>"),
         }
     }
@@ -482,6 +513,7 @@ impl ContainsError for Type {
             Self::Named(named_type) => named_type.contains_error(),
             Self::Parameter(_) => false,
             Self::Self_ { base_type } => base_type.contains_error(),
+            Self::Function(function_type) => function_type.contains_error(),
             Self::Error => true,
         }
     }
@@ -491,6 +523,14 @@ impl ContainsError for NamedType {
         self.type_arguments
             .iter()
             .any(ContainsError::contains_error)
+    }
+}
+impl ContainsError for FunctionType {
+    fn contains_error(&self) -> bool {
+        self.parameter_types
+            .iter()
+            .any(ContainsError::contains_error)
+            || self.return_type.contains_error()
     }
 }
 
@@ -559,6 +599,12 @@ pub struct Parameter {
     pub name: Box<str>,
     pub type_: Type,
 }
+impl ToText for Parameter {
+    fn build_text(&self, builder: &mut TextBuilder) {
+        self.id.build_text(builder);
+        builder.push(format!(": {} = {}", self.type_, self.name));
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BodyOrBuiltin {
@@ -574,6 +620,10 @@ impl Body {
     #[must_use]
     pub fn return_value_id(&self) -> Id {
         self.expressions.last().unwrap().0
+    }
+    #[must_use]
+    pub fn return_type(&self) -> &Type {
+        &self.expressions.last().unwrap().2.type_
     }
 }
 impl ToText for Body {
@@ -641,6 +691,10 @@ pub enum ExpressionKind {
         value: Id,
         enum_: Type,
         cases: Box<[SwitchCase]>,
+    },
+    Lambda {
+        parameters: Box<[Parameter]>,
+        body: Body,
     },
     Error,
 }
@@ -717,6 +771,12 @@ impl ToText for ExpressionKind {
                     builder.push("}");
                 });
                 builder.push("}");
+            }
+            Self::Lambda { parameters, body } => {
+                builder.push("(");
+                builder.push_children(parameters.iter(), ", ");
+                builder.push(") => ");
+                body.build_text(builder);
             }
             Self::Error => builder.push("<error>"),
         }
