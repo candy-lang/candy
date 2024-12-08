@@ -151,8 +151,8 @@ fun remainder(dividend: Int, divisor: Int) Int {
 fun modulo(dividend: Int, divisor: Int) Int {
   # Returns `dividend` % `divisor`.
   #
-  # The result of a modulo operation is the smallest possible number $x$ such
-  # that there exists a $y$ with $dividend = y * divisor + x$.
+  # The result of a modulo operation is the smallest non-negative number $x$
+  # such that there exists a $y$ with $dividend = y * divisor + x$.
   #
   # | `dividend` | `divisor` | `dividend.modulo(divisor)` |
   # |-----------:|----------:|---------------------------:|
