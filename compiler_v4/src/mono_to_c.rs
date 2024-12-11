@@ -404,6 +404,17 @@ impl<'h> Context<'h> {
                     )),
                     BuiltinFunction::ListFilled => self.push(format!(
                         "\
+                        if ({length}->value < 0) {{
+                            char* message_format = \"List length must not be negative; was %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {length}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {length}->value);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {length}->value;
                         result_pointer->values = malloc({length}->value * sizeof({item_type}));
