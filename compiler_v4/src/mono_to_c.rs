@@ -83,7 +83,7 @@ impl<'h> Context<'h> {
                     match name.as_ref() {
                         "Int" => {
                             assert!(type_arguments.is_empty());
-                            self.push("uint64_t value;\n");
+                            self.push("int64_t value;\n");
                         }
                         "List" => {
                             assert_eq!(type_arguments.len(), 1);
