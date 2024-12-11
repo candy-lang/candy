@@ -415,6 +415,25 @@ fun map[T, R](list: List[T], transform: (T) R) List[R] {
     result.append(transform(item))
   })
 }
+fun windows[T](list: List[T], windowLength: Int) List[List[T]] {
+  # Returns a list over all contiguous windows of length `windowLength`.
+  #
+  # The windows overlap. If the `list` is shorter than `windowLength`, the
+  # resulting list is empty.
+  needs(windowLength.isPositive())
+
+  list.windowsHelper(windowLength, listOf[List[T]]())
+}
+fun windowsHelper[T](list: List[T], windowLength: Int, resultSoFar: List[List[T]]) List[List[T]] {
+  let index = resultSoFar.length()
+  switch index.isLessThanOrEqualTo(list.length().subtract(windowLength)) {
+    true => list.windowsHelper(
+      windowLength,
+      resultSoFar.append(list.getRange(index, index.add(windowLength))),
+    ),
+    false => resultSoFar,
+  }
+}
 impl[T: ToText] List[T]: ToText {
   fun toText(self: List[T]) Text {
     let items = self.map((item: T) { item.toText() })
