@@ -396,7 +396,7 @@ impl<'h> Context<'h> {
                         int length = snprintf(NULL, 0, \"%ld\", {int}->value);
                         char* result = malloc(length + 1);
                         snprintf(result, length + 1, \"%ld\", {int}->value);
-                        
+
                         Text* result_pointer = malloc(sizeof(Text));
                         result_pointer->value = result;
                         return result_pointer;",
