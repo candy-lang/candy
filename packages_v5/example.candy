@@ -370,7 +370,20 @@ fun replace[T](list: List[T], index: Int, item: T) List[T] {
 fun removeAt[T](list: List[T], index: Int) List[T] {
   builtinListRemoveAt(list, index)
 }
-# TODO: list.getRange(…), .concatenate(…), .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
+fun getRange[T](list: List[T], startInclusive: Int, endExclusive: Int) List[T] {
+  switch startInclusive.isNonNegative()
+    .and(endExclusive.isNonNegative())
+    .and(startInclusive.isLessThanOrEqualTo(endExclusive))
+    .and(endExclusive.isLessThanOrEqualTo(list.length())) {
+    false => panic("Invalid range"),
+    true => listGenerate(
+      endExclusive.subtract(startInclusive),
+      (i: Int) { list.get(startInclusive.add(i)).unwrap() },
+    ),
+  }
+}
+
+# TODO: .concatenate(…), .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
 }
