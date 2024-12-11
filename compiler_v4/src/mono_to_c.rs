@@ -427,6 +427,33 @@ impl<'h> Context<'h> {
                         length = function.parameters[0].id,
                         item = function.parameters[1].id,
                     )),
+                    BuiltinFunction::ListGenerate => self.push(format!(
+                        "\
+                        if ({length}->value < 0) {{
+                            char* message_format = \"List length must not be negative; was %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {length}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {length}->value);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {length}->value;
+                        result_pointer->values = malloc({length}->value * sizeof({item_type}));
+                        for (uint64_t i = 0; i < {length}->value; i++) {{
+                            Int* index = malloc(sizeof(Int));
+                            index->value = i;
+                            result_pointer->values[i] = {item_getter}->function({item_getter}->closure, index);
+                        }}
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        length = function.parameters[0].id,
+                        item_getter = function.parameters[1].id,
+                    )),
                     BuiltinFunction::ListGet => self.push(format!(
                         "\
                         {return_type}* result_pointer = malloc(sizeof({return_type}));

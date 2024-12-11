@@ -307,7 +307,9 @@ struct List[T] = builtin
 fun listFilled[T](length: Int, item: T) List[T] {
   builtinListFilled(length, item)
 }
-# TODO: listGenerate(…)
+fun listGenerate[T](length: Int, generator: (Int) T) List[T] {
+  builtinListGenerate(length, generator)
+}
 fun listOf[T]() List[T] {
   builtinListOf[T]()
 }
