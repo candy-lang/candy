@@ -806,6 +806,7 @@ pub enum BuiltinFunction {
     IntSubtract,
     IntToText,
     ListFilled,
+    ListGenerate,
     ListGet,
     ListInsert,
     ListLength,
@@ -962,6 +963,20 @@ impl BuiltinFunction {
                 parameters: [
                     ("length".into(), NamedType::int().into()),
                     ("item".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListGenerate => BuiltinFunctionSignature {
+                name: "builtinListGenerate".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("length".into(), NamedType::int().into()),
+                    (
+                        "itemGetter".into(),
+                        FunctionType::new([NamedType::int().into()], ParameterType::new("T"))
+                            .into(),
+                    ),
                 ]
                 .into(),
                 return_type: NamedType::list(ParameterType::new("T")).into(),
