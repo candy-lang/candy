@@ -247,8 +247,12 @@ impl<'h> Context<'h> {
                 | ExpressionKind::GlobalAssignmentReference(_)
                 | ExpressionKind::LocalReference(_)
                 | ExpressionKind::CallFunction { .. }
-                | ExpressionKind::CallLambda { .. }
-                | ExpressionKind::Switch { .. } => {}
+                | ExpressionKind::CallLambda { .. } => {}
+                ExpressionKind::Switch { cases, .. } => {
+                    for case in cases.iter() {
+                        Self::visit_lambdas_inside_body(&case.body, visitor);
+                    }
+                }
                 ExpressionKind::Lambda(lambda) => {
                     Self::visit_lambdas_inside_body(&lambda.body, visitor);
                     visitor(*id, lambda);
