@@ -1,11 +1,6 @@
 struct Nothing {}
 enum Never {}
 
-# struct List[T] {}
-# impl[T: Equal] List[T]: Equal {
-#   # fun equals(self: Self, other: Self) Bool {}
-# }
-
 trait ToText {
   fun toText(self: Self) Text
 }
