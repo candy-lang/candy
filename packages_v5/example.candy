@@ -1006,7 +1006,7 @@ fun day6Part1(input: Text) Int {
     },
   )
   let state = state.moveToEnd()
-  # print(state)
+  print(state)
   state.visitedCellCount()
 }
 struct Day6Part1State {
