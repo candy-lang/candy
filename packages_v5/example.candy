@@ -255,7 +255,7 @@ fun concat(self: Text, other: Text) Text {
 }
 # TODO: Support ranges when we have them.
 fun get(self: Text, index: Int) Maybe[Text] {
-  switch index.isNonNegative().and(index.isLessThan(self.length())) {
+  switch index.isInRange(0, self.length()) {
     false => none[Text](),
     true => some(self.getRange(index, index.add(1))),
   }
@@ -264,7 +264,7 @@ fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
   self.builtinTextGetRange(startInclusive, endExclusive)
 }
 fun characterAt(self: Text, index: Int) Maybe[Text] {
-  switch index.isNonNegative().and(index.isLessThan(self.length())) {
+  switch index.isInRange(0, self.length()) {
     false => none[Text](),
     true => some(self.getRange(index, index.add(1))),
   }
@@ -486,6 +486,12 @@ fun range(startInclusive: Int, endExclusive: Int) List[Int] {
 }
 fun indexes[T](list: List[T]) List[Int] {
   list.length().range()
+}
+
+fun isInRange[T: Compare](self: T, startInclusive: T, endExclusive: T) Bool {
+  needs(startInclusive.isAtMost(endExclusive))
+
+  self.isAtLeast(startInclusive).and(self.isLessThan(endExclusive))
 }
 
 # TODO: .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
