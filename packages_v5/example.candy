@@ -478,6 +478,13 @@ fun windowsHelper[T](list: List[T], windowLength: Int, resultSoFar: List[List[T]
     false => resultSoFar,
   }
 }
+fun pairs[T](list: List[T]) List[Pair[T, T]] {
+  # Returns a list over all contiguous pairs of items.
+  #
+  # The pairs overlap. If the `list` is shorter than two, the resulting list is
+  # empty.
+  list.windows(2).map((window: List[T]) { window.toPair().unwrap() })
+}
 impl[T: ToText] List[T]: ToText {
   fun toText(self: List[T]) Text {
     let items = self.map((item: T) { item.toText() })
