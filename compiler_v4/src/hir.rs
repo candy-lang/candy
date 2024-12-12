@@ -732,8 +732,8 @@ impl ToText for ExpressionKind {
                     builder.push("[");
                     builder.push_children_custom(
                         substitutions.iter(),
-                        |builder, (id, type_)| {
-                            builder.push(format!("{id}: {type_}"));
+                        |builder, (type_parameter, type_argument)| {
+                            builder.push(format!("{type_parameter} = {type_argument}"));
                         },
                         ", ",
                     );
