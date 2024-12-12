@@ -471,6 +471,14 @@ fun getRange[T](list: List[T], startInclusive: Int, endExclusive: Int) List[T] {
     ),
   }
 }
+fun skip[T](list: List[T], count: Int) List[T] {
+  needs(count.isNonNegative())
+  getRange(list, count, list.length())
+}
+fun skipLast[T](list: List[T], count: Int) List[T] {
+  needs(count.isNonNegative())
+  getRange(list, 0, list.length().subtract(count))
+}
 fun indexes[T](list: List[T]) List[Int] {
   listGenerate(list.length(), (i: Int) { i })
 }
