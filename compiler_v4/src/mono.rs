@@ -241,7 +241,7 @@ impl Body {
             match &expression.kind {
                 ExpressionKind::Int(_) | ExpressionKind::Text(_) => {}
                 ExpressionKind::CreateStruct { fields, .. } => {
-                    defined_ids.extend(fields.iter());
+                    referenced_ids.extend(fields.iter());
                 }
                 ExpressionKind::StructAccess { struct_, .. } => {
                     referenced_ids.insert(*struct_);
