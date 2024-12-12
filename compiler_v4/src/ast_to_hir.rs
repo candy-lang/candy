@@ -1612,7 +1612,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             );
                             LoweredExpression::Error
                         }
-                        Type::Error => todo!(),
+                        Type::Error => LoweredExpression::Error,
                     },
                     LoweredExpression::NamedTypeReference(type_) => {
                         let declaration = self.context.hir.type_declarations.get(&type_).unwrap();
