@@ -564,6 +564,11 @@ fun mapIndexed[T, R](list: List[T], transform: (Int, T) R) List[R] {
     result.append(transform(result.length(), item))
   })
 }
+fun flatMap[T, R](list: List[T], transform: (T) List[R]) List[R] {
+  list.fold(listOf[R](), (result: List[R], item: T) {
+    result.concat(transform(item))
+  })
+}
 fun filter[T](list: List[T], predicate: (T) Bool) List[T] {
   list.fold(listOf[T](), (result: List[T], item: T) {
     switch predicate(item) {
