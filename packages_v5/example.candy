@@ -51,6 +51,25 @@ fun isAtLeast[T: Compare](left: T, right: T) Bool {
     greater => true,
   }
 }
+fun coerceAtLeast[T: Compare](value: T, minimum: T) T {
+  switch value.compareTo(minimum) {
+    less => minimum,
+    equal => value,
+    greater => value,
+  }
+}
+fun coerceAtMost[T: Compare](value: T, maximum: T) T {
+  switch value.compareTo(maximum) {
+    less => value,
+    equal => value,
+    greater => maximum,
+  }
+}
+fun coerceInRange[T: Compare](value: T, minimum: T, maximum: T) T {
+  needs(minimum.isAtMost(maximum))
+
+  value.coerceAtLeast(minimum).coerceAtMost(maximum)
+}
 enum Ordering { less, equal, greater }
 impl Ordering: Compare {
   fun compareTo(self: Ordering, other: Ordering) Ordering {
