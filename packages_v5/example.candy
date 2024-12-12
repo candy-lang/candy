@@ -269,6 +269,9 @@ fun characterAt(self: Text, index: Int) Maybe[Text] {
     true => some(self.getRange(index, index.add(1))),
   }
 }
+fun characters(self: Text) List[Text] {
+  listGenerate(self.length(), (i: Int) { self.get(i).unwrap() })
+}
 
 fun startsWith(self: Text, prefix: Text) Bool {
   switch self.length().isAtLeast(prefix.length()) {
