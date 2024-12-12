@@ -752,6 +752,9 @@ impl ToText for ExpressionKind {
                 value.build_text(builder);
                 builder.push(format!(": {enum_} {{"));
                 builder.push_children_multiline(cases.iter());
+                if !cases.is_empty() {
+                    builder.push_newline();
+                }
                 builder.push("}");
             }
             Self::Lambda { parameters, body } => {
@@ -772,23 +775,12 @@ pub struct SwitchCase {
 }
 impl ToText for SwitchCase {
     fn build_text(&self, builder: &mut TextBuilder) {
-        builder.push(format!("case {}", self.variant));
+        builder.push(format!("{}", self.variant));
         if let Some(value_id) = self.value_id {
             builder.push(format!("({value_id})"));
         }
-        builder.push(" {");
-        builder.push_children_custom_multiline(
-            self.body.expressions.iter(),
-            |builder, (id, name, expression)| {
-                id.build_text(builder);
-                builder.push(format!(": {} = ", expression.type_));
-                if let Some(name) = name {
-                    builder.push(format!("{name} = "));
-                }
-                expression.kind.build_text(builder);
-            },
-        );
-        builder.push("}");
+        builder.push(" => ");
+        self.body.build_text(builder);
     }
 }
 
