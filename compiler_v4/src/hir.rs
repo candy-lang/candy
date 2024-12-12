@@ -751,25 +751,7 @@ impl ToText for ExpressionKind {
                 builder.push("switch ");
                 value.build_text(builder);
                 builder.push(format!(": {enum_} {{"));
-                builder.push_children_custom_multiline(cases.iter(), |builder, case| {
-                    builder.push(format!("case {}", case.variant));
-                    if let Some(value_id) = case.value_id {
-                        builder.push(format!("({value_id})"));
-                    }
-                    builder.push(" {");
-                    builder.push_children_custom_multiline(
-                        case.body.expressions.iter(),
-                        |builder, (id, name, expression)| {
-                            id.build_text(builder);
-                            builder.push(format!(": {} = ", expression.type_));
-                            if let Some(name) = name {
-                                builder.push(format!("{name} = "));
-                            }
-                            expression.kind.build_text(builder);
-                        },
-                    );
-                    builder.push("}");
-                });
+                builder.push_children_multiline(cases.iter());
                 builder.push("}");
             }
             Self::Lambda { parameters, body } => {
@@ -787,6 +769,27 @@ pub struct SwitchCase {
     pub variant: Box<str>,
     pub value_id: Option<Id>,
     pub body: Body,
+}
+impl ToText for SwitchCase {
+    fn build_text(&self, builder: &mut TextBuilder) {
+        builder.push(format!("case {}", self.variant));
+        if let Some(value_id) = self.value_id {
+            builder.push(format!("({value_id})"));
+        }
+        builder.push(" {");
+        builder.push_children_custom_multiline(
+            self.body.expressions.iter(),
+            |builder, (id, name, expression)| {
+                id.build_text(builder);
+                builder.push(format!(": {} = ", expression.type_));
+                if let Some(name) = name {
+                    builder.push(format!("{name} = "));
+                }
+                expression.kind.build_text(builder);
+            },
+        );
+        builder.push("}");
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
