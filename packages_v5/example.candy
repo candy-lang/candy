@@ -30,7 +30,7 @@ fun isLessThan[T: Compare](left: T, right: T) Bool {
     greater => false,
   }
 }
-fun isLessThanOrEqualTo[T: Compare](left: T, right: T) Bool {
+fun isAtMost[T: Compare](left: T, right: T) Bool {
   switch left.compareTo(right) {
     less => true,
     equal => true,
@@ -44,7 +44,7 @@ fun isGreaterThan[T: Compare](left: T, right: T) Bool {
     greater => true,
   }
 }
-fun isGreaterThanOrEqualTo[T: Compare](left: T, right: T) Bool {
+fun isAtLeast[T: Compare](left: T, right: T) Bool {
   switch left.compareTo(right) {
     less => false,
     equal => true,
@@ -94,13 +94,13 @@ fun isPositive(self: Int) Bool {
   self.isGreaterThan(0)
 }
 fun isNonPositive(self: Int) Bool {
-  self.isLessThanOrEqualTo(0)
+  self.isAtMost(0)
 }
 fun isNegative(self: Int) Bool {
   self.isLessThan(0)
 }
 fun isNonNegative(self: Int) Bool {
-  self.isGreaterThanOrEqualTo(0)
+  self.isAtLeast(0)
 }
 fun absolute(self: Int) Int {
   switch self.isNegative() {
@@ -230,13 +230,13 @@ fun characterAt(self: Text, index: Int) Maybe[Text] {
 }
 
 fun startsWith(self: Text, prefix: Text) Bool {
-  switch self.length().isGreaterThanOrEqualTo(prefix.length()) {
+  switch self.length().isAtLeast(prefix.length()) {
     false => false,
     true => self.getRange(0, prefix.length()).equals(prefix),
   }
 }
 fun endsWith(self: Text, suffix: Text) Bool {
-  switch self.length().isGreaterThanOrEqualTo(suffix.length()) {
+  switch self.length().isAtLeast(suffix.length()) {
     false => false,
     true => self.getRange(self.length().subtract(suffix.length()), self.length()).equals(suffix),
   }
@@ -393,8 +393,8 @@ fun removeAt[T](list: List[T], index: Int) List[T] {
 fun getRange[T](list: List[T], startInclusive: Int, endExclusive: Int) List[T] {
   switch startInclusive.isNonNegative()
     .and(endExclusive.isNonNegative())
-    .and(startInclusive.isLessThanOrEqualTo(endExclusive))
-    .and(endExclusive.isLessThanOrEqualTo(list.length())) {
+    .and(startInclusive.isAtMost(endExclusive))
+    .and(endExclusive.isAtMost(list.length())) {
     false => panic("Invalid range"),
     true => listGenerate(
       endExclusive.subtract(startInclusive),
@@ -446,7 +446,7 @@ fun windows[T](list: List[T], windowLength: Int) List[List[T]] {
 }
 fun windowsHelper[T](list: List[T], windowLength: Int, resultSoFar: List[List[T]]) List[List[T]] {
   let index = resultSoFar.length()
-  switch index.isLessThanOrEqualTo(list.length().subtract(windowLength)) {
+  switch index.isAtMost(list.length().subtract(windowLength)) {
     true => list.windowsHelper(
       windowLength,
       resultSoFar.append(list.getRange(index, index.add(windowLength))),
