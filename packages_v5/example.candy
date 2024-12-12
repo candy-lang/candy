@@ -326,6 +326,18 @@ fun lines(self: Text) List[Text] {
 fun indexOf(self: Text, other: Text) Maybe[Int] {
   self.builtinTextIndexOf(other)
 }
+fun allIndexesOfOverlapping(self: Text, other: Text) List[Int] {
+  self.allIndexesOfOverlappingHelper(other, 0, listOf[Int]())
+}
+fun allIndexesOfOverlappingHelper(self: Text, other: Text, offset: Int, result: List[Int]) List[Int] {
+  switch self.getRange(offset, self.length()).indexOf(other) {
+    none => result,
+    some(index) => {
+      let index = offset.add(index)
+      self.allIndexesOfOverlappingHelper(other, index.add(1), result.append(index))
+    },
+  }
+}
 fun contains(self: Text, other: Text) Bool {
   self.indexOf(other).isSome()
 }
