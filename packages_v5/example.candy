@@ -259,6 +259,12 @@ fun concat(self: Text, other: Text) Text {
   self.builtinTextConcat(other)
 }
 # TODO: Support ranges when we have them.
+fun get(self: Text, index: Int) Maybe[Text] {
+  switch index.isNonNegative().and(index.isLessThan(self.length())) {
+    false => none[Text](),
+    true => some(self.getRange(index, index.add(1))),
+  }
+}
 fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
   self.builtinTextGetRange(startInclusive, endExclusive)
 }
