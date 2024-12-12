@@ -467,6 +467,16 @@ fun any[T](list: List[T], predicate: (T) Bool) Bool {
   list.all((it: T) { predicate(it).not() }).not()
 }
 
+fun isStrictlyAscending[T: Compare](list: List[T]) Bool {
+  list.isSortedBy((a: T, b: T) { a.compareTo(b).equals(Ordering.less()) })
+}
+fun isStrictlyDescending[T: Compare](list: List[T]) Bool {
+  list.isSortedBy((a: T, b: T) { a.compareTo(b).equals(Ordering.greater()) })
+}
+fun isSortedBy[T](list: List[T], checkPair: (T, T) Bool) Bool {
+  list.pairs().all((pair: Pair[T, T]) { checkPair(pair.first, pair.second) })
+}
+
 fun map[T, R](list: List[T], transform: (T) R) List[R] {
   list.fold(listOf[R](), (result: List[R], item: T) {
     result.append(transform(item))
