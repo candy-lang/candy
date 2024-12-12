@@ -479,8 +479,18 @@ fun skipLast[T](list: List[T], count: Int) List[T] {
   needs(count.isNonNegative())
   getRange(list, 0, list.length().subtract(count))
 }
+fun range(length: Int) List[Int] {
+  needs(length.isNonNegative())
+
+  listGenerate(length, (i: Int) { i })
+}
+fun range(startInclusive: Int, endExclusive: Int) List[Int] {
+  needs(startInclusive.isAtMost(endExclusive))
+
+  listGenerate(endExclusive.subtract(startInclusive), (i: Int) { startInclusive.add(i) })
+}
 fun indexes[T](list: List[T]) List[Int] {
-  listGenerate(list.length(), (i: Int) { i })
+  list.length().range()
 }
 
 # TODO: .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
