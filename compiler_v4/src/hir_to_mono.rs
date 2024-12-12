@@ -170,7 +170,7 @@ impl<'h> Context<'h> {
                     .get(&function_id)
                     .map(|function| (trait_, function))
             })
-            .unwrap();
+            .unwrap_or_else(|| panic!("Unknown trait function: {function_id}"));
         let self_type = function.signature.parameters[0]
             .type_
             .substitute(substitutions);
@@ -230,7 +230,9 @@ impl<'h> Context<'h> {
                     .collect::<Option<Vec<_>>>()
                     .is_some()
             })
-            .unwrap()
+            .unwrap_or_else(|| {
+                panic!("No matching impl found for trait `{trait_}` with {substitutions:?}")
+            })
     }
     fn mangle_function(
         &mut self,
