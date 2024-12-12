@@ -835,25 +835,14 @@ impl<'h> Context<'h> {
                 enum_,
                 cases,
             } => {
-                let TypeDeclaration::Enum { variants } = &self.mono.type_declarations[enum_] else {
-                    unreachable!();
-                };
-
                 self.push(format!("{}* {id};\n", &expression.type_));
 
                 self.push(format!("switch ({value}->variant) {{"));
                 for case in cases.iter() {
                     self.push(format!("case {enum_}_{}:\n", case.variant));
-                    if let Some(value_id) = case.value_id {
-                        let variant_type = variants
-                            .iter()
-                            .find(|variant| variant.name == case.variant)
-                            .unwrap()
-                            .value_type
-                            .as_ref()
-                            .unwrap();
+                    if let Some((value_id, value_type)) = &case.value {
                         self.push(format!(
-                            "{variant_type}* {value_id} = {value}->value.{};\n",
+                            "{value_type}* {value_id} = {value}->value.{};\n",
                             case.variant,
                         ));
                     }

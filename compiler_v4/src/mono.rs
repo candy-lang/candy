@@ -265,7 +265,9 @@ impl Body {
                 ExpressionKind::Switch { value, cases, .. } => {
                     referenced_ids.insert(*value);
                     for case in cases.iter() {
-                        referenced_ids.extend(case.value_id.iter());
+                        if let Some((value_id, _)) = &case.value {
+                            referenced_ids.insert(*value_id);
+                        }
                         case.body
                             .collect_defined_and_referenced_ids(defined_ids, referenced_ids);
                     }
@@ -278,17 +280,26 @@ impl Body {
         }
     }
     #[must_use]
-    pub fn find_expression(&self, id: Id) -> Option<&Expression> {
+    pub fn find_expression(&self, id: Id) -> Option<(&str, Option<&Expression>)> {
         self.expressions.iter().find_map(|(it_id, _, expression)| {
             if *it_id == id {
-                return Some(expression);
+                return Some((expression.type_.as_ref(), Some(expression)));
             }
 
             match &expression.kind {
-                ExpressionKind::Switch { cases, .. } => {
-                    cases.iter().find_map(|it| it.body.find_expression(id))
-                }
-                ExpressionKind::Lambda(Lambda { body, .. }) => body.find_expression(id),
+                ExpressionKind::Switch { cases, .. } => cases.iter().find_map(|it| {
+                    if let Some((value_id, box value_type)) = &it.value
+                        && *value_id == id
+                    {
+                        return Some((value_type, None));
+                    }
+                    it.body.find_expression(id)
+                }),
+                ExpressionKind::Lambda(Lambda { parameters, body }) => parameters
+                    .iter()
+                    .find(|it| it.id == id)
+                    .map(|it| (it.type_.as_ref(), None))
+                    .or_else(|| body.find_expression(id)),
                 _ => None,
             }
         })
@@ -415,14 +426,14 @@ impl ToText for ExpressionKind {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SwitchCase {
     pub variant: Box<str>,
-    pub value_id: Option<Id>,
+    pub value: Option<(Id, Box<str>)>,
     pub body: Body,
 }
 impl ToText for SwitchCase {
     fn build_text(&self, builder: &mut TextBuilder) {
         builder.push(format!("{}", self.variant));
-        if let Some(value_id) = self.value_id {
-            builder.push(format!("({value_id})"));
+        if let Some((value_id, value_type)) = &self.value {
+            builder.push(format!("({value_id}: {value_type})"));
         }
         builder.push(" => ");
         self.body.build_text(builder);
@@ -455,8 +466,9 @@ impl Lambda {
                                         "Couldn't find expression {id} in declaration body {declaration_body:?}"
                                     )
                                 })
-                                .type_
-                                .clone()
+                                .0
+                                .to_string()
+                                .into_boxed_str()
                         },
                         |it| it.type_.clone(),
                     )
