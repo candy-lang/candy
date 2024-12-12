@@ -731,6 +731,36 @@ fun identity[T](t: T) T {
   t
 }
 
+# Advent of Code 2024
+# https://adventofcode.com/2024
+
+fun day2Part1(input: Text) Int {
+  day2Wrapper(input, (line: List[Int]) { day2CheckLine(line) })
+}
+fun day2Part2(input: Text) Int {
+  day2Wrapper(input, (line: List[Int]) {
+    listOf(line)
+      .concat(line.indexes().map((index: Int) { line.removeAt(index) }))
+      .any((line: List[Int]) { day2CheckLine(line) })
+  })
+}
+fun day2Wrapper(input: Text, checkLine: (List[Int]) Bool) Int {
+  input
+    .split("\n")
+    .map((line: Text) { line.split(" ").map((number: Text) { parseInt(number).unwrap() }) })
+    .filter(checkLine)
+    .length()
+}
+fun day2CheckLine(line: List[Int]) Bool {
+  line
+    .pairs()
+    .all((pair: Pair[Int, Int]) {
+      let difference = pair.second.subtract(pair.first).absolute()
+      difference.isAtLeast(1).and(difference.isAtMost(3))
+    })
+    .and(line.isStrictlyAscending().or(line.isStrictlyDescending()))
+}
+
 fun main() Int {
   identity(1)
   identity("foo")
