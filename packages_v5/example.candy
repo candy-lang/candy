@@ -430,6 +430,22 @@ fun reduceHelper[T](list: List[T], index: Int, current: T, combine: (T, T) T) T 
   }
 }
 
+fun all[T](list: List[T], predicate: (T) Bool) Bool {
+  list.allHelper(predicate, 0)
+}
+fun allHelper[T](list: List[T], predicate: (T) Bool, index: Int) Bool {
+  switch index.isLessThan(list.length()) {
+    true => switch predicate(list.get(index).unwrap()) {
+      true => list.allHelper(predicate, index.add(1)),
+      false => false,
+    },
+    false => true,
+  }
+}
+fun any[T](list: List[T], predicate: (T) Bool) Bool {
+  list.all((it: T) { predicate(it).not() }).not()
+}
+
 fun map[T, R](list: List[T], transform: (T) R) List[R] {
   list.fold(listOf[R](), (result: List[R], item: T) {
     result.append(transform(item))
