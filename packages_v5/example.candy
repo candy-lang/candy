@@ -591,12 +591,15 @@ fun pairs[T](list: List[T]) List[Pair[T, T]] {
   # empty.
   list.windows(2).map((window: List[T]) { window.toPair().unwrap() })
 }
+
+fun join[T: ToText](self: List[T], separator: Text) Text {
+  self.map((item: T) { item.toText() })
+    .reduce((result: Text, item: Text) { "{result}{separator}{item}" })
+    .unwrapOr("")
+}
 impl[T: ToText] List[T]: ToText {
   fun toText(self: List[T]) Text {
-    let items = self.map((item: T) { item.toText() })
-      .reduce((result: Text, item: Text) { "{result}, {item}" })
-      .unwrapOr("")
-    "[{items}]"
+    "[{self.join(", ")}]"
   }
 }
 
