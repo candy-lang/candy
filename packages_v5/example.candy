@@ -646,6 +646,12 @@ fun xor(a: Bool, b: Bool) Bool {
 fun implies(a: Bool, b: Bool) Bool {
   not(a).or(b)
 }
+fun toInt(self: Bool) Int {
+  switch self {
+    false => 0,
+    true => 1,
+  }
+}
 impl Bool: Compare {
   fun compareTo(self: Bool, other: Bool) Ordering {
     switch self {
