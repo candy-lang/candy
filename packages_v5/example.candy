@@ -487,6 +487,17 @@ impl[T: ToText] List[T]: ToText {
   }
 }
 
+struct Pair[T0, T1] {
+  first: T0,
+  second: T1,
+}
+fun toPair[T](list: List[T]) Maybe[Pair[T, T]] {
+  switch list.length().equals(2) {
+    true => some(Pair[T, T](list.get(0).unwrap(), list.get(1).unwrap())),
+    false => none[Pair[T, T]](),
+  }
+}
+
 struct MyStruct {
   name: Text,
   color: Int,
