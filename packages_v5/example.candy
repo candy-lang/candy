@@ -519,6 +519,9 @@ fun reduceHelper[T](list: List[T], index: Int, current: T, combine: (T, T) T) T 
     false => current,
   }
 }
+fun sum(list: List[Int]) Int {
+  list.fold(0, (sum: Int, item: Int) { sum.add(item) })
+}
 
 fun all[T](list: List[T], predicate: (T) Bool) Bool {
   list.allHelper(predicate, 0)
