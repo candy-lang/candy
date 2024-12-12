@@ -319,6 +319,9 @@ fun splitIfHelper(self: Text, predicate: (Text) Bool, currentStartOffset: Int, o
     },
   }
 }
+fun lines(self: Text) List[Text] {
+  self.split("\n")
+}
 
 fun indexOf(self: Text, other: Text) Maybe[Int] {
   self.builtinTextIndexOf(other)
