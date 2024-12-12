@@ -431,6 +431,9 @@ fun getRange[T](list: List[T], startInclusive: Int, endExclusive: Int) List[T] {
     ),
   }
 }
+fun indexes[T](list: List[T]) List[Int] {
+  listGenerate(list.length(), (i: Int) { i })
+}
 
 # TODO: .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
 fun print[T: ToText](t: T) {
