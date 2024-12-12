@@ -417,7 +417,7 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {length}->value;
-                        result_pointer->values = malloc({length}->value * sizeof({item_type}));
+                        result_pointer->values = malloc({length}->value * sizeof({item_type}*));
                         for (uint64_t i = 0; i < {length}->value; i++) {{
                             result_pointer->values[i] = {item};
                         }}
@@ -442,7 +442,7 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {length}->value;
-                        result_pointer->values = malloc({length}->value * sizeof({item_type}));
+                        result_pointer->values = malloc({length}->value * sizeof({item_type}*));
                         for (uint64_t i = 0; i < {length}->value; i++) {{
                             Int* index = malloc(sizeof(Int));
                             index->value = i;
@@ -483,8 +483,8 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {list}->length + 1;
-                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
-                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}));
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}*));
+                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}*));
                         result_pointer->values[{index}->value] = {item};
                         memcpy(result_pointer->values + {index}->value + 1, {list}->values + {index}->value, ({list}->length - {index}->value) * sizeof({item_type}));
                         return result_pointer;",
@@ -513,7 +513,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 1;
-                        result_pointer->values = malloc(sizeof({item_type}));
+                        result_pointer->values = malloc(sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         return result_pointer;",
                         item_type = substitutions["T"],
@@ -524,7 +524,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 2;
-                        result_pointer->values = malloc(2 * sizeof({item_type}));
+                        result_pointer->values = malloc(2 * sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         return result_pointer;",
@@ -537,7 +537,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 3;
-                        result_pointer->values = malloc(3 * sizeof({item_type}));
+                        result_pointer->values = malloc(3 * sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         result_pointer->values[2] = {item2};
@@ -552,7 +552,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 4;
-                        result_pointer->values = malloc(4 * sizeof({item_type}));
+                        result_pointer->values = malloc(4 * sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         result_pointer->values[2] = {item2};
@@ -569,7 +569,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 5;
-                        result_pointer->values = malloc(5 * sizeof({item_type}));
+                        result_pointer->values = malloc(5 * sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         result_pointer->values[2] = {item2};
@@ -599,9 +599,9 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {list}->length - 1;
-                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
-                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}));
-                        memcpy(result_pointer->values + {index}->value, {list}->values + {index}->value + 1, ({list}->length - {index}->value - 1) * sizeof({item_type}));
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}*));
+                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}*));
+                        memcpy(result_pointer->values + {index}->value, {list}->values + {index}->value + 1, ({list}->length - {index}->value - 1) * sizeof({item_type}*));
                         return result_pointer;",
                         item_type = substitutions["T"],
                         list_type = function.return_type,
@@ -623,8 +623,8 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {list}->length;
-                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
-                        memcpy(result_pointer->values, {list}->values, {list}->length * sizeof({item_type}));
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}*));
+                        memcpy(result_pointer->values, {list}->values, {list}->length * sizeof({item_type}*));
                         result_pointer->values[{index}->value] = {new_item};
                         return result_pointer;",
                         item_type = substitutions["T"],
