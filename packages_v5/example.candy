@@ -435,6 +435,14 @@ fun map[T, R](list: List[T], transform: (T) R) List[R] {
     result.append(transform(item))
   })
 }
+fun filter[T](list: List[T], predicate: (T) Bool) List[T] {
+  list.fold(listOf[T](), (result: List[T], item: T) {
+    switch predicate(item) {
+      true => result.append(item),
+      false => result,
+    }
+  })
+}
 fun windows[T](list: List[T], windowLength: Int) List[List[T]] {
   # Returns a list over all contiguous windows of length `windowLength`.
   #
