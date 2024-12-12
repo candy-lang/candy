@@ -52,6 +52,27 @@ fun isAtLeast[T: Compare](left: T, right: T) Bool {
   }
 }
 enum Ordering { less, equal, greater }
+impl Ordering: Compare {
+  fun compareTo(self: Ordering, other: Ordering) Ordering {
+    switch self {
+      less => switch other {
+        less => Ordering.equal(),
+        equal => Ordering.less(),
+        greater => Ordering.less(),
+      },
+      equal => switch other {
+        less => Ordering.greater(),
+        equal => Ordering.equal(),
+        greater => Ordering.less(),
+      },
+      greater => switch other {
+        less => Ordering.greater(),
+        equal => Ordering.greater(),
+        greater => Ordering.equal(),
+      },
+    }
+  }
+}
 impl Ordering: ToText {
   fun toText(self: Ordering) Text {
     switch self {
