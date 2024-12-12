@@ -411,6 +411,14 @@ fun replace[T](list: List[T], index: Int, item: T) List[T] {
 fun removeAt[T](list: List[T], index: Int) List[T] {
   builtinListRemoveAt(list, index)
 }
+fun concat[T](list0: List[T], list1: List[T]) List[T] {
+  listGenerate(list0.length().add(list1.length()), (i: Int) {
+    switch i.isLessThan(list0.length()) {
+      true => list0.get(i).unwrap(),
+      false => list1.get(i.subtract(list0.length())).unwrap(),
+    }
+  })
+}
 fun getRange[T](list: List[T], startInclusive: Int, endExclusive: Int) List[T] {
   switch startInclusive.isNonNegative()
     .and(endExclusive.isNonNegative())
@@ -424,7 +432,7 @@ fun getRange[T](list: List[T], startInclusive: Int, endExclusive: Int) List[T] {
   }
 }
 
-# TODO: .concatenate(…), .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
+# TODO: .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
 }
