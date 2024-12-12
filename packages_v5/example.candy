@@ -503,12 +503,15 @@ fun print[T: ToText](t: T) {
 }
 
 fun fold[T, R](list: List[T], initial: R, combine: (R, T) R) R {
-  list.foldHelper(0, initial, combine)
+  list.foldIndexed(initial, (state: R, index: Int, item: T) { combine(state, item) })
 }
-fun foldHelper[T, R](list: List[T], index: Int, current: R, combine: (R, T) R) R {
+fun foldIndexed[T, R](list: List[T], initial: R, combine: (R, Int, T) R) R {
+  list.foldIndexedHelper(0, initial, combine)
+}
+fun foldIndexedHelper[T, R](list: List[T], index: Int, state: R, combine: (R, Int, T) R) R {
   switch index.isLessThan(list.length()) {
-    true => list.foldHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
-    false => current,
+    true => list.foldIndexedHelper(index.add(1), combine(state, index, list.get(index).unwrap()), combine),
+    false => state,
   }
 }
 fun reduce[T](list: List[T], combine: (T, T) T) Maybe[T] {
