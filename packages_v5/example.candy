@@ -497,6 +497,61 @@ fun isInRange[T: Compare](self: T, startInclusive: T, endExclusive: T) Bool {
   self.isAtLeast(startInclusive).and(self.isLessThan(endExclusive))
 }
 
+struct List2D[T] {
+  width: Int,
+  height: Int,
+  items: List[T],
+}
+fun list2D[T](width: Int, height: Int, items: List[T]) List2D[T] {
+  needs(width.isNonNegative())
+  needs(height.isNonNegative())
+  needs(width.multiply(height).equals(items.length()))
+
+  List2D[T](width, height, items)
+}
+fun list2DFilled[T](width: Int, height: Int, item: T) List2D[T] {
+  needs(width.isNonNegative())
+  needs(height.isNonNegative())
+
+  list2D(width, height, listFilled(width.multiply(height), item))
+}
+fun get[T](self: List2D[T], position: Pair[Int, Int]) Maybe[T] {
+  self.get(position.first, position.second)
+}
+fun get[T](self: List2D[T], x: Int, y: Int) Maybe[T] {
+  switch x.isInRange(0, self.width).and(y.isInRange(0, self.height)) {
+    false => none[T](),
+    true => some(self.items.get(self.rawIndex(x, y)).unwrap()),
+  }
+}
+fun replace[T](self: List2D[T], x: Int, y: Int, value: T) List2D[T] {
+  needs(x.isInRange(0, self.width))
+  needs(y.isInRange(0, self.height))
+
+  let newItems = self.items.replace(self.rawIndex(x, y), value)
+  list2D(self.width, self.height, newItems)
+}
+fun indexesRowWise[T](self: List2D[T]) List[Pair[Int, Int]] {
+  range(self.height).flatMap((y: Int) {
+    range(self.width).map((x: Int) { Pair(x, y) })
+  })
+}
+fun rows[T](self: List2D[T]) List[List[T]] {
+  range(self.height).map((y: Int) { self.row(y).unwrap() })
+}
+fun row[T](self: List2D[T], y: Int) Maybe[List[T]] {
+  switch y.isInRange(0, self.height) {
+    false => none[List[T]](),
+    true => some(self.items.getRange(self.rawIndex(0, y), self.rawIndex(0, y.add(1)))),
+  }
+}
+fun rawIndex[T](self: List2D[T], x: Int, y: Int) Int {
+  needs(x.isInRange(0, self.width))
+  needs(y.isInRange(0, self.height))
+
+  y.multiply(self.width).add(x)
+}
+
 # TODO: .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
@@ -624,6 +679,15 @@ fun toPair[T](list: List[T]) Maybe[Pair[T, T]] {
     true => some(Pair[T, T](list.get(0).unwrap(), list.get(1).unwrap())),
     false => none[Pair[T, T]](),
   }
+}
+# TODO: Use this impl when it compiles
+# impl[T0: Equal, T1: Equal] Pair[T0, T1]: Equal {
+#   fun equals(self: Pair[T0, T1], other: Pair[T0, T1]) Bool {
+#     self.first.equals(other.first).and(self.second.equals(other.second))
+#   }
+# }
+fun equals[T: Equal](self: Pair[T, T], other: Pair[T, T]) Bool {
+  self.first.equals(other.first).and(self.second.equals(other.second))
 }
 
 struct MyStruct {
