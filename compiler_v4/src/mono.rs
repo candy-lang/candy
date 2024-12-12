@@ -262,8 +262,13 @@ impl Body {
                     referenced_ids.insert(*lambda);
                     referenced_ids.extend(arguments.iter());
                 }
-                ExpressionKind::Switch { value, .. } => {
+                ExpressionKind::Switch { value, cases, .. } => {
                     referenced_ids.insert(*value);
+                    for case in cases.iter() {
+                        referenced_ids.extend(case.value_id.iter());
+                        case.body
+                            .collect_defined_and_referenced_ids(defined_ids, referenced_ids);
+                    }
                 }
                 ExpressionKind::Lambda(Lambda { parameters, body }) => {
                     defined_ids.extend(parameters.iter().map(|it| it.id));
