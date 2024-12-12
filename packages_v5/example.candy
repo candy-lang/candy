@@ -972,6 +972,134 @@ fun day4Part2(input: Text) Int {
     .sum()
 }
 
+fun day6Part1(input: Text) Int {
+  let lines = input.lines()
+  let width = lines.first().unwrap().length()
+  let height = lines.length()
+
+  let state = lines.foldIndexed(
+    Day6Part1State(
+      list2DFilled(width, height, false),
+      list2DFilled(width, height, false),
+      Pair(0, 0),
+      Day6Part1Direction.up(),
+    ),
+    (state: Day6Part1State, y: Int, line: Text) {
+      line.characters()
+        .foldIndexed(
+          state,
+          (state: Day6Part1State, x: Int, cell: Text) {
+            Day6Part1State(
+              state.obstructions.replace(x, y, cell.equals("#")),
+              switch cell.equals("^") {
+                true => state.visited.replace(x, y, true),
+                false => state.visited,
+              },
+              switch cell.equals("^") {
+                true => Pair(x, y),
+                false => state.position,
+              },
+              state.direction,
+            )
+          },
+        )
+    },
+  )
+  let state = state.moveToEnd()
+  # print(state)
+  state.visitedCellCount()
+}
+struct Day6Part1State {
+  obstructions: List2D[Bool],
+  visited: List2D[Bool],
+  position: Pair[Int, Int],
+  direction: Day6Part1Direction,
+}
+enum Day6Part1Direction { up, right, down, left }
+fun rotateRight(self: Day6Part1Direction) Day6Part1Direction {
+  switch self {
+    up => Day6Part1Direction.right(),
+    right => Day6Part1Direction.down(),
+    down => Day6Part1Direction.left(),
+    left => Day6Part1Direction.up(),
+  }
+}
+fun moveToEnd(self: Day6Part1State) Day6Part1State {
+  switch self.move() {
+    none => self,
+    some(newState) => moveToEnd(newState),
+  }
+}
+fun move(self: Day6Part1State) Maybe[Day6Part1State] {
+  switch self.nextPosition() {
+    none => none[Day6Part1State](),
+    some(nextPosition) => switch self.obstructions.get(nextPosition).unwrap() {
+      true => some(Day6Part1State(
+        self.obstructions,
+        self.visited,
+        self.position,
+        self.direction.rotateRight(),
+      )),
+      false => some(Day6Part1State(
+        self.obstructions,
+        self.visited.replace(nextPosition.first, nextPosition.second, true),
+        nextPosition,
+        self.direction,
+      )),
+    },
+  }
+}
+fun nextPosition(self: Day6Part1State) Maybe[Pair[Int, Int]] {
+  switch self.direction {
+    up => switch self.position.second.equals(0) {
+      true => none[Pair[Int, Int]](),
+      false => some(Pair(self.position.first, self.position.second.subtract(1))),
+    },
+    right => switch self.position.first.equals(self.obstructions.width.subtract(1)) {
+      true => none[Pair[Int, Int]](),
+      false => some(Pair(self.position.first.add(1), self.position.second)),
+    },
+    down => switch self.position.second.equals(self.obstructions.height.subtract(1)) {
+      true => none[Pair[Int, Int]](),
+      false => some(Pair(self.position.first, self.position.second.add(1))),
+    },
+    left => switch self.position.first.equals(0) {
+      true => none[Pair[Int, Int]](),
+      false => some(Pair(self.position.first.subtract(1), self.position.second)),
+    },
+  }
+}
+fun visitedCellCount(self: Day6Part1State) Int {
+  self.visited.items.filter((visited: Bool) { visited }).length()
+}
+impl Day6Part1State: ToText {
+  fun toText(self: Day6Part1State) Text {
+    self.obstructions.height.range()
+      .map((y: Int) {
+        self.obstructions.width.range()
+          .map((x: Int) {
+            switch self.position.equals(Pair(x, y)) {
+              true => switch self.direction {
+                up => "^",
+                right => ">",
+                down => "v",
+                left => "<",
+              },
+              false => switch self.visited.get(x, y).unwrap() {
+                true => "X",
+                false => switch self.obstructions.get(x, y).unwrap() {
+                  true => "#",
+                  false => ".",
+                },
+              },
+            }
+          })
+          .join("")
+      })
+      .join("\n")
+  }
+}
+
 fun main() Int {
   identity(1)
   identity("foo")
