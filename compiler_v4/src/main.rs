@@ -2,9 +2,7 @@
     anonymous_lifetime_in_impl_trait,
     box_patterns,
     if_let_guard,
-    iter_repeat_n,
     let_chains,
-    option_take_if,
     try_blocks
 )]
 #![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
