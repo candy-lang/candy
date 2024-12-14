@@ -74,7 +74,10 @@ fn main() -> ProgramResult {
         CandyOptions::Debug(options) => debug(options),
         CandyOptions::Check(options) => check(options),
         CandyOptions::Compile(options) => compile(options),
-        CandyOptions::ToolingAnalyze(options) => tooling_analyze(options),
+        CandyOptions::ToolingAnalyze(options) => {
+            tooling_analyze(options);
+            Ok(())
+        }
     }
 }
 pub type ProgramResult = Result<(), Exit>;
@@ -221,7 +224,7 @@ struct ToolingAnalyzeOptions {
     path: PathBuf,
 }
 #[allow(clippy::needless_pass_by_value)]
-fn tooling_analyze(options: ToolingAnalyzeOptions) -> ProgramResult {
+fn tooling_analyze(options: ToolingAnalyzeOptions) {
     let path_str = options.path.to_string_lossy();
     let path = path_str.strip_prefix("file:/").unwrap();
     let source = fs::read_to_string(Path::new(path))
@@ -249,15 +252,18 @@ fn tooling_analyze(options: ToolingAnalyzeOptions) -> ProgramResult {
         "{}",
         serde_json::to_string(&Message::Diagnostics { diagnostics }).unwrap(),
     );
-
-    Ok(())
 }
 
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Message {
-    ReadFile { path: String },
-    Diagnostics { diagnostics: Vec<Diagnostic> },
+    #[allow(dead_code)]
+    ReadFile {
+        path: String,
+    },
+    Diagnostics {
+        diagnostics: Vec<Diagnostic>,
+    },
 }
 #[derive(Serialize)]
 struct Diagnostic {
