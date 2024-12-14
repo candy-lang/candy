@@ -176,9 +176,28 @@ pub struct AstTypeParameter {
 // Types
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct AstType {
+pub enum AstType {
+    Named(AstNamedType),
+    Function(AstFunctionType),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstNamedType {
     pub name: AstResult<AstString>,
     pub type_arguments: Option<AstTypeArguments>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstFunctionType {
+    pub parameter_types: Vec<AstFunctionTypeParameterType>,
+    pub closing_parenthesis_error: Option<AstError>,
+    pub return_type: AstResult<Box<AstType>>,
+    pub span: Range<Offset>,
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstFunctionTypeParameterType {
+    pub type_: Box<AstType>,
+    pub comma_error: Option<AstError>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -497,8 +516,28 @@ impl CollectAstErrors for AstTypeParameter {
 
 impl CollectAstErrors for AstType {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        match &self {
+            Self::Named(named) => named.collect_errors_to(errors),
+            Self::Function(function) => function.collect_errors_to(errors),
+        }
+    }
+}
+impl CollectAstErrors for AstNamedType {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         self.name.collect_errors_to(errors);
         self.type_arguments.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstFunctionType {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.parameter_types.collect_errors_to(errors);
+        self.return_type.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstFunctionTypeParameterType {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.type_.collect_errors_to(errors);
+        self.comma_error.collect_errors_to(errors);
     }
 }
 impl CollectAstErrors for AstTypeArguments {

@@ -699,6 +699,9 @@ impl<'h> Context<'h> {
             }
 
             self.lower_expression(declaration_name, *id, expression);
+            if &*expression.type_ == "Never" {
+                self.push("// Returns `Never`\n");
+            }
             self.push("\n\n");
         }
     }
@@ -810,8 +813,11 @@ impl<'h> Context<'h> {
                     }
 
                     self.lower_body_expressions(declaration_name, &case.body);
-
-                    self.push(format!("{id} = {};\n", case.body.return_value_id()));
+                    if case.body.return_type() == "Never" {
+                        self.push("// Returns `Never`\n");
+                    } else {
+                        self.push(format!("{id} = {};\n", case.body.return_value_id()));
+                    }
 
                     self.push("break;");
                 }
