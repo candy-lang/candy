@@ -7,9 +7,9 @@ use crate::{
     },
     error::CompilerError,
     hir::{
-        self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, ContainsError, Expression,
-        ExpressionKind, Function, FunctionSignature, FunctionType, Hir, Id, Impl, NamedType,
-        Parameter, ParameterType, SliceOfTypeParameter, StructField, SwitchCase, Trait,
+        self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, BuiltinType, ContainsError,
+        Expression, ExpressionKind, Function, FunctionSignature, FunctionType, Hir, Id, Impl,
+        NamedType, Parameter, ParameterType, SliceOfTypeParameter, StructField, SwitchCase, Trait,
         TraitDefinition, TraitFunction, Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
     },
     id::IdGenerator,
@@ -501,10 +501,23 @@ impl<'a> Context<'a> {
             self.lower_type_parameters(&[], None, struct_type.type_parameters.as_ref());
         let self_base_type = NamedType::new(name.string.clone(), type_parameters.type_()).into();
 
-        let fields = match &struct_type.kind {
-            AstStructKind::Builtin { .. } => None,
-            AstStructKind::UserDefined { fields, .. } => Some(
-                fields
+        let kind = match &struct_type.kind {
+            AstStructKind::Builtin { .. } => TypeDeclarationKind::Builtin(match &*name.string {
+                "Int" => BuiltinType::Int,
+                "List" => BuiltinType::List(Box::new(
+                    type_parameters.iter().next().unwrap().type_().into(),
+                )),
+                "Text" => BuiltinType::Text,
+                _ => {
+                    self.add_error(
+                        name.span.clone(),
+                        format!("Unknown builtin type: `{}`", name.string),
+                    );
+                    return;
+                }
+            }),
+            AstStructKind::UserDefined { fields, .. } => TypeDeclarationKind::Struct {
+                fields: fields
                     .iter()
                     .filter_map(|field| {
                         let name = field.name.value()?;
@@ -520,7 +533,7 @@ impl<'a> Context<'a> {
                         })
                     })
                     .collect(),
-            ),
+            },
         };
 
         if self.traits.contains_key(&name.string) {
@@ -540,7 +553,7 @@ impl<'a> Context<'a> {
             Entry::Vacant(entry) => {
                 entry.insert(TypeDeclaration {
                     type_parameters,
-                    kind: TypeDeclarationKind::Struct { fields },
+                    kind,
                 });
             }
         };
@@ -1473,7 +1486,8 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 let type_declaration =
                                     self.context.hir.type_declarations[&type_].clone();
                                 match &type_declaration.kind {
-                                    TypeDeclarationKind::Struct { .. } => {
+                                    TypeDeclarationKind::Builtin(_)
+                                    | TypeDeclarationKind::Struct { .. } => {
                                         self.context.add_error(
                                             key.span.clone(),
                                             format!(
@@ -1519,6 +1533,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                 let type_declaration =
                                     self.context.hir.type_declarations[&type_].clone();
                                 match &type_declaration.kind {
+                                    TypeDeclarationKind::Builtin(builtin_type) => {
+                                        self.context.add_error(
+                                            call.receiver.span.clone(),
+                                            format!("Can't instantiate builtin type `{builtin_type}` directly."),
+                                        );
+                                        LoweredExpression::Error
+                                    }
                                     TypeDeclarationKind::Struct { fields } => {
                                         // Foo(bar, baz)
                                         self.lower_struct_creation(
@@ -1527,7 +1548,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                                             type_arguments.as_deref(),
                                             &type_,
                                             &type_declaration.type_parameters,
-                                            fields.as_deref(),
+                                            Some(fields),
                                         )
                                     }
                                     TypeDeclarationKind::Enum { .. } => {
@@ -1566,9 +1587,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     } => match &receiver_type {
                         Type::Named(named_type) => {
                             let type_ = &self.context.hir.type_declarations[&named_type.name];
-                            if let TypeDeclarationKind::Struct {
-                                fields: Some(fields),
-                            } = &type_.kind
+                            if let TypeDeclarationKind::Struct { fields } = &type_.kind
                                 && let Some(field) = fields.iter().find(|it| it.name == key.string)
                             {
                                 return self.push_lowered(
@@ -1617,6 +1636,16 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     LoweredExpression::NamedTypeReference(type_) => {
                         let declaration = self.context.hir.type_declarations.get(&type_).unwrap();
                         match &declaration.kind {
+                            TypeDeclarationKind::Builtin(_) => {
+                                self.context.add_error(
+                                    key.span.clone(),
+                                    format!(
+                                        "Builtin type `{type_:?}` doesn't have a field `{}`",
+                                        key.string,
+                                    ),
+                                );
+                                LoweredExpression::Error
+                            }
                             TypeDeclarationKind::Struct { .. } => {
                                 self.context.add_error(
                                     key.span.clone(),
@@ -1715,6 +1744,13 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             return LoweredExpression::Error;
                         };
                         match &declaration.kind {
+                            TypeDeclarationKind::Builtin(_) => {
+                                self.context.add_error(
+                                    expression.span.clone(),
+                                    format!("Can't switch over builtin `{enum_:?}`"),
+                                );
+                                return LoweredExpression::Error;
+                            }
                             TypeDeclarationKind::Struct { .. } => {
                                 self.context.add_error(
                                     expression.span.clone(),

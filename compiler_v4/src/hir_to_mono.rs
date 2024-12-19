@@ -277,32 +277,36 @@ impl<'h> Context<'h> {
                     return mangled_name;
                 };
                 match &declaration.kind {
+                    hir::TypeDeclarationKind::Builtin(builtin_type) => {
+                        entry.insert(None);
+                        match builtin_type {
+                            hir::BuiltinType::Int => {
+                                mono::TypeDeclaration::Builtin(mono::BuiltinType::Int)
+                            }
+                            hir::BuiltinType::List(item_type) => mono::TypeDeclaration::Builtin(
+                                mono::BuiltinType::List(self.lower_type(&item_type)),
+                            ),
+                            hir::BuiltinType::Text => {
+                                mono::TypeDeclaration::Builtin(mono::BuiltinType::Text)
+                            }
+                        }
+                    }
                     hir::TypeDeclarationKind::Struct { fields } => {
                         entry.insert(None);
                         let environment = hir::Type::build_environment(
                             &declaration.type_parameters,
                             type_arguments,
                         );
-                        if let Some(fields) = fields.as_ref() {
-                            let fields = fields
-                                .iter()
-                                .map(|field| {
-                                    (
-                                        field.name.clone(),
-                                        self.lower_type(&field.type_.substitute(&environment)),
-                                    )
-                                })
-                                .collect();
-                            mono::TypeDeclaration::Struct { fields }
-                        } else {
-                            mono::TypeDeclaration::Builtin {
-                                name: name.clone(),
-                                type_arguments: type_arguments
-                                    .iter()
-                                    .map(|it| self.lower_type(it))
-                                    .collect(),
-                            }
-                        }
+                        let fields = fields
+                            .iter()
+                            .map(|field| {
+                                (
+                                    field.name.clone(),
+                                    self.lower_type(&field.type_.substitute(&environment)),
+                                )
+                            })
+                            .collect();
+                        mono::TypeDeclaration::Struct { fields }
                     }
                     hir::TypeDeclarationKind::Enum { variants } => {
                         entry.insert(None);

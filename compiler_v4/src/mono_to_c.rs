@@ -1,8 +1,8 @@
 use crate::{
     hir::BuiltinFunction,
     mono::{
-        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Lambda, Mono, Parameter,
-        TypeDeclaration,
+        Body, BodyOrBuiltin, BuiltinType, Expression, ExpressionKind, Function, Id, Lambda, Mono,
+        Parameter, TypeDeclaration,
     },
 };
 use itertools::Itertools;
@@ -76,25 +76,18 @@ impl<'h> Context<'h> {
         for (name, declaration) in &self.mono.type_declarations {
             self.push(format!("struct {name} {{\n"));
             match declaration {
-                TypeDeclaration::Builtin {
-                    name,
-                    type_arguments,
-                } => {
-                    match name.as_ref() {
-                        "Int" => {
-                            assert!(type_arguments.is_empty());
+                TypeDeclaration::Builtin(builtin_type) => {
+                    match builtin_type {
+                        BuiltinType::Int => {
                             self.push("int64_t value;\n");
                         }
-                        "List" => {
-                            assert_eq!(type_arguments.len(), 1);
+                        BuiltinType::List(item_type_) => {
                             self.push("uint64_t length;\n");
-                            self.push(format!("{}** values;\n", type_arguments[0]));
+                            self.push(format!("{item_type_}** values;\n"));
                         }
-                        "Text" => {
-                            assert!(type_arguments.is_empty());
+                        BuiltinType::Text => {
                             self.push("char* value;\n");
                         }
-                        _ => panic!("Unknown builtin type: {name}"),
                     }
                     self.push("};\n");
                 }

@@ -75,21 +75,22 @@ impl ToText for Hir {
             .sorted_by_key(|(name, _)| *name)
         {
             match &declaration.kind {
+                TypeDeclarationKind::Builtin(_) => {
+                    builder.push(format!("struct {name}"));
+                    declaration.type_parameters.build_text(builder);
+                    builder.push(" = builtin");
+                }
                 TypeDeclarationKind::Struct { fields } => {
                     builder.push(format!("struct {name}"));
                     declaration.type_parameters.build_text(builder);
-                    if let Some(fields) = fields {
-                        builder.push(" {");
-                        builder.push_children_custom_multiline(fields.iter(), |builder, it| {
-                            builder.push(format!("{}: {},", it.name, it.type_));
-                        });
-                        if !fields.is_empty() {
-                            builder.push_newline();
-                        }
-                        builder.push("}");
-                    } else {
-                        builder.push(" = builtin");
+                    builder.push(" {");
+                    builder.push_children_custom_multiline(fields.iter(), |builder, it| {
+                        builder.push(format!("{}: {},", it.name, it.type_));
+                    });
+                    if !fields.is_empty() {
+                        builder.push_newline();
                     }
+                    builder.push("}");
                 }
                 TypeDeclarationKind::Enum { variants } => {
                     builder.push(format!("enum {name}"));
@@ -150,13 +151,28 @@ pub struct TypeDeclaration {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeDeclarationKind {
+    Builtin(BuiltinType),
     Struct {
-        /// `None` if the struct is a builtin.
-        fields: Option<Box<[StructField]>>,
+        fields: Box<[StructField]>,
     },
     Enum {
         variants: Box<[(Box<str>, Option<Type>)]>,
     },
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum BuiltinType {
+    Int,
+    List(Box<Type>),
+    Text,
+}
+impl Display for BuiltinType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Int => write!(f, "Int"),
+            Self::List(item_type) => write!(f, "List[{item_type}]"),
+            Self::Text => write!(f, "Text"),
+        }
+    }
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StructField {

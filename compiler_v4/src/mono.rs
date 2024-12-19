@@ -40,18 +40,8 @@ impl ToText for Mono {
             builder.push("Type Declarations:");
             builder.push_newline();
             match declaration {
-                TypeDeclaration::Builtin {
-                    name,
-                    type_arguments,
-                } => {
-                    builder.push(format!(
-                        "builtin struct {name} = {name}{}",
-                        if type_arguments.is_empty() {
-                            String::new()
-                        } else {
-                            format!("[{}]", type_arguments.join(", "))
-                        }
-                    ));
+                TypeDeclaration::Builtin(builtin_type) => {
+                    builder.push(format!("builtin struct {name} = {builtin_type}"));
                 }
                 TypeDeclaration::Struct { fields } => {
                     builder.push(format!("struct {name} {{"));
@@ -120,10 +110,7 @@ impl ToText for Mono {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TypeDeclaration {
-    Builtin {
-        name: Box<str>,
-        type_arguments: Box<[Box<str>]>,
-    },
+    Builtin(BuiltinType),
     Struct {
         fields: Box<[(Box<str>, Box<str>)]>,
     },
@@ -134,6 +121,21 @@ pub enum TypeDeclaration {
         parameter_types: Box<[Box<str>]>,
         return_type: Box<str>,
     },
+}
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum BuiltinType {
+    Int,
+    List(Box<str>),
+    Text,
+}
+impl Display for BuiltinType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Int => write!(f, "Int"),
+            Self::List(item_type) => write!(f, "List[{item_type}]"),
+            Self::Text => write!(f, "Text"),
+        }
+    }
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct EnumVariant {
