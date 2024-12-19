@@ -41,7 +41,7 @@
         },
         {
           "name": "keyword.control",
-          "match": "([a-zA-Z_0-9]*)(?=(?:\\(.*\\))?\\s*=>)",
+          "match": "\\b([a-zA-Z_0-9]+)(?=(?:\\(.*\\))?\\s*=>)",
           "captures": {
             "1": {
               "name": "emphasis"
@@ -68,6 +68,10 @@
               "match": "\\\\."
             }
           ]
+        },
+        {
+          "name": "variable.language",
+          "match": "\\bself\\b"
         },
         {
           "name": "constant.numeric",

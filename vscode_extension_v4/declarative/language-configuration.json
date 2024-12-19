@@ -19,7 +19,7 @@
   },
   "onEnterRules": [
     {
-      // Assignment start with optional comment but no actual content.
+      // Assignment starts with optional comment but no actual content.
       "beforeText": "^[^#]*=\\s*(?:#.*)?$",
       "action": {
         "indent": "indent"
