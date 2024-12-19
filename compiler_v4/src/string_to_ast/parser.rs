@@ -51,10 +51,15 @@ impl<'s> Parser<'s> {
     pub fn string(self, start_offset: Offset) -> AstString {
         assert!(start_offset <= self.offset);
         AstString {
-            string: self.source[*start_offset..*self.offset].into(),
+            string: self.str(start_offset).into(),
             file: self.file.to_path_buf(),
             span: start_offset..self.offset,
         }
+    }
+    #[must_use]
+    pub fn str(self, start_offset: Offset) -> &'s str {
+        assert!(start_offset <= self.offset);
+        &self.source[*start_offset..*self.offset]
     }
 
     #[must_use]
@@ -70,7 +75,7 @@ impl<'s> Parser<'s> {
     }
 
     #[must_use]
-    pub fn consume_literal(mut self, literal: &'static str) -> Option<Parser<'s>> {
+    pub fn consume_literal(mut self, literal: &'static str) -> Option<Self> {
         if self.rest().starts_with(literal) {
             self.offset = Offset(*self.offset + literal.len());
             Some(self)
@@ -82,7 +87,7 @@ impl<'s> Parser<'s> {
     pub fn consume_while_not_empty(
         self,
         predicate: impl FnMut(char) -> bool,
-    ) -> Option<(Parser<'s>, AstString)> {
+    ) -> Option<(Self, AstString)> {
         let (parser, string) = self.consume_while(predicate);
         if string.is_empty() {
             None
@@ -91,10 +96,7 @@ impl<'s> Parser<'s> {
         }
     }
     #[must_use]
-    pub fn consume_while(
-        mut self,
-        mut predicate: impl FnMut(char) -> bool,
-    ) -> (Parser<'s>, AstString) {
+    pub fn consume_while(mut self, mut predicate: impl FnMut(char) -> bool) -> (Self, AstString) {
         let start_offset = self.offset();
         while let Some((new_parser, c)) = self.consume_char()
             && predicate(c)
@@ -104,7 +106,7 @@ impl<'s> Parser<'s> {
         (self, self.string(start_offset))
     }
     #[must_use]
-    fn consume_char(self) -> Option<(Parser<'s>, char)> {
+    pub fn consume_char(self) -> Option<(Self, char)> {
         self.next_char().map(|c| {
             (
                 Parser {

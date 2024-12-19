@@ -1,7 +1,7 @@
 use crate::{
     hir::BuiltinFunction,
     mono::{
-        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Lambda, Mono,
+        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Lambda, Mono, Parameter,
         TypeDeclaration,
     },
 };
@@ -58,7 +58,7 @@ impl<'h> Context<'h> {
         self.lower_function_definitions();
 
         self.push("int main() {\n");
-        for name in self.mono.assignment_initialization_order.iter() {
+        for name in &self.mono.assignment_initialization_order {
             self.push(format!("{name}$init();\n"));
         }
         self.push(format!(
@@ -83,7 +83,7 @@ impl<'h> Context<'h> {
                     match name.as_ref() {
                         "Int" => {
                             assert!(type_arguments.is_empty());
-                            self.push("uint64_t value;\n");
+                            self.push("int64_t value;\n");
                         }
                         "List" => {
                             assert_eq!(type_arguments.len(), 1);
@@ -99,7 +99,7 @@ impl<'h> Context<'h> {
                     self.push("};\n");
                 }
                 TypeDeclaration::Struct { fields } => {
-                    for (name, type_) in fields.iter() {
+                    for (name, type_) in &**fields {
                         self.push(format!("{type_}* {name}; "));
                     }
                     self.push("};\n");
@@ -107,14 +107,14 @@ impl<'h> Context<'h> {
                 TypeDeclaration::Enum { variants } => {
                     if !variants.is_empty() {
                         self.push("enum {");
-                        for variant in variants.iter() {
+                        for variant in &**variants {
                             self.push(format!("{name}_{},", variant.name));
                         }
                         self.push("} variant;\n");
                     }
 
                     self.push("union {");
-                    for variant in variants.iter() {
+                    for variant in &**variants {
                         if let Some(value_type) = &variant.value_type {
                             self.push(format!("{value_type}* {};", variant.name));
                         }
@@ -127,7 +127,7 @@ impl<'h> Context<'h> {
                 } => {
                     self.push("void* closure;\n");
                     self.push(format!("{return_type}* (*function)(void*"));
-                    for parameter_type in parameter_types.iter() {
+                    for parameter_type in &**parameter_types {
                         self.push(format!(", {parameter_type}*"));
                     }
                     self.push(");\n");
@@ -145,7 +145,7 @@ impl<'h> Context<'h> {
     }
     fn lower_assignment_definitions(&mut self) {
         for (name, assignment) in &self.mono.assignments {
-            self.lower_lambda_definitions_in(name, &assignment.body);
+            self.lower_lambda_definitions_in(name, &[], &assignment.body);
 
             self.push(format!("void {name}$init() {{\n"));
             self.lower_body_expressions(name, &assignment.body);
@@ -179,7 +179,7 @@ impl<'h> Context<'h> {
     fn lower_function_definitions(&mut self) {
         for (name, function) in &self.mono.functions {
             if let BodyOrBuiltin::Body(body) = &function.body {
-                self.lower_lambda_definitions_in(name, body);
+                self.lower_lambda_definitions_in(name, &function.parameters, body);
             }
 
             self.lower_function_signature(name, function);
@@ -188,9 +188,14 @@ impl<'h> Context<'h> {
             self.push("}\n\n");
         }
     }
-    fn lower_lambda_definitions_in(&mut self, declaration_name: &str, body: &'h Body) {
+    fn lower_lambda_definitions_in(
+        &mut self,
+        declaration_name: &str,
+        declaration_parameters: &[Parameter],
+        body: &'h Body,
+    ) {
         Self::visit_lambdas_inside_body(body, &mut |id, lambda| {
-            let closure = lambda.closure_with_types(body);
+            let closure = lambda.closure_with_types(declaration_parameters, body);
 
             self.push(format!("struct {declaration_name}$lambda{id}_closure {{"));
             for (id, type_) in &closure {
@@ -225,7 +230,7 @@ impl<'h> Context<'h> {
             "{}* {declaration_name}$lambda{id}_function(void* raw_closure",
             &lambda.body.return_type()
         ));
-        for parameter in lambda.parameters.iter() {
+        for parameter in &lambda.parameters {
             self.push(format!(", {}* {}", &parameter.type_, parameter.id));
         }
         self.push(")");
@@ -242,8 +247,12 @@ impl<'h> Context<'h> {
                 | ExpressionKind::GlobalAssignmentReference(_)
                 | ExpressionKind::LocalReference(_)
                 | ExpressionKind::CallFunction { .. }
-                | ExpressionKind::CallLambda { .. }
-                | ExpressionKind::Switch { .. } => {}
+                | ExpressionKind::CallLambda { .. } => {}
+                ExpressionKind::Switch { cases, .. } => {
+                    for case in &**cases {
+                        Self::visit_lambdas_inside_body(&case.body, visitor);
+                    }
+                }
                 ExpressionKind::Lambda(lambda) => {
                     Self::visit_lambdas_inside_body(&lambda.body, visitor);
                     visitor(*id, lambda);
@@ -387,7 +396,7 @@ impl<'h> Context<'h> {
                         int length = snprintf(NULL, 0, \"%ld\", {int}->value);
                         char* result = malloc(length + 1);
                         snprintf(result, length + 1, \"%ld\", {int}->value);
-                        
+
                         Text* result_pointer = malloc(sizeof(Text));
                         result_pointer->value = result;
                         return result_pointer;",
@@ -395,9 +404,20 @@ impl<'h> Context<'h> {
                     )),
                     BuiltinFunction::ListFilled => self.push(format!(
                         "\
+                        if ({length}->value < 0) {{
+                            char* message_format = \"List length must not be negative; was %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {length}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {length}->value);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {length}->value;
-                        result_pointer->values = malloc({length}->value * sizeof({item_type}));
+                        result_pointer->values = malloc({length}->value * sizeof({item_type}*));
                         for (uint64_t i = 0; i < {length}->value; i++) {{
                             result_pointer->values[i] = {item};
                         }}
@@ -406,6 +426,33 @@ impl<'h> Context<'h> {
                         list_type = function.return_type,
                         length = function.parameters[0].id,
                         item = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::ListGenerate => self.push(format!(
+                        "\
+                        if ({length}->value < 0) {{
+                            char* message_format = \"List length must not be negative; was %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {length}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {length}->value);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {length}->value;
+                        result_pointer->values = malloc({length}->value * sizeof({item_type}*));
+                        for (uint64_t i = 0; i < {length}->value; i++) {{
+                            Int* index = malloc(sizeof(Int));
+                            index->value = i;
+                            result_pointer->values[i] = {item_getter}->function({item_getter}->closure, index);
+                        }}
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        length = function.parameters[0].id,
+                        item_getter = function.parameters[1].id,
                     )),
                     BuiltinFunction::ListGet => self.push(format!(
                         "\
@@ -436,8 +483,8 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {list}->length + 1;
-                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
-                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}));
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}*));
+                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}*));
                         result_pointer->values[{index}->value] = {item};
                         memcpy(result_pointer->values + {index}->value + 1, {list}->values + {index}->value, ({list}->length - {index}->value) * sizeof({item_type}));
                         return result_pointer;",
@@ -458,7 +505,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 0;
-                        result_pointer->values = nullptr;
+                        result_pointer->values = NULL;
                         return result_pointer;",
                         list_type = function.return_type,
                     )),
@@ -466,7 +513,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 1;
-                        result_pointer->values = malloc(sizeof({item_type}));
+                        result_pointer->values = malloc(sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         return result_pointer;",
                         item_type = substitutions["T"],
@@ -477,7 +524,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 2;
-                        result_pointer->values = malloc(2 * sizeof({item_type}));
+                        result_pointer->values = malloc(2 * sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         return result_pointer;",
@@ -490,7 +537,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 3;
-                        result_pointer->values = malloc(3 * sizeof({item_type}));
+                        result_pointer->values = malloc(3 * sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         result_pointer->values[2] = {item2};
@@ -505,7 +552,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 4;
-                        result_pointer->values = malloc(4 * sizeof({item_type}));
+                        result_pointer->values = malloc(4 * sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         result_pointer->values[2] = {item2};
@@ -522,7 +569,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 5;
-                        result_pointer->values = malloc(5 * sizeof({item_type}));
+                        result_pointer->values = malloc(5 * sizeof({item_type}*));
                         result_pointer->values[0] = {item0};
                         result_pointer->values[1] = {item1};
                         result_pointer->values[2] = {item2};
@@ -552,9 +599,9 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {list}->length - 1;
-                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
-                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}));
-                        memcpy(result_pointer->values + {index}->value, {list}->values + {index}->value + 1, ({list}->length - {index}->value - 1) * sizeof({item_type}));
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}*));
+                        memcpy(result_pointer->values, {list}->values, {index}->value * sizeof({item_type}*));
+                        memcpy(result_pointer->values + {index}->value, {list}->values + {index}->value + 1, ({list}->length - {index}->value - 1) * sizeof({item_type}*));
                         return result_pointer;",
                         item_type = substitutions["T"],
                         list_type = function.return_type,
@@ -576,8 +623,8 @@ impl<'h> Context<'h> {
 
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {list}->length;
-                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}));
-                        memcpy(result_pointer->values, {list}->values, {list}->length * sizeof({item_type}));
+                        result_pointer->values = malloc(result_pointer->length * sizeof({item_type}*));
+                        memcpy(result_pointer->values, {list}->values, {list}->length * sizeof({item_type}*));
                         result_pointer->values[{index}->value] = {new_item};
                         return result_pointer;",
                         item_type = substitutions["T"],
@@ -719,8 +766,7 @@ impl<'h> Context<'h> {
                     "{}* {id} = malloc(sizeof({}));",
                     &expression.type_, &expression.type_,
                 ));
-                // TODO: escape text
-                self.push(format!("{id}->value = \"{text}\";"));
+                self.push(format!("{id}->value = \"{}\";", text.escape_default()));
             }
             ExpressionKind::CreateStruct { struct_, fields } => {
                 let TypeDeclaration::Struct {
@@ -779,7 +825,7 @@ impl<'h> Context<'h> {
                     "{}* {id} = {lambda}->function({lambda}->closure",
                     &expression.type_
                 ));
-                for argument in arguments.iter() {
+                for argument in &**arguments {
                     self.push(format!(", {argument}"));
                 }
                 self.push(");");
@@ -789,25 +835,14 @@ impl<'h> Context<'h> {
                 enum_,
                 cases,
             } => {
-                let TypeDeclaration::Enum { variants } = &self.mono.type_declarations[enum_] else {
-                    unreachable!();
-                };
-
                 self.push(format!("{}* {id};\n", &expression.type_));
 
                 self.push(format!("switch ({value}->variant) {{"));
-                for case in cases.iter() {
+                for case in &**cases {
                     self.push(format!("case {enum_}_{}:\n", case.variant));
-                    if let Some(value_id) = case.value_id {
-                        let variant_type = variants
-                            .iter()
-                            .find(|variant| variant.name == case.variant)
-                            .unwrap()
-                            .value_type
-                            .as_ref()
-                            .unwrap();
+                    if let Some((value_id, value_type)) = &case.value {
                         self.push(format!(
-                            "{variant_type}* {value_id} = {value}->value.{};\n",
+                            "{value_type}* {value_id} = {value}->value.{};\n",
                             case.variant,
                         ));
                     }

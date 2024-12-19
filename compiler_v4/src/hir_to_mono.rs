@@ -170,7 +170,7 @@ impl<'h> Context<'h> {
                     .get(&function_id)
                     .map(|function| (trait_, function))
             })
-            .unwrap();
+            .unwrap_or_else(|| panic!("Unknown trait function: {function_id}"));
         let self_type = function.signature.parameters[0]
             .type_
             .substitute(substitutions);
@@ -230,7 +230,9 @@ impl<'h> Context<'h> {
                     .collect::<Option<Vec<_>>>()
                     .is_some()
             })
-            .unwrap()
+            .unwrap_or_else(|| {
+                panic!("No matching impl found for trait `{trait_}` with {substitutions:?}")
+            })
     }
     fn mangle_function(
         &mut self,
@@ -356,7 +358,7 @@ impl<'h> Context<'h> {
                 result.push_str(&type_.name);
                 if !type_.type_arguments.is_empty() {
                     result.push_str("$of$");
-                    for type_ in type_.type_arguments.iter() {
+                    for type_ in &type_.type_arguments {
                         Self::mangle_type_helper(result, type_);
                         result.push('$');
                     }
@@ -373,7 +375,7 @@ impl<'h> Context<'h> {
                 result.push_str("$Fun$");
                 if !type_.parameter_types.is_empty() {
                     result.push_str("of$");
-                    for type_ in type_.parameter_types.iter() {
+                    for type_ in &type_.parameter_types {
                         Self::mangle_type_helper(result, type_);
                         result.push('$');
                     }
@@ -425,7 +427,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
             id_generator: IdGenerator::default(),
             id_mapping: FxHashMap::default(),
         };
-        builder.id_mapping = self.id_mapping.clone();
+        builder.id_mapping.clone_from(&self.id_mapping);
         builder.id_generator = mem::take(&mut self.id_generator);
 
         fun(&mut builder);
@@ -478,7 +480,7 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                 );
             }
             hir::ExpressionKind::CreateStruct { struct_, fields } => {
-                let struct_ = self.context.lower_type(&struct_.clone().into());
+                let struct_ = self.lower_type(&struct_.clone().into());
                 let fields = self.lower_ids(fields);
                 self.push(
                     id,
@@ -556,6 +558,14 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
             } => {
                 let value = self.lower_id(*value);
                 let enum_ = self.lower_type(enum_);
+
+                let mono::TypeDeclaration::Enum { variants } =
+                    &self.context.type_declarations[&enum_].as_ref().unwrap()
+                else {
+                    unreachable!();
+                };
+                let variants = variants.clone();
+
                 let cases = cases
                     .iter()
                     .map(|case| {
@@ -564,7 +574,19 @@ impl<'c, 'h> BodyBuilder<'c, 'h> {
                             .map(|hir_id| (hir_id, self.id_generator.generate()));
                         mono::SwitchCase {
                             variant: case.variant.clone(),
-                            value_id: value_ids.map(|(_, mir_id)| mir_id),
+                            value: value_ids.map(|(_, mir_id)| {
+                                (
+                                    mir_id,
+                                    variants
+                                        .iter()
+                                        .find(|it| it.name == case.variant)
+                                        .unwrap()
+                                        .value_type
+                                        .as_ref()
+                                        .unwrap()
+                                        .clone(),
+                                )
+                            }),
                             body: self
                                 .build_inner(|builder| {
                                     if let Some((hir_id, mir_id)) = value_ids {

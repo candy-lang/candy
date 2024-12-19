@@ -117,7 +117,7 @@ impl ToText for Hir {
             (name.as_ref(), definition).build_text(builder);
             builder.push_newline();
         }
-        for impl_ in self.impls.iter() {
+        for impl_ in &self.impls {
             impl_.build_text(builder);
             builder.push_newline();
         }
@@ -732,8 +732,8 @@ impl ToText for ExpressionKind {
                     builder.push("[");
                     builder.push_children_custom(
                         substitutions.iter(),
-                        |builder, (id, type_)| {
-                            builder.push(format!("{id}: {type_}"));
+                        |builder, (type_parameter, type_argument)| {
+                            builder.push(format!("{type_parameter} = {type_argument}"));
                         },
                         ", ",
                     );
@@ -751,25 +751,10 @@ impl ToText for ExpressionKind {
                 builder.push("switch ");
                 value.build_text(builder);
                 builder.push(format!(": {enum_} {{"));
-                builder.push_children_custom_multiline(cases.iter(), |builder, case| {
-                    builder.push(format!("case {}", case.variant));
-                    if let Some(value_id) = case.value_id {
-                        builder.push(format!("({value_id})"));
-                    }
-                    builder.push(" {");
-                    builder.push_children_custom_multiline(
-                        case.body.expressions.iter(),
-                        |builder, (id, name, expression)| {
-                            id.build_text(builder);
-                            builder.push(format!(": {} = ", expression.type_));
-                            if let Some(name) = name {
-                                builder.push(format!("{name} = "));
-                            }
-                            expression.kind.build_text(builder);
-                        },
-                    );
-                    builder.push("}");
-                });
+                builder.push_children_multiline(cases.iter());
+                if !cases.is_empty() {
+                    builder.push_newline();
+                }
                 builder.push("}");
             }
             Self::Lambda { parameters, body } => {
@@ -787,6 +772,16 @@ pub struct SwitchCase {
     pub variant: Box<str>,
     pub value_id: Option<Id>,
     pub body: Body,
+}
+impl ToText for SwitchCase {
+    fn build_text(&self, builder: &mut TextBuilder) {
+        builder.push(format!("{}", self.variant));
+        if let Some(value_id) = self.value_id {
+            builder.push(format!("({value_id})"));
+        }
+        builder.push(" => ");
+        self.body.build_text(builder);
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, VariantArray)]
@@ -806,6 +801,7 @@ pub enum BuiltinFunction {
     IntSubtract,
     IntToText,
     ListFilled,
+    ListGenerate,
     ListGet,
     ListInsert,
     ListLength,
@@ -962,6 +958,20 @@ impl BuiltinFunction {
                 parameters: [
                     ("length".into(), NamedType::int().into()),
                     ("item".into(), ParameterType::new("T").into()),
+                ]
+                .into(),
+                return_type: NamedType::list(ParameterType::new("T")).into(),
+            },
+            Self::ListGenerate => BuiltinFunctionSignature {
+                name: "builtinListGenerate".into(),
+                type_parameters: ["T".into()].into(),
+                parameters: [
+                    ("length".into(), NamedType::int().into()),
+                    (
+                        "itemGetter".into(),
+                        FunctionType::new([NamedType::int().into()], ParameterType::new("T"))
+                            .into(),
+                    ),
                 ]
                 .into(),
                 return_type: NamedType::list(ParameterType::new("T")).into(),

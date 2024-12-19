@@ -4,7 +4,7 @@ use super::{
     parser::{OptionOfParser, OptionOfParserWithValue, Parser},
     whitespace::{AndTrailingWhitespace, ValueAndTrailingWhitespace},
 };
-use crate::ast::{AstText, AstTextPart};
+use crate::ast::{AstError, AstResult, AstText, AstTextPart};
 use tracing::instrument;
 
 // TODO: It might be a good idea to ignore text interpolations in patterns
@@ -62,8 +62,43 @@ fn text_part_interpolation(parser: Parser) -> Option<(Parser, AstTextPart)> {
 }
 
 #[instrument(level = "trace")]
-fn text_part_text(parser: Parser) -> Option<(Parser, AstTextPart)> {
-    parser
-        .consume_while_not_empty(|c| !matches!(c, '{' | '"' | '\r' | '\n'))
-        .map(|(parser, text)| (parser, AstTextPart::Text(text.string)))
+fn text_part_text(mut parser: Parser) -> Option<(Parser, AstTextPart)> {
+    let mut text = String::new();
+    let mut current_start = parser.offset();
+    let mut errors = vec![];
+    while let Some((new_parser, char)) = parser.consume_char() {
+        match char {
+            '{' | '"' | '\r' | '\n' => break,
+            '\\' => {
+                let Some((new_new_parser, char)) = new_parser.consume_char() else {
+                    errors.push(new_parser.error_at_current_offset(
+                        "Unexpected end of file, expected escaped character",
+                    ));
+                    break;
+                };
+                text.push_str(parser.str(current_start));
+                match char {
+                    '\\' => text.push('\\'),
+                    'n' => text.push('\n'),
+                    '"' => text.push('"'),
+                    _ => errors.push(AstError {
+                        unparsable_input: new_new_parser.string(new_parser.offset()),
+                        error: "Invalid escape character.".to_string(),
+                    }),
+                }
+                current_start = new_new_parser.offset();
+                parser = new_new_parser;
+            }
+            _ => parser = new_parser,
+        }
+    }
+
+    text.push_str(parser.str(current_start));
+    if text.is_empty() && errors.is_empty() {
+        return None;
+    }
+    Some((
+        parser,
+        AstTextPart::Text(AstResult::errors(text.into_boxed_str(), errors)),
+    ))
 }
