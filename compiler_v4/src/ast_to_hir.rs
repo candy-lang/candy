@@ -1357,7 +1357,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 {
                     self.context.add_error(
                         expression.span.clone(),
-                        format!("Expected type `{context_type:?}`, got `{type_:?}`."),
+                        format!("Expected type `{context_type}`, got `{type_}`."),
                     );
                     (self.push_error(), Type::Error)
                 } else {
@@ -1397,9 +1397,11 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                     .parts
                     .iter()
                     .map::<Id, _>(|it| match it {
-                        AstTextPart::Text(text) => {
-                            self.push(None, ExpressionKind::Text(text.clone()), NamedType::text())
-                        }
+                        AstTextPart::Text(text) => self.push(
+                            None,
+                            ExpressionKind::Text(text.value().cloned().unwrap_or_default()),
+                            NamedType::text(),
+                        ),
                         AstTextPart::Interpolation { expression, .. } => {
                             if let Some(expression) = expression.value() {
                                 // TODO: accept impl ToText
@@ -1547,7 +1549,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             LoweredExpression::Error => LoweredExpression::Error,
                         }
                     }
-                    _ => todo!("Support calling other expressions"),
+                    receiver => todo!("Support calling other expressions: {receiver:?}"),
                 }
             }
             AstExpressionKind::Navigation(navigation) => {
@@ -1610,7 +1612,7 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                             );
                             LoweredExpression::Error
                         }
-                        Type::Error => todo!(),
+                        Type::Error => LoweredExpression::Error,
                     },
                     LoweredExpression::NamedTypeReference(type_) => {
                         let declaration = self.context.hir.type_declarations.get(&type_).unwrap();
@@ -1904,18 +1906,15 @@ impl<'c, 'a> BodyBuilder<'c, 'a> {
                 &argument_types,
             );
             return match result {
-                Ok(substitutions) => {
-                    assert!(substitutions.is_empty());
-                    self.push_lowered(
-                        None,
-                        ExpressionKind::Call {
-                            function: id,
-                            substitutions,
-                            arguments: arguments.iter().map(|(id, _)| *id).collect(),
-                        },
-                        *type_.return_type,
-                    )
-                }
+                Ok(substitutions) => self.push_lowered(
+                    None,
+                    ExpressionKind::Call {
+                        function: id,
+                        substitutions,
+                        arguments: arguments.iter().map(|(id, _)| *id).collect(),
+                    },
+                    *type_.return_type,
+                ),
                 Err(error) => {
                     self.context.add_error(
                         name.span.clone(),

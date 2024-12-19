@@ -122,8 +122,9 @@ fn debug(options: DebugOptions) -> ProgramResult {
                 }
                 return Err(Exit::CodeContainsErrors);
             }
+
             let mono = hir_to_mono(&hir);
-            println!("{mono:?}");
+            println!("{}", mono.to_text(true));
         }
     }
     Ok(())

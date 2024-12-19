@@ -1,7 +1,7 @@
 use crate::{
     hir::BuiltinFunction,
     mono::{
-        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Lambda, Mono,
+        Body, BodyOrBuiltin, Expression, ExpressionKind, Function, Id, Lambda, Mono, Parameter,
         TypeDeclaration,
     },
 };
@@ -83,7 +83,7 @@ impl<'h> Context<'h> {
                     match name.as_ref() {
                         "Int" => {
                             assert!(type_arguments.is_empty());
-                            self.push("uint64_t value;\n");
+                            self.push("int64_t value;\n");
                         }
                         "List" => {
                             assert_eq!(type_arguments.len(), 1);
@@ -145,7 +145,7 @@ impl<'h> Context<'h> {
     }
     fn lower_assignment_definitions(&mut self) {
         for (name, assignment) in &self.mono.assignments {
-            self.lower_lambda_definitions_in(name, &assignment.body);
+            self.lower_lambda_definitions_in(name, &[], &assignment.body);
 
             self.push(format!("void {name}$init() {{\n"));
             self.lower_body_expressions(name, &assignment.body);
@@ -179,7 +179,7 @@ impl<'h> Context<'h> {
     fn lower_function_definitions(&mut self) {
         for (name, function) in &self.mono.functions {
             if let BodyOrBuiltin::Body(body) = &function.body {
-                self.lower_lambda_definitions_in(name, body);
+                self.lower_lambda_definitions_in(name, &function.parameters, body);
             }
 
             self.lower_function_signature(name, function);
@@ -188,9 +188,14 @@ impl<'h> Context<'h> {
             self.push("}\n\n");
         }
     }
-    fn lower_lambda_definitions_in(&mut self, declaration_name: &str, body: &'h Body) {
+    fn lower_lambda_definitions_in(
+        &mut self,
+        declaration_name: &str,
+        declaration_parameters: &[Parameter],
+        body: &'h Body,
+    ) {
         Self::visit_lambdas_inside_body(body, &mut |id, lambda| {
-            let closure = lambda.closure_with_types(body);
+            let closure = lambda.closure_with_types(declaration_parameters, body);
 
             self.push(format!("struct {declaration_name}$lambda{id}_closure {{"));
             for (id, type_) in &closure {
@@ -242,8 +247,12 @@ impl<'h> Context<'h> {
                 | ExpressionKind::GlobalAssignmentReference(_)
                 | ExpressionKind::LocalReference(_)
                 | ExpressionKind::CallFunction { .. }
-                | ExpressionKind::CallLambda { .. }
-                | ExpressionKind::Switch { .. } => {}
+                | ExpressionKind::CallLambda { .. } => {}
+                ExpressionKind::Switch { cases, .. } => {
+                    for case in cases.iter() {
+                        Self::visit_lambdas_inside_body(&case.body, visitor);
+                    }
+                }
                 ExpressionKind::Lambda(lambda) => {
                     Self::visit_lambdas_inside_body(&lambda.body, visitor);
                     visitor(*id, lambda);
@@ -387,7 +396,7 @@ impl<'h> Context<'h> {
                         int length = snprintf(NULL, 0, \"%ld\", {int}->value);
                         char* result = malloc(length + 1);
                         snprintf(result, length + 1, \"%ld\", {int}->value);
-                        
+
                         Text* result_pointer = malloc(sizeof(Text));
                         result_pointer->value = result;
                         return result_pointer;",
@@ -395,6 +404,17 @@ impl<'h> Context<'h> {
                     )),
                     BuiltinFunction::ListFilled => self.push(format!(
                         "\
+                        if ({length}->value < 0) {{
+                            char* message_format = \"List length must not be negative; was %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {length}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {length}->value);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = {length}->value;
                         result_pointer->values = malloc({length}->value * sizeof({item_type}));
@@ -406,6 +426,33 @@ impl<'h> Context<'h> {
                         list_type = function.return_type,
                         length = function.parameters[0].id,
                         item = function.parameters[1].id,
+                    )),
+                    BuiltinFunction::ListGenerate => self.push(format!(
+                        "\
+                        if ({length}->value < 0) {{
+                            char* message_format = \"List length must not be negative; was %ld.\";
+                            int length = snprintf(NULL, 0, message_format, {length}->value);
+                            char *message = malloc(length + 1);
+                            snprintf(message, length + 1, message_format, {length}->value);
+
+                            Text *message_pointer = malloc(sizeof(Text));
+                            message_pointer->value = message;
+                            builtinPanic$$Text(message_pointer);
+                        }}
+
+                        {list_type}* result_pointer = malloc(sizeof({list_type}));
+                        result_pointer->length = {length}->value;
+                        result_pointer->values = malloc({length}->value * sizeof({item_type}));
+                        for (uint64_t i = 0; i < {length}->value; i++) {{
+                            Int* index = malloc(sizeof(Int));
+                            index->value = i;
+                            result_pointer->values[i] = {item_getter}->function({item_getter}->closure, index);
+                        }}
+                        return result_pointer;",
+                        item_type = substitutions["T"],
+                        list_type = function.return_type,
+                        length = function.parameters[0].id,
+                        item_getter = function.parameters[1].id,
                     )),
                     BuiltinFunction::ListGet => self.push(format!(
                         "\
@@ -458,7 +505,7 @@ impl<'h> Context<'h> {
                         "\
                         {list_type}* result_pointer = malloc(sizeof({list_type}));
                         result_pointer->length = 0;
-                        result_pointer->values = nullptr;
+                        result_pointer->values = NULL;
                         return result_pointer;",
                         list_type = function.return_type,
                     )),
@@ -719,8 +766,7 @@ impl<'h> Context<'h> {
                     "{}* {id} = malloc(sizeof({}));",
                     &expression.type_, &expression.type_,
                 ));
-                // TODO: escape text
-                self.push(format!("{id}->value = \"{text}\";"));
+                self.push(format!("{id}->value = \"{}\";", text.escape_default()));
             }
             ExpressionKind::CreateStruct { struct_, fields } => {
                 let TypeDeclaration::Struct {

@@ -30,7 +30,7 @@ fun isLessThan[T: Compare](left: T, right: T) Bool {
     greater => false,
   }
 }
-fun isLessThanOrEqualTo[T: Compare](left: T, right: T) Bool {
+fun isAtMost[T: Compare](left: T, right: T) Bool {
   switch left.compareTo(right) {
     less => true,
     equal => true,
@@ -44,7 +44,7 @@ fun isGreaterThan[T: Compare](left: T, right: T) Bool {
     greater => true,
   }
 }
-fun isGreaterThanOrEqualTo[T: Compare](left: T, right: T) Bool {
+fun isAtLeast[T: Compare](left: T, right: T) Bool {
   switch left.compareTo(right) {
     less => false,
     equal => true,
@@ -52,6 +52,27 @@ fun isGreaterThanOrEqualTo[T: Compare](left: T, right: T) Bool {
   }
 }
 enum Ordering { less, equal, greater }
+impl Ordering: Compare {
+  fun compareTo(self: Ordering, other: Ordering) Ordering {
+    switch self {
+      less => switch other {
+        less => Ordering.equal(),
+        equal => Ordering.less(),
+        greater => Ordering.less(),
+      },
+      equal => switch other {
+        less => Ordering.greater(),
+        equal => Ordering.equal(),
+        greater => Ordering.less(),
+      },
+      greater => switch other {
+        less => Ordering.greater(),
+        equal => Ordering.greater(),
+        greater => Ordering.equal(),
+      },
+    }
+  }
+}
 impl Ordering: ToText {
   fun toText(self: Ordering) Text {
     switch self {
@@ -94,13 +115,13 @@ fun isPositive(self: Int) Bool {
   self.isGreaterThan(0)
 }
 fun isNonPositive(self: Int) Bool {
-  self.isLessThanOrEqualTo(0)
+  self.isAtMost(0)
 }
 fun isNegative(self: Int) Bool {
   self.isLessThan(0)
 }
 fun isNonNegative(self: Int) Bool {
-  self.isGreaterThanOrEqualTo(0)
+  self.isAtLeast(0)
 }
 fun absolute(self: Int) Int {
   switch self.isNegative() {
@@ -230,13 +251,13 @@ fun characterAt(self: Text, index: Int) Maybe[Text] {
 }
 
 fun startsWith(self: Text, prefix: Text) Bool {
-  switch self.length().isGreaterThanOrEqualTo(prefix.length()) {
+  switch self.length().isAtLeast(prefix.length()) {
     false => false,
     true => self.getRange(0, prefix.length()).equals(prefix),
   }
 }
 fun endsWith(self: Text, suffix: Text) Bool {
-  switch self.length().isGreaterThanOrEqualTo(suffix.length()) {
+  switch self.length().isAtLeast(suffix.length()) {
     false => false,
     true => self.getRange(self.length().subtract(suffix.length()), self.length()).equals(suffix),
   }
@@ -251,6 +272,26 @@ fun removeSuffix(self: Text, suffix: Text) Text {
   switch self.endsWith(suffix) {
     false => self,
     true => self.getRange(self.length().subtract(suffix.length()), self.length()),
+  }
+}
+
+fun split(self: Text, character: Text) List[Text] {
+  self.splitIf((char: Text) { char.equals(character) })
+}
+fun splitIf(self: Text, predicate: (Text) Bool) List[Text] {
+  self.splitIfHelper(predicate, 0, 0 listOf[Text]())
+}
+fun splitIfHelper(self: Text, predicate: (Text) Bool, currentStartOffset: Int, offset: Int, result: List[Text]) List[Text] {
+  switch self.characterAt(offset) {
+    none => result.append(self.getRange(currentStartOffset, offset)),
+    some(char) => switch predicate(char) {
+      true => {
+        let nextOffset = offset.add(1)
+        let nextResult = result.append(self.getRange(currentStartOffset, offset))
+        self.splitIfHelper(predicate, nextOffset, nextOffset, nextResult)
+      },
+      false => self.splitIfHelper(predicate, currentStartOffset, offset.add(1), result),
+    },
   }
 }
 
@@ -307,7 +348,9 @@ struct List[T] = builtin
 fun listFilled[T](length: Int, item: T) List[T] {
   builtinListFilled(length, item)
 }
-# TODO: listGenerate(…)
+fun listGenerate[T](length: Int, generator: (Int) T) List[T] {
+  builtinListGenerate(length, generator)
+}
 fun listOf[T]() List[T] {
   builtinListOf[T]()
 }
@@ -317,7 +360,7 @@ fun listOf[T](item0: T) List[T] {
 fun listOf[T](item0: T, item1: T) List[T] {
   builtinListOf(item0, item1)
 }
-fun listOf[T](item0: T, item1: T, item2) List[T] {
+fun listOf[T](item0: T, item1: T, item2: T) List[T] {
   builtinListOf(item0, item1, item2)
 }
 fun listOf[T](item0: T, item1: T, item2: T, item3: T) List[T] {
@@ -368,9 +411,140 @@ fun replace[T](list: List[T], index: Int, item: T) List[T] {
 fun removeAt[T](list: List[T], index: Int) List[T] {
   builtinListRemoveAt(list, index)
 }
-# TODO: list.getRange(…), .concatenate(…), .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
+fun concat[T](list0: List[T], list1: List[T]) List[T] {
+  listGenerate(list0.length().add(list1.length()), (i: Int) {
+    switch i.isLessThan(list0.length()) {
+      true => list0.get(i).unwrap(),
+      false => list1.get(i.subtract(list0.length())).unwrap(),
+    }
+  })
+}
+fun getRange[T](list: List[T], startInclusive: Int, endExclusive: Int) List[T] {
+  switch startInclusive.isNonNegative()
+    .and(endExclusive.isNonNegative())
+    .and(startInclusive.isAtMost(endExclusive))
+    .and(endExclusive.isAtMost(list.length())) {
+    false => panic("Invalid range"),
+    true => listGenerate(
+      endExclusive.subtract(startInclusive),
+      (i: Int) { list.get(startInclusive.add(i)).unwrap() },
+    ),
+  }
+}
+fun indexes[T](list: List[T]) List[Int] {
+  listGenerate(list.length(), (i: Int) { i })
+}
+
+# TODO: .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
 fun print[T: ToText](t: T) {
   builtinPrint(t.toText())
+}
+
+fun fold[T, R](list: List[T], initial: R, combine: (R, T) R) R {
+  list.foldHelper(0, initial, combine)
+}
+fun foldHelper[T, R](list: List[T], index: Int, current: R, combine: (R, T) R) R {
+  switch index.isLessThan(list.length()) {
+    true => list.foldHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
+    false => current,
+  }
+}
+fun reduce[T](list: List[T], combine: (T, T) T) Maybe[T] {
+  switch list.isEmpty() {
+    true => none[T](),
+    false => some(list.reduceHelper(1, list.get(0).unwrap(), combine)),
+  }
+}
+fun reduceHelper[T](list: List[T], index: Int, current: T, combine: (T, T) T) T {
+  switch index.isLessThan(list.length()) {
+    true => list.reduceHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
+    false => current,
+  }
+}
+
+fun all[T](list: List[T], predicate: (T) Bool) Bool {
+  list.allHelper(predicate, 0)
+}
+fun allHelper[T](list: List[T], predicate: (T) Bool, index: Int) Bool {
+  switch list.get(index) {
+    some(item) => switch predicate(item) {
+      true => list.allHelper(predicate, index.add(1)),
+      false => false,
+    },
+    none => true,
+  }
+}
+fun any[T](list: List[T], predicate: (T) Bool) Bool {
+  list.all((it: T) { predicate(it).not() }).not()
+}
+
+fun isStrictlyAscending[T: Compare](list: List[T]) Bool {
+  list.isSortedBy((a: T, b: T) { a.compareTo(b).equals(Ordering.less()) })
+}
+fun isStrictlyDescending[T: Compare](list: List[T]) Bool {
+  list.isSortedBy((a: T, b: T) { a.compareTo(b).equals(Ordering.greater()) })
+}
+fun isSortedBy[T](list: List[T], checkPair: (T, T) Bool) Bool {
+  list.pairs().all((pair: Pair[T, T]) { checkPair(pair.first, pair.second) })
+}
+
+fun map[T, R](list: List[T], transform: (T) R) List[R] {
+  list.fold(listOf[R](), (result: List[R], item: T) {
+    result.append(transform(item))
+  })
+}
+fun filter[T](list: List[T], predicate: (T) Bool) List[T] {
+  list.fold(listOf[T](), (result: List[T], item: T) {
+    switch predicate(item) {
+      true => result.append(item),
+      false => result,
+    }
+  })
+}
+fun windows[T](list: List[T], windowLength: Int) List[List[T]] {
+  # Returns a list over all contiguous windows of length `windowLength`.
+  #
+  # The windows overlap. If the `list` is shorter than `windowLength`, the
+  # resulting list is empty.
+  needs(windowLength.isPositive())
+
+  list.windowsHelper(windowLength, listOf[List[T]]())
+}
+fun windowsHelper[T](list: List[T], windowLength: Int, resultSoFar: List[List[T]]) List[List[T]] {
+  let index = resultSoFar.length()
+  switch index.isAtMost(list.length().subtract(windowLength)) {
+    true => list.windowsHelper(
+      windowLength,
+      resultSoFar.append(list.getRange(index, index.add(windowLength))),
+    ),
+    false => resultSoFar,
+  }
+}
+fun pairs[T](list: List[T]) List[Pair[T, T]] {
+  # Returns a list over all contiguous pairs of items.
+  #
+  # The pairs overlap. If the `list` is shorter than two, the resulting list is
+  # empty.
+  list.windows(2).map((window: List[T]) { window.toPair().unwrap() })
+}
+impl[T: ToText] List[T]: ToText {
+  fun toText(self: List[T]) Text {
+    let items = self.map((item: T) { item.toText() })
+      .reduce((result: Text, item: Text) { "{result}, {item}" })
+      .unwrapOr("")
+    "[{items}]"
+  }
+}
+
+struct Pair[T0, T1] {
+  first: T0,
+  second: T1,
+}
+fun toPair[T](list: List[T]) Maybe[Pair[T, T]] {
+  switch list.length().equals(2) {
+    true => some(Pair[T, T](list.get(0).unwrap(), list.get(1).unwrap())),
+    false => none[Pair[T, T]](),
+  }
 }
 
 struct MyStruct {
@@ -405,11 +579,17 @@ fun xor(a: Bool, b: Bool) Bool {
 fun implies(a: Bool, b: Bool) Bool {
   not(a).or(b)
 }
-impl Bool: Equal {
-  fun equals(self: Bool, other: Bool) Bool {
+impl Bool: Compare {
+  fun compareTo(self: Bool, other: Bool) Ordering {
     switch self {
-      true => other,
-      false => other.not(),
+      false => switch other {
+        false => Ordering.equal(),
+        true => Ordering.less(),
+      },
+      true => switch other {
+        false => Ordering.greater(),
+        true => Ordering.equal(),
+      },
     }
   }
 }
@@ -433,9 +613,20 @@ fun none[T]() Maybe[T] {
   Maybe.none[T]()
 }
 fun unwrap[T](self: Maybe[T]) T {
+  # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+  # self.unwrapOrElse(() { panic("`unwrap()` called on `none()`") })
   switch self {
     some(value) => value,
     none => panic("`unwrap()` called on `none()`"),
+  }
+}
+fun unwrapOr[T](self: Maybe[T], defaultValue: T) T {
+  self.unwrapOrElse(() { defaultValue })
+}
+fun unwrapOrElse[T](self: Maybe[T], getDefaultValue: () T) T {
+  switch self {
+    some(value) => value,
+    none => getDefaultValue(),
   }
 }
 fun isSome[T](self: Maybe[T]) Bool {
@@ -470,9 +661,20 @@ fun error[T, E](value: E) Result[T, E] {
   Result.error[T, E](value)
 }
 fun unwrap[T, E](self: Result[T, E]) T {
+  # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+  # self.unwrapOrElse((error: E) { panic("`unwrap()` called on `error()`") })
   switch self {
     ok(value) => value,
-    error(value) => panic("`unwrap()` called on `error()`"),
+    error(error) => panic("`unwrap()` called on `error()`"),
+  }
+}
+fun unwrapOr[T, E](self: Result[T, E], defaultValue: T) T {
+  self.unwrapOrElse((error: E) { defaultValue })
+}
+fun unwrapOrElse[T, E](self: Result[T, E], getDefaultValue: (E) T) T {
+  switch self {
+    ok(value) => value,
+    error(error) => getDefaultValue(error),
   }
 }
 fun isOk[T, E](self: Result[T, E]) Bool {
@@ -560,6 +762,8 @@ fun main() Int {
   print("addCaptured(1) = {addCaptured(1).toText()}")
 
   repeat(3, () { print("Hello, World!") })
+
+  print(listOf(1, 2, 3).map((x: Int) { x.multiply(2) }))
 
   0
 }

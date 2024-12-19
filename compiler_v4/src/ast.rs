@@ -252,7 +252,7 @@ pub struct AstText {
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AstTextPart {
-    Text(Box<str>),
+    Text(AstResult<Box<str>>),
     Interpolation {
         expression: AstResult<Box<AstExpression>>,
         closing_curly_brace_error: Option<AstError>,
@@ -379,6 +379,9 @@ impl CollectAstErrors for AstError {
     }
 }
 impl CollectAstErrors for AstString {
+    fn collect_errors_to(&self, _errors: &mut Vec<CompilerError>) {}
+}
+impl CollectAstErrors for str {
     fn collect_errors_to(&self, _errors: &mut Vec<CompilerError>) {}
 }
 impl CollectAstErrors for i64 {
@@ -594,7 +597,9 @@ impl CollectAstErrors for AstText {
 impl CollectAstErrors for AstTextPart {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         match &self {
-            Self::Text(_) => {}
+            Self::Text(text) => {
+                text.errors.collect_errors_to(errors);
+            }
             Self::Interpolation {
                 expression,
                 closing_curly_brace_error,
