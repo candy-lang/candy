@@ -466,12 +466,12 @@ fun all[T](list: List[T], predicate: (T) Bool) Bool {
   list.allHelper(predicate, 0)
 }
 fun allHelper[T](list: List[T], predicate: (T) Bool, index: Int) Bool {
-  switch index.isLessThan(list.length()) {
-    true => switch predicate(list.get(index).unwrap()) {
+  switch list.get(index) {
+    some(item) => switch predicate(item) {
       true => list.allHelper(predicate, index.add(1)),
       false => false,
     },
-    false => true,
+    none => true,
   }
 }
 fun any[T](list: List[T], predicate: (T) Bool) Bool {
