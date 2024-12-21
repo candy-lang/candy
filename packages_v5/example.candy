@@ -1,11 +1,6 @@
 struct Nothing {}
 enum Never {}
 
-# struct List[T] {}
-# impl[T: Equal] List[T]: Equal {
-#   # fun equals(self: Self, other: Self) Bool {}
-# }
-
 trait ToText {
   fun toText(self: Self) Text
 }
@@ -50,6 +45,25 @@ fun isAtLeast[T: Compare](left: T, right: T) Bool {
     equal => true,
     greater => true,
   }
+}
+fun coerceAtLeast[T: Compare](value: T, minimum: T) T {
+  switch value.compareTo(minimum) {
+    less => minimum,
+    equal => value,
+    greater => value,
+  }
+}
+fun coerceAtMost[T: Compare](value: T, maximum: T) T {
+  switch value.compareTo(maximum) {
+    less => value,
+    equal => value,
+    greater => maximum,
+  }
+}
+fun coerceInRange[T: Compare](value: T, minimum: T, maximum: T) T {
+  needs(minimum.isAtMost(maximum))
+
+  value.coerceAtLeast(minimum).coerceAtMost(maximum)
 }
 enum Ordering { less, equal, greater }
 impl Ordering: Compare {
@@ -240,14 +254,17 @@ fun concat(self: Text, other: Text) Text {
   self.builtinTextConcat(other)
 }
 # TODO: Support ranges when we have them.
-fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
-  self.builtinTextGetRange(startInclusive, endExclusive)
-}
-fun characterAt(self: Text, index: Int) Maybe[Text] {
-  switch index.isNonNegative().and(index.isLessThan(self.length())) {
+fun get(self: Text, index: Int) Maybe[Text] {
+  switch index.isInRange(0, self.length()) {
     false => none[Text](),
     true => some(self.getRange(index, index.add(1))),
   }
+}
+fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
+  self.builtinTextGetRange(startInclusive, endExclusive)
+}
+fun characters(self: Text) List[Text] {
+  listGenerate(self.length(), (i: Int) { self.get(i).unwrap() })
 }
 
 fun startsWith(self: Text, prefix: Text) Bool {
@@ -282,7 +299,7 @@ fun splitIf(self: Text, predicate: (Text) Bool) List[Text] {
   self.splitIfHelper(predicate, 0, 0 listOf[Text]())
 }
 fun splitIfHelper(self: Text, predicate: (Text) Bool, currentStartOffset: Int, offset: Int, result: List[Text]) List[Text] {
-  switch self.characterAt(offset) {
+  switch self.get(offset) {
     none => result.append(self.getRange(currentStartOffset, offset)),
     some(char) => switch predicate(char) {
       true => {
@@ -294,9 +311,24 @@ fun splitIfHelper(self: Text, predicate: (Text) Bool, currentStartOffset: Int, o
     },
   }
 }
+fun lines(self: Text) List[Text] {
+  self.split("\n")
+}
 
 fun indexOf(self: Text, other: Text) Maybe[Int] {
   self.builtinTextIndexOf(other)
+}
+fun allIndexesOfOverlapping(self: Text, other: Text) List[Int] {
+  self.allIndexesOfOverlappingHelper(other, 0, listOf[Int]())
+}
+fun allIndexesOfOverlappingHelper(self: Text, other: Text, offset: Int, result: List[Int]) List[Int] {
+  switch self.getRange(offset, self.length()).indexOf(other) {
+    none => result,
+    some(index) => {
+      let index = offset.add(index)
+      self.allIndexesOfOverlappingHelper(other, index.add(1), result.append(index))
+    },
+  }
 }
 fun contains(self: Text, other: Text) Bool {
   self.indexOf(other).isSome()
@@ -431,8 +463,87 @@ fun getRange[T](list: List[T], startInclusive: Int, endExclusive: Int) List[T] {
     ),
   }
 }
+fun skip[T](list: List[T], count: Int) List[T] {
+  needs(count.isNonNegative())
+  getRange(list, count, list.length())
+}
+fun skipLast[T](list: List[T], count: Int) List[T] {
+  needs(count.isNonNegative())
+  getRange(list, 0, list.length().subtract(count))
+}
+fun range(length: Int) List[Int] {
+  needs(length.isNonNegative())
+
+  listGenerate(length, (i: Int) { i })
+}
+fun range(startInclusive: Int, endExclusive: Int) List[Int] {
+  needs(startInclusive.isAtMost(endExclusive))
+
+  listGenerate(endExclusive.subtract(startInclusive), (i: Int) { startInclusive.add(i) })
+}
 fun indexes[T](list: List[T]) List[Int] {
-  listGenerate(list.length(), (i: Int) { i })
+  list.length().range()
+}
+
+fun isInRange[T: Compare](self: T, startInclusive: T, endExclusive: T) Bool {
+  needs(startInclusive.isAtMost(endExclusive))
+
+  self.isAtLeast(startInclusive).and(self.isLessThan(endExclusive))
+}
+
+struct List2D[T] {
+  width: Int,
+  height: Int,
+  items: List[T],
+}
+fun list2D[T](width: Int, height: Int, items: List[T]) List2D[T] {
+  needs(width.isNonNegative())
+  needs(height.isNonNegative())
+  needs(width.multiply(height).equals(items.length()))
+
+  List2D[T](width, height, items)
+}
+fun list2DFilled[T](width: Int, height: Int, item: T) List2D[T] {
+  needs(width.isNonNegative())
+  needs(height.isNonNegative())
+
+  list2D(width, height, listFilled(width.multiply(height), item))
+}
+fun get[T](self: List2D[T], position: Pair[Int, Int]) Maybe[T] {
+  self.get(position.first, position.second)
+}
+fun get[T](self: List2D[T], x: Int, y: Int) Maybe[T] {
+  switch x.isInRange(0, self.width).and(y.isInRange(0, self.height)) {
+    false => none[T](),
+    true => some(self.items.get(self.rawIndex(x, y)).unwrap()),
+  }
+}
+fun replace[T](self: List2D[T], x: Int, y: Int, value: T) List2D[T] {
+  needs(x.isInRange(0, self.width))
+  needs(y.isInRange(0, self.height))
+
+  let newItems = self.items.replace(self.rawIndex(x, y), value)
+  list2D(self.width, self.height, newItems)
+}
+fun indexesRowWise[T](self: List2D[T]) List[Pair[Int, Int]] {
+  range(self.height).flatMap((y: Int) {
+    range(self.width).map((x: Int) { Pair(x, y) })
+  })
+}
+fun rows[T](self: List2D[T]) List[List[T]] {
+  range(self.height).map((y: Int) { self.row(y).unwrap() })
+}
+fun row[T](self: List2D[T], y: Int) Maybe[List[T]] {
+  switch y.isInRange(0, self.height) {
+    false => none[List[T]](),
+    true => some(self.items.getRange(self.rawIndex(0, y), self.rawIndex(0, y.add(1)))),
+  }
+}
+fun rawIndex[T](self: List2D[T], x: Int, y: Int) Int {
+  needs(x.isInRange(0, self.width))
+  needs(y.isInRange(0, self.height))
+
+  y.multiply(self.width).add(x)
 }
 
 # TODO: .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
@@ -441,12 +552,15 @@ fun print[T: ToText](t: T) {
 }
 
 fun fold[T, R](list: List[T], initial: R, combine: (R, T) R) R {
-  list.foldHelper(0, initial, combine)
+  list.foldIndexed(initial, (state: R, index: Int, item: T) { combine(state, item) })
 }
-fun foldHelper[T, R](list: List[T], index: Int, current: R, combine: (R, T) R) R {
+fun foldIndexed[T, R](list: List[T], initial: R, combine: (R, Int, T) R) R {
+  list.foldIndexedHelper(0, initial, combine)
+}
+fun foldIndexedHelper[T, R](list: List[T], index: Int, state: R, combine: (R, Int, T) R) R {
   switch index.isLessThan(list.length()) {
-    true => list.foldHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
-    false => current,
+    true => list.foldIndexedHelper(index.add(1), combine(state, index, list.get(index).unwrap()), combine),
+    false => state,
   }
 }
 fun reduce[T](list: List[T], combine: (T, T) T) Maybe[T] {
@@ -460,6 +574,9 @@ fun reduceHelper[T](list: List[T], index: Int, current: T, combine: (T, T) T) T 
     true => list.reduceHelper(index.add(1), combine(current, list.get(index).unwrap()), combine),
     false => current,
   }
+}
+fun sum(list: List[Int]) Int {
+  list.fold(0, (sum: Int, item: Int) { sum.add(item) })
 }
 
 fun all[T](list: List[T], predicate: (T) Bool) Bool {
@@ -489,8 +606,16 @@ fun isSortedBy[T](list: List[T], checkPair: (T, T) Bool) Bool {
 }
 
 fun map[T, R](list: List[T], transform: (T) R) List[R] {
+  list.mapIndexed((index: Int, item: T) { transform(item) })
+}
+fun mapIndexed[T, R](list: List[T], transform: (Int, T) R) List[R] {
   list.fold(listOf[R](), (result: List[R], item: T) {
-    result.append(transform(item))
+    result.append(transform(result.length(), item))
+  })
+}
+fun flatMap[T, R](list: List[T], transform: (T) List[R]) List[R] {
+  list.fold(listOf[R](), (result: List[R], item: T) {
+    result.concat(transform(item))
   })
 }
 fun filter[T](list: List[T], predicate: (T) Bool) List[T] {
@@ -527,12 +652,15 @@ fun pairs[T](list: List[T]) List[Pair[T, T]] {
   # empty.
   list.windows(2).map((window: List[T]) { window.toPair().unwrap() })
 }
+
+fun join[T: ToText](self: List[T], separator: Text) Text {
+  self.map((item: T) { item.toText() })
+    .reduce((result: Text, item: Text) { "{result}{separator}{item}" })
+    .unwrapOr("")
+}
 impl[T: ToText] List[T]: ToText {
   fun toText(self: List[T]) Text {
-    let items = self.map((item: T) { item.toText() })
-      .reduce((result: Text, item: Text) { "{result}, {item}" })
-      .unwrapOr("")
-    "[{items}]"
+    "[{self.join(", ")}]"
   }
 }
 
@@ -545,6 +673,15 @@ fun toPair[T](list: List[T]) Maybe[Pair[T, T]] {
     true => some(Pair[T, T](list.get(0).unwrap(), list.get(1).unwrap())),
     false => none[Pair[T, T]](),
   }
+}
+# TODO: Use this impl when it compiles
+# impl[T0: Equal, T1: Equal] Pair[T0, T1]: Equal {
+#   fun equals(self: Pair[T0, T1], other: Pair[T0, T1]) Bool {
+#     self.first.equals(other.first).and(self.second.equals(other.second))
+#   }
+# }
+fun equals[T: Equal](self: Pair[T, T], other: Pair[T, T]) Bool {
+  self.first.equals(other.first).and(self.second.equals(other.second))
 }
 
 struct MyStruct {
@@ -578,6 +715,12 @@ fun xor(a: Bool, b: Bool) Bool {
 }
 fun implies(a: Bool, b: Bool) Bool {
   not(a).or(b)
+}
+fun toInt(self: Bool) Int {
+  switch self {
+    false => 0,
+    true => 1,
+  }
 }
 impl Bool: Compare {
   fun compareTo(self: Bool, other: Bool) Ordering {
@@ -729,6 +872,226 @@ fun fibonacci(n: Int) Int {
 
 fun identity[T](t: T) T {
   t
+}
+
+# Advent of Code 2024
+# https://adventofcode.com/2024
+
+fun day2Part1(input: Text) Int {
+  day2Wrapper(input, (line: List[Int]) { day2CheckLine(line) })
+}
+fun day2Part2(input: Text) Int {
+  day2Wrapper(input, (line: List[Int]) {
+    listOf(line)
+      .concat(line.indexes().map((index: Int) { line.removeAt(index) }))
+      .any((line: List[Int]) { day2CheckLine(line) })
+  })
+}
+fun day2Wrapper(input: Text, checkLine: (List[Int]) Bool) Int {
+  input
+    .lines()
+    .map((line: Text) { line.split(" ").map((number: Text) { parseInt(number).unwrap() }) })
+    .filter(checkLine)
+    .length()
+}
+fun day2CheckLine(line: List[Int]) Bool {
+  line
+    .pairs()
+    .all((pair: Pair[Int, Int]) {
+      let difference = pair.second.subtract(pair.first).absolute()
+      difference.isAtLeast(1).and(difference.isAtMost(3))
+    })
+    .and(line.isStrictlyAscending().or(line.isStrictlyDescending()))
+}
+
+fun day4Part1(input: Text) Int {
+  let lines = input.lines()
+  let rows = lines.length()
+  let columns = lines.first().unwrap().length()
+  lines
+    .mapIndexed((row: Int, line: Text) {
+      columns.range()
+        .map((column: Int) {
+          let horizontalText = line.getRange(column, column.add(4).coerceAtMost(line.length()))
+          let verticalText = lines.getRange(row, row.add(4).coerceAtMost(lines.length()))
+            .map((line: Text) { line.get(column).unwrap() })
+            .join("")
+          let diagonalRightDownText = switch row.isAtMost(rows.subtract(4))
+            .and(column.isAtMost(columns.subtract(4))) {
+            true => range(4)
+              .map((i: Int) { lines.get(row.add(i)).unwrap().get(column.add(i)).unwrap() })
+              .join(""),
+            false => "",
+          }
+          let diagonalLeftDownText = switch row.isAtLeast(3)
+            .and(column.isAtMost(columns.subtract(4))) {
+            true => range(4)
+              .map((i: Int) { lines.get(row.subtract(i)).unwrap().get(column.add(i)).unwrap() })
+              .join(""),
+            false => "",
+          }
+          listOf(horizontalText, verticalText, diagonalRightDownText, diagonalLeftDownText)
+            .filter((text: Text) { text.equals("XMAS").or(text.equals("SAMX")) })
+            .length()
+        })
+        .sum()
+    })
+    .sum()
+}
+fun day4Part2(input: Text) Int {
+  let lines = input.lines()
+  let rows = lines.length()
+  let columns = lines.first().unwrap().length()
+  range(1, rows.subtract(1))
+    .map((row: Int) {
+      range(1, columns.subtract(1))
+        .filter((column: Int) {
+          switch lines.get(row).unwrap().get(column).unwrap().equals("A") {
+            false => false,
+            true => {
+              let topLeft = lines.get(row.subtract(1)).unwrap().get(column.subtract(1)).unwrap()
+              let topRight = lines.get(row.subtract(1)).unwrap().get(column.add(1)).unwrap()
+              let bottomLeft = lines.get(row.add(1)).unwrap().get(column.subtract(1)).unwrap()
+              let bottomRight = lines.get(row.add(1)).unwrap().get(column.add(1)).unwrap()
+              let rightDown = topLeft.equals("M").and(bottomRight.equals("S"))
+                .or(topLeft.equals("S").and(bottomRight.equals("M")))
+              let leftDown = topRight.equals("M").and(bottomLeft.equals("S"))
+                .or(topRight.equals("S").and(bottomLeft.equals("M")))
+              rightDown.and(leftDown)
+            },
+          }
+        })
+        .length()
+    })
+    .sum()
+}
+
+fun day6Part1(input: Text) Int {
+  let lines = input.lines()
+  let width = lines.first().unwrap().length()
+  let height = lines.length()
+
+  let state = lines.foldIndexed(
+    Day6Part1State(
+      list2DFilled(width, height, false),
+      list2DFilled(width, height, false),
+      Pair(0, 0),
+      Day6Part1Direction.up(),
+    ),
+    (state: Day6Part1State, y: Int, line: Text) {
+      line.characters()
+        .foldIndexed(
+          state,
+          (state: Day6Part1State, x: Int, cell: Text) {
+            Day6Part1State(
+              state.obstructions.replace(x, y, cell.equals("#")),
+              switch cell.equals("^") {
+                true => state.visited.replace(x, y, true),
+                false => state.visited,
+              },
+              switch cell.equals("^") {
+                true => Pair(x, y),
+                false => state.position,
+              },
+              state.direction,
+            )
+          },
+        )
+    },
+  )
+  let state = state.moveToEnd()
+  print(state)
+  state.visitedCellCount()
+}
+struct Day6Part1State {
+  obstructions: List2D[Bool],
+  visited: List2D[Bool],
+  position: Pair[Int, Int],
+  direction: Day6Part1Direction,
+}
+enum Day6Part1Direction { up, right, down, left }
+fun rotateRight(self: Day6Part1Direction) Day6Part1Direction {
+  switch self {
+    up => Day6Part1Direction.right(),
+    right => Day6Part1Direction.down(),
+    down => Day6Part1Direction.left(),
+    left => Day6Part1Direction.up(),
+  }
+}
+fun moveToEnd(self: Day6Part1State) Day6Part1State {
+  switch self.move() {
+    none => self,
+    some(newState) => moveToEnd(newState),
+  }
+}
+fun move(self: Day6Part1State) Maybe[Day6Part1State] {
+  switch self.nextPosition() {
+    none => none[Day6Part1State](),
+    some(nextPosition) => switch self.obstructions.get(nextPosition).unwrap() {
+      true => some(Day6Part1State(
+        self.obstructions,
+        self.visited,
+        self.position,
+        self.direction.rotateRight(),
+      )),
+      false => some(Day6Part1State(
+        self.obstructions,
+        self.visited.replace(nextPosition.first, nextPosition.second, true),
+        nextPosition,
+        self.direction,
+      )),
+    },
+  }
+}
+fun nextPosition(self: Day6Part1State) Maybe[Pair[Int, Int]] {
+  switch self.direction {
+    up => switch self.position.second.equals(0) {
+      true => none[Pair[Int, Int]](),
+      false => some(Pair(self.position.first, self.position.second.subtract(1))),
+    },
+    right => switch self.position.first.equals(self.obstructions.width.subtract(1)) {
+      true => none[Pair[Int, Int]](),
+      false => some(Pair(self.position.first.add(1), self.position.second)),
+    },
+    down => switch self.position.second.equals(self.obstructions.height.subtract(1)) {
+      true => none[Pair[Int, Int]](),
+      false => some(Pair(self.position.first, self.position.second.add(1))),
+    },
+    left => switch self.position.first.equals(0) {
+      true => none[Pair[Int, Int]](),
+      false => some(Pair(self.position.first.subtract(1), self.position.second)),
+    },
+  }
+}
+fun visitedCellCount(self: Day6Part1State) Int {
+  self.visited.items.filter((visited: Bool) { visited }).length()
+}
+impl Day6Part1State: ToText {
+  fun toText(self: Day6Part1State) Text {
+    self.obstructions.height.range()
+      .map((y: Int) {
+        self.obstructions.width.range()
+          .map((x: Int) {
+            switch self.position.equals(Pair(x, y)) {
+              true => switch self.direction {
+                up => "^",
+                right => ">",
+                down => "v",
+                left => "<",
+              },
+              false => switch self.visited.get(x, y).unwrap() {
+                true => "X",
+                false => switch self.obstructions.get(x, y).unwrap() {
+                  true => "#",
+                  false => ".",
+                },
+              },
+            }
+          })
+          .join("")
+      })
+      .join("\n")
+  }
 }
 
 fun main() Int {
