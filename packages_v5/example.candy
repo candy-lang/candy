@@ -263,12 +263,6 @@ fun get(self: Text, index: Int) Maybe[Text] {
 fun getRange(self: Text, startInclusive: Int, endExclusive: Int) Text {
   self.builtinTextGetRange(startInclusive, endExclusive)
 }
-fun characterAt(self: Text, index: Int) Maybe[Text] {
-  switch index.isInRange(0, self.length()) {
-    false => none[Text](),
-    true => some(self.getRange(index, index.add(1))),
-  }
-}
 fun characters(self: Text) List[Text] {
   listGenerate(self.length(), (i: Int) { self.get(i).unwrap() })
 }
@@ -305,7 +299,7 @@ fun splitIf(self: Text, predicate: (Text) Bool) List[Text] {
   self.splitIfHelper(predicate, 0, 0 listOf[Text]())
 }
 fun splitIfHelper(self: Text, predicate: (Text) Bool, currentStartOffset: Int, offset: Int, result: List[Text]) List[Text] {
-  switch self.characterAt(offset) {
+  switch self.get(offset) {
     none => result.append(self.getRange(currentStartOffset, offset)),
     some(char) => switch predicate(char) {
       true => {
@@ -589,12 +583,12 @@ fun all[T](list: List[T], predicate: (T) Bool) Bool {
   list.allHelper(predicate, 0)
 }
 fun allHelper[T](list: List[T], predicate: (T) Bool, index: Int) Bool {
-  switch index.isLessThan(list.length()) {
-    true => switch predicate(list.get(index).unwrap()) {
+  switch list.get(index) {
+    some(item) => switch predicate(item) {
       true => list.allHelper(predicate, index.add(1)),
       false => false,
     },
-    false => true,
+    none => true,
   }
 }
 fun any[T](list: List[T], predicate: (T) Bool) Bool {
