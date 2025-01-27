@@ -52,7 +52,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: dependabot/fetch-metadata@v1.6.0
+      - uses: dependabot/fetch-metadata@v2.3.0
         id: dependabot-metadata
       - name: Approve patch and minor updates
         id: approve-patch-and-minor-updates
