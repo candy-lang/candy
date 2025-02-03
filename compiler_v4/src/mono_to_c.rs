@@ -760,7 +760,7 @@ impl<'h> Context<'h> {
 
                 self.push(format!("{} {id} = {{", &expression.type_));
                 for ((name, _), value) in type_fields.iter().zip_eq(fields.iter()) {
-                    self.push(format!("\n.{name} = {value};"));
+                    self.push(format!("\n.{name} = {value},"));
                 }
                 self.push("};");
             }
