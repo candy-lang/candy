@@ -40,7 +40,7 @@ impl<'h> Context<'h> {
             .into_iter()
             .map(|(name, declaration)| (name, declaration.unwrap()))
             .collect();
-        let memory_layout = lay_out_memory(&type_declarations);
+        let memory_layouts = lay_out_memory(&type_declarations);
 
         Mono {
             type_declarations,
