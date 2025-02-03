@@ -64,26 +64,32 @@ pub struct AggregateLayout {
 
 pub fn lay_out_memory(
     type_declarations: &FxHashMap<Box<str>, TypeDeclaration>,
-) -> FxHashMap<Box<str>, TypeLayout> {
+) -> (FxHashMap<Box<str>, TypeLayout>, Box<[Box<str>]>) {
     let mut context = Context::new(type_declarations);
     for type_ in type_declarations.keys() {
         context.lay_out(type_);
     }
-    context
+    let memory_layouts = context
         .memory_layouts
         .into_iter()
         .map(|(type_, layout)| (type_, layout.unwrap()))
-        .collect()
+        .collect();
+    (
+        memory_layouts,
+        context.sorted_declarations.into_boxed_slice(),
+    )
 }
 struct Context<'m> {
     type_declarations: &'m FxHashMap<Box<str>, TypeDeclaration>,
     memory_layouts: FxHashMap<Box<str>, Option<TypeLayout>>,
+    sorted_declarations: Vec<Box<str>>,
 }
 impl<'m> Context<'m> {
     fn new(type_declarations: &'m FxHashMap<Box<str>, TypeDeclaration>) -> Self {
         Self {
             type_declarations,
             memory_layouts: FxHashMap::default(),
+            sorted_declarations: Vec::new(),
         }
     }
 
@@ -168,6 +174,7 @@ impl<'m> Context<'m> {
                 kind: TypeLayoutKind::Builtin,
             },
         };
+        self.sorted_declarations.push(type_.into());
         let layout = type_layout.layout;
         assert!(self
             .memory_layouts

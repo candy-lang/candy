@@ -27,6 +27,7 @@ impl ToText for Id {
 pub struct Mono {
     pub type_declarations: FxHashMap<Box<str>, TypeDeclaration>,
     pub memory_layouts: FxHashMap<Box<str>, TypeLayout>,
+    pub type_declaration_order: Box<[Box<str>]>,
     pub assignments: FxHashMap<Box<str>, Assignment>,
     pub assignment_initialization_order: Box<[Box<str>]>,
     pub functions: FxHashMap<Box<str>, Function>,

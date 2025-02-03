@@ -40,7 +40,7 @@ impl<'h> Context<'h> {
             .into_iter()
             .map(|(name, declaration)| (name, declaration.unwrap()))
             .collect();
-        let memory_layouts = lay_out_memory(&type_declarations);
+        let (memory_layouts, type_declaration_order) = lay_out_memory(&type_declarations);
 
         Mono {
             type_declarations,
@@ -58,6 +58,7 @@ impl<'h> Context<'h> {
                 .map(|(name, function)| (name, function.unwrap()))
                 .collect(),
             memory_layouts,
+            type_declaration_order,
             main_function,
         }
     }

@@ -72,8 +72,8 @@ impl<'h> Context<'h> {
         }
     }
     fn lower_type_declarations(&mut self) {
-        // FIXME: topological sort
-        for (name, declaration) in &self.mono.type_declarations {
+        for name in &self.mono.type_declaration_order {
+            let declaration = &self.mono.type_declarations[name];
             self.push(format!("struct {name} {{\n"));
             match declaration {
                 TypeDeclaration::Builtin(builtin_type) => {
