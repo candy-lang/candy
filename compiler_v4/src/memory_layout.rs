@@ -8,8 +8,8 @@ use std::{cmp::Reverse, collections::hash_map::Entry};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeLayout {
-    layout: Layout,
-    kind: TypeLayoutKind,
+    pub layout: Layout,
+    pub kind: TypeLayoutKind,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeLayoutKind {
@@ -49,10 +49,10 @@ impl Alignment {
     #[must_use]
     const fn get(self) -> usize {
         match self {
-            Alignment::_1 => 1,
-            Alignment::_2 => 2,
-            Alignment::_4 => 4,
-            Alignment::_8 => 8,
+            Self::_1 => 1,
+            Self::_2 => 2,
+            Self::_4 => 4,
+            Self::_8 => 8,
         }
     }
 }
@@ -92,7 +92,7 @@ impl<'m> Context<'m> {
     fn lay_out(&mut self, type_: &str) -> Option<Layout> {
         match self.memory_layouts.entry(type_.into()) {
             Entry::Occupied(entry) => {
-                return entry.get().map(|it| it.layout);
+                return entry.get().as_ref().map(|it| it.layout);
             }
             Entry::Vacant(entry) => {
                 entry.insert(None);
@@ -141,7 +141,7 @@ impl<'m> Context<'m> {
                 let mut size = 0;
                 let mut alignment = Alignment::default();
                 let mut boxed_variants = FxHashSet::default();
-                for variant in variants.iter() {
+                for variant in variants {
                     if let Some(value_type) = variant.value_type.as_ref() {
                         let mut layout = self.lay_out(value_type)?;
                         if self.is_field_recursive(type_, value_type) {
