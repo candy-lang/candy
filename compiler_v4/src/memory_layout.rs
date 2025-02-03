@@ -33,7 +33,6 @@ impl Layout {
 
     #[must_use]
     pub const fn new(size: usize, alignment: Alignment) -> Self {
-        assert!(size.is_multiple_of(alignment.get()));
         Self { size, alignment }
     }
 }
@@ -88,7 +87,6 @@ impl<'m> Context<'m> {
         }
     }
 
-    /// `None` means a recursive struct type that would have infinite size.
     fn lay_out(&mut self, type_: &str) -> Option<Layout> {
         match self.memory_layouts.entry(type_.into()) {
             Entry::Occupied(entry) => {
@@ -113,10 +111,14 @@ impl<'m> Context<'m> {
                 }
             }
             TypeDeclaration::Struct { fields } => {
-                let field_layouts = fields
+                let Some(field_layouts) = fields
                     .iter()
                     .map(|(name, type_)| try { (name, self.lay_out(type_)?) })
-                    .collect::<Option<Vec<_>>>()?;
+                    .collect::<Option<Vec<_>>>()
+                else {
+                    assert!(self.memory_layouts.remove(type_).unwrap().is_none());
+                    return None;
+                };
                 let parts = field_layouts
                     .iter()
                     .map(|(_, layout)| *layout)
@@ -143,11 +145,10 @@ impl<'m> Context<'m> {
                 let mut boxed_variants = FxHashSet::default();
                 for variant in variants {
                     if let Some(value_type) = variant.value_type.as_ref() {
-                        let mut layout = self.lay_out(value_type)?;
-                        if self.is_field_recursive(type_, value_type) {
-                            layout = Layout::POINTER;
+                        let layout = self.lay_out(value_type).unwrap_or_else(|| {
                             boxed_variants.force_insert(variant.name.clone());
-                        }
+                            Layout::POINTER
+                        });
                         size = size.max(layout.size);
                         alignment = alignment.max(layout.alignment);
                     }
@@ -168,29 +169,12 @@ impl<'m> Context<'m> {
             },
         };
         let layout = type_layout.layout;
-        self.memory_layouts
+        assert!(self
+            .memory_layouts
             .insert(type_.into(), Some(type_layout))
-            .unwrap();
+            .unwrap()
+            .is_none());
         Some(layout)
-    }
-    fn is_field_recursive(&self, outer_type: &str, field_type: &str) -> bool {
-        if outer_type == field_type {
-            return true;
-        }
-
-        match &self.type_declarations[field_type] {
-            TypeDeclaration::Builtin(_) => false,
-            TypeDeclaration::Struct { fields } => fields
-                .iter()
-                .any(|(_, field_type)| self.is_field_recursive(outer_type, field_type)),
-            TypeDeclaration::Enum { variants } => variants.iter().any(|variant| {
-                variant
-                    .value_type
-                    .iter()
-                    .any(|field_type| self.is_field_recursive(outer_type, field_type))
-            }),
-            TypeDeclaration::Function { .. } => false,
-        }
     }
 
     fn lay_out_aggregate(parts: &[Layout]) -> AggregateLayout {
