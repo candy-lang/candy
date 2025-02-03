@@ -1,6 +1,7 @@
 use crate::{
     hir::BuiltinFunction,
     impl_countable_id,
+    memory_layout::TypeLayout,
     to_text::{TextBuilder, ToText},
 };
 use derive_more::Deref;
@@ -25,6 +26,7 @@ impl ToText for Id {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Mono {
     pub type_declarations: FxHashMap<Box<str>, TypeDeclaration>,
+    pub memory_layouts: FxHashMap<Box<str>, TypeLayout>,
     pub assignments: FxHashMap<Box<str>, Assignment>,
     pub assignment_initialization_order: Box<[Box<str>]>,
     pub functions: FxHashMap<Box<str>, Function>,

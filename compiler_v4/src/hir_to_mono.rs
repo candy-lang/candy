@@ -2,6 +2,7 @@ use crate::{
     ast_to_hir::TypeUnifier,
     hir::{self, BuiltinFunction, Hir, NamedType, ParameterType, Type},
     id::IdGenerator,
+    memory_layout::lay_out_memory,
     mono::{self, Mono},
     type_solver::{goals::SolverSolution, values::SolverVariable},
     utils::HashMapExtension,
@@ -33,12 +34,16 @@ impl<'h> Context<'h> {
         };
         let main_function = context.lower_function(hir.main_function_id, &FxHashMap::default());
         context.lower_function(BuiltinFunction::Panic.id(), &FxHashMap::default());
+
+        let type_declarations = context
+            .type_declarations
+            .into_iter()
+            .map(|(name, declaration)| (name, declaration.unwrap()))
+            .collect();
+        let memory_layout = lay_out_memory(&type_declarations);
+
         Mono {
-            type_declarations: context
-                .type_declarations
-                .into_iter()
-                .map(|(name, declaration)| (name, declaration.unwrap()))
-                .collect(),
+            type_declarations,
             assignments: context
                 .assignments
                 .into_iter()
@@ -52,6 +57,7 @@ impl<'h> Context<'h> {
                 .into_iter()
                 .map(|(name, function)| (name, function.unwrap()))
                 .collect(),
+            memory_layouts,
             main_function,
         }
     }

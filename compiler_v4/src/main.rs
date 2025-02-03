@@ -3,7 +3,8 @@
     box_patterns,
     if_let_guard,
     let_chains,
-    try_blocks
+    try_blocks,
+    unsigned_is_multiple_of
 )]
 #![warn(clippy::nursery, clippy::pedantic, unused_crate_dependencies)]
 #![allow(
@@ -47,6 +48,7 @@ mod error;
 mod hir;
 mod hir_to_mono;
 mod id;
+mod memory_layout;
 mod mono;
 mod mono_to_c;
 mod position;
