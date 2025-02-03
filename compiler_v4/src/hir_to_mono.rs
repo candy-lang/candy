@@ -289,8 +289,8 @@ impl<'h> Context<'h> {
                             hir::BuiltinType::Int => {
                                 mono::TypeDeclaration::Builtin(mono::BuiltinType::Int)
                             }
-                            hir::BuiltinType::List(item_type) => mono::TypeDeclaration::Builtin(
-                                mono::BuiltinType::List(self.lower_type(&item_type)),
+                            hir::BuiltinType::List => mono::TypeDeclaration::Builtin(
+                                mono::BuiltinType::List(self.lower_type(&type_arguments[0])),
                             ),
                             hir::BuiltinType::Text => {
                                 mono::TypeDeclaration::Builtin(mono::BuiltinType::Text)

@@ -162,14 +162,14 @@ pub enum TypeDeclarationKind {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum BuiltinType {
     Int,
-    List(Box<Type>),
+    List,
     Text,
 }
 impl Display for BuiltinType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::Int => write!(f, "Int"),
-            Self::List(item_type) => write!(f, "List[{item_type}]"),
+            Self::List => write!(f, "List[T]"),
             Self::Text => write!(f, "Text"),
         }
     }

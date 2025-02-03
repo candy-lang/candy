@@ -504,9 +504,7 @@ impl<'a> Context<'a> {
         let kind = match &struct_type.kind {
             AstStructKind::Builtin { .. } => TypeDeclarationKind::Builtin(match &*name.string {
                 "Int" => BuiltinType::Int,
-                "List" => BuiltinType::List(Box::new(
-                    type_parameters.iter().next().unwrap().type_().into(),
-                )),
+                "List" => BuiltinType::List,
                 "Text" => BuiltinType::Text,
                 _ => {
                     self.add_error(
