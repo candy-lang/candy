@@ -62,9 +62,12 @@ pub struct AggregateLayout {
     part_offsets: Box<[usize]>,
 }
 
-pub fn lay_out_memory(
-    type_declarations: &FxHashMap<Box<str>, TypeDeclaration>,
-) -> (FxHashMap<Box<str>, TypeLayout>, Box<[Box<str>]>) {
+pub struct LayoutResult {
+    pub memory_layouts: FxHashMap<Box<str>, TypeLayout>,
+    pub type_declaration_order: Box<[Box<str>]>,
+}
+
+pub fn lay_out_memory(type_declarations: &FxHashMap<Box<str>, TypeDeclaration>) -> LayoutResult {
     let mut context = Context::new(type_declarations);
     for type_ in type_declarations.keys() {
         context.lay_out(type_);
@@ -74,10 +77,10 @@ pub fn lay_out_memory(
         .into_iter()
         .map(|(type_, layout)| (type_, layout.unwrap()))
         .collect();
-    (
+    LayoutResult {
         memory_layouts,
-        context.sorted_declarations.into_boxed_slice(),
-    )
+        type_declaration_order: context.sorted_declarations.into_boxed_slice(),
+    }
 }
 struct Context<'m> {
     type_declarations: &'m FxHashMap<Box<str>, TypeDeclaration>,
