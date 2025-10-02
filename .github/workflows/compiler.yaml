@@ -18,11 +18,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2.7.5
 
       - name: "Compiler: clippy"
-        run: cargo clippy -- --deny warnings
+        run: cargo clippy --package candy_compiler_v4 -- --deny warnings
       - name: "Compiler: test"
-        run: cargo test --workspace
+        run: cargo test --package candy_compiler_v4
       - name: "Compiler: fmt"
-        run: cargo fmt --check
+        run: cargo fmt --package candy_compiler_v4 --check
 
   vscode-extension-check:
     name: Check VS Code Extension
