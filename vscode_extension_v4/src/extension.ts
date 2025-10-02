@@ -17,9 +17,8 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // Updates can be triggered very frequently (on every keystroke), but they can
-// take long – for example, when editing the Candy compiler itself, simply
-// analyzing the files takes some time. Thus, here we make sure that only one
-// update runs at a time.
+// take long to process. Thus, here we make sure that only one update runs at a
+// time.
 let generation = 0;
 let currentRun = Promise.resolve(null);
 async function onlyRunOneAtATime(callback: () => Promise<void>) {
