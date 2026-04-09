@@ -47,6 +47,10 @@ impl<T> AstResult<T> {
             errors: self.errors,
         }
     }
+
+    pub fn add_error(&mut self, error: AstError) {
+        self.errors.push(error);
+    }
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstError {
@@ -54,7 +58,30 @@ pub struct AstError {
     pub error: String,
 }
 
-pub type Ast = Vec<AstDeclaration>;
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Ast {
+    pub use_lines: Vec<AstUseLine>,
+    pub declarations: Vec<AstDeclaration>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum AstUseLine {
+    Local(AstLocalUseLine),
+    Package(AstPackageUseLine),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstLocalUseLine {
+    pub use_keyword_span: Range<Offset>,
+    pub dot_count: usize,
+    pub path: AstResult<AstString>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct AstPackageUseLine {
+    pub use_keyword_span: Range<Offset>,
+    pub package_name: AstResult<AstString>,
+}
 
 // Declarations
 
@@ -70,6 +97,7 @@ pub enum AstDeclaration {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstStruct {
+    pub is_pub: bool,
     pub name: AstResult<AstString>,
     pub type_parameters: Option<AstTypeParameters>,
     pub kind: AstStructKind,
@@ -95,6 +123,7 @@ pub struct AstStructField {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstEnum {
+    pub is_pub: bool,
     pub name: AstResult<AstString>,
     pub type_parameters: Option<AstTypeParameters>,
     pub opening_curly_brace_error: Option<AstError>,
@@ -110,6 +139,7 @@ pub struct AstEnumVariant {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstTrait {
+    pub is_pub: bool,
     pub name: AstResult<AstString>,
     pub type_parameters: Option<AstTypeParameters>,
     pub opening_curly_brace_error: Option<AstError>,
@@ -131,6 +161,7 @@ pub struct AstImpl {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstAssignment {
+    pub is_pub: bool,
     pub display_span: Range<Offset>,
     pub name: AstResult<AstString>,
     pub type_: Option<AstResult<AstType>>,
@@ -140,6 +171,7 @@ pub struct AstAssignment {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AstFunction {
+    pub is_pub: bool,
     pub display_span: Range<Offset>,
     pub name: AstResult<AstString>,
     pub type_parameters: Option<AstTypeParameters>,
@@ -389,6 +421,30 @@ impl CollectAstErrors for i64 {
     fn collect_errors_to(&self, _errors: &mut Vec<CompilerError>) {}
 }
 
+impl CollectAstErrors for Ast {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.use_lines.collect_errors_to(errors);
+        self.declarations.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstUseLine {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        match &self {
+            Self::Local(local) => local.collect_errors_to(errors),
+            Self::Package(package) => package.collect_errors_to(errors),
+        }
+    }
+}
+impl CollectAstErrors for AstLocalUseLine {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.path.collect_errors_to(errors);
+    }
+}
+impl CollectAstErrors for AstPackageUseLine {
+    fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
+        self.package_name.collect_errors_to(errors);
+    }
+}
 impl CollectAstErrors for AstDeclaration {
     fn collect_errors_to(&self, errors: &mut Vec<CompilerError>) {
         match &self {

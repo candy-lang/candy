@@ -1,0 +1,58 @@
+use operators
+use text
+
+enum Bool { true, false }
+let true: Bool = Bool.true()
+let false: Bool = Bool.false()
+fun not(value: Bool) Bool {
+  switch value {
+    true => false,
+    false => true,
+  }
+}
+fun and(a: Bool, b: Bool) Bool {
+  switch a {
+    true => b,
+    false => false,
+  }
+}
+fun or(a: Bool, b: Bool) Bool {
+  switch a {
+    true => true,
+    false => b,
+  }
+}
+fun xor(a: Bool, b: Bool) Bool {
+  a.equals(b).not()
+}
+fun implies(a: Bool, b: Bool) Bool {
+  not(a).or(b)
+}
+fun toInt(self: Bool) Int {
+  switch self {
+    false => 0,
+    true => 1,
+  }
+}
+impl Bool: Compare {
+  fun compareTo(self: Bool, other: Bool) Ordering {
+    switch self {
+      false => switch other {
+        false => Ordering.equal(),
+        true => Ordering.less(),
+      },
+      true => switch other {
+        false => Ordering.greater(),
+        true => Ordering.equal(),
+      },
+    }
+  }
+}
+impl Bool: ToText {
+  fun toText(self: Bool) Text {
+    switch self {
+      true => "true",
+      false => "false",
+    }
+  }
+}

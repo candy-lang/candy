@@ -5,5 +5,38 @@ struct Text = builtin
 
 fun main() Int {
   builtinPrint(42.builtinIntToText())
+  let list = LinkedList(0, Maybe.some(LinkedList(1, Maybe.none[LinkedList[Int]]())))
+  builtinPrint(list.toText())
   0
+}
+
+struct LinkedList[T] {
+  data: T,
+  next: Maybe[LinkedList[T]],
+}
+
+enum Maybe[T] {
+  some: T,
+  none,
+}
+
+
+trait ToText {
+  fun toText(self: Self) Text
+}
+impl Int: ToText {
+  fun toText(self: Int) Text {
+    self.builtinIntToText()
+  }
+}
+impl[T: ToText] LinkedList[T]: ToText {
+  fun toText(self: LinkedList[T]) Text {
+    "({self.toTextHelper()})"
+  }
+}
+fun toTextHelper[T: ToText](self: LinkedList[T]) Text {
+  switch self.next {
+    some(value) => "{self.data.toText()}, {value.toTextHelper()}",
+    none => "{self.data.toText()}",
+  }
 }

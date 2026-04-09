@@ -1,0 +1,50 @@
+use .bool
+use .text
+
+enum Maybe[T] {
+  some: T,
+  none,
+}
+fun some[T](value: T) Maybe[T] {
+  Maybe.some(value)
+}
+fun none[T]() Maybe[T] {
+  Maybe.none[T]()
+}
+fun unwrap[T](self: Maybe[T]) T {
+  # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+  # self.unwrapOrElse(() { panic("`unwrap()` called on `none()`") })
+  switch self {
+    some(value) => value,
+    none => panic("`unwrap()` called on `none()`"),
+  }
+}
+fun unwrapOr[T](self: Maybe[T], defaultValue: T) T {
+  self.unwrapOrElse(() { defaultValue })
+}
+fun unwrapOrElse[T](self: Maybe[T], getDefaultValue: () T) T {
+  switch self {
+    some(value) => value,
+    none => getDefaultValue(),
+  }
+}
+fun isSome[T](self: Maybe[T]) Bool {
+  switch self {
+    some(value) => true,
+    none => false,
+  }
+}
+fun isNone[T](self: Maybe[T]) Bool {
+  switch self {
+    some(value) => false,
+    none => true,
+  }
+}
+impl[T: ToText] Maybe[T]: ToText {
+  fun toText(self: Maybe[T]) Text {
+    switch self {
+      some(value) => "some({value.toText()})",
+      none => "none()",
+    }
+  }
+}

@@ -1,0 +1,94 @@
+use ..bool
+use ..text
+use .equality
+
+trait Compare {
+  fun compareTo(self: Self, other: Self) Ordering
+}
+fun isLessThan[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => true,
+    equal => false,
+    greater => false,
+  }
+}
+fun isAtMost[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => true,
+    equal => true,
+    greater => false,
+  }
+}
+fun isGreaterThan[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => false,
+    equal => false,
+    greater => true,
+  }
+}
+fun isAtLeast[T: Compare](left: T, right: T) Bool {
+  switch left.compareTo(right) {
+    less => false,
+    equal => true,
+    greater => true,
+  }
+}
+fun coerceAtLeast[T: Compare](value: T, minimum: T) T {
+  switch value.compareTo(minimum) {
+    less => minimum,
+    equal => value,
+    greater => value,
+  }
+}
+fun coerceAtMost[T: Compare](value: T, maximum: T) T {
+  switch value.compareTo(maximum) {
+    less => value,
+    equal => value,
+    greater => maximum,
+  }
+}
+fun coerceInRange[T: Compare](value: T, minimum: T, maximum: T) T {
+  needs(minimum.isAtMost(maximum))
+
+  value.coerceAtLeast(minimum).coerceAtMost(maximum)
+}
+enum Ordering { less, equal, greater }
+impl Ordering: Compare {
+  fun compareTo(self: Ordering, other: Ordering) Ordering {
+    switch self {
+      less => switch other {
+        less => Ordering.equal(),
+        equal => Ordering.less(),
+        greater => Ordering.less(),
+      },
+      equal => switch other {
+        less => Ordering.greater(),
+        equal => Ordering.equal(),
+        greater => Ordering.less(),
+      },
+      greater => switch other {
+        less => Ordering.greater(),
+        equal => Ordering.greater(),
+        greater => Ordering.equal(),
+      },
+    }
+  }
+}
+impl Ordering: ToText {
+  fun toText(self: Ordering) Text {
+    switch self {
+      less => "less",
+      equal => "equal",
+      greater => "greater",
+    }
+  }
+}
+impl[T: Compare] T: Equal {
+  fun equals(self: T, other: T) Bool {
+    switch self.compareTo(other) {
+      less => false,
+      equal => true,
+      greater => false,
+    }
+  }
+}

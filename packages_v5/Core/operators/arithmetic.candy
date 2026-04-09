@@ -1,0 +1,13 @@
+trait OperatorPlus[T] {
+  # TODO: add associated type for return type
+  fun plus(self: Self, other: T) Self
+}
+
+
+trait Add {
+  fun add(self: Self, other: Self) Self
+}
+trait Subtract {
+  fun subtract(self: Self, other: Self) Self
+}
+# TODO: `impl[T: Add] T: OperatorPlus[T] {}`, etc.

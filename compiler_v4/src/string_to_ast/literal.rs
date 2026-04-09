@@ -25,7 +25,7 @@ define_literal!(octothorpe, "#");
 define_literal!(arrow, "=>");
 
 pub const KEYWORDS: &[&str] = &[
-    "builtin", "struct", "enum", "trait", "impl", "fun", "let", "switch",
+    "builtin", "struct", "enum", "trait", "impl", "fun", "let", "pub", "switch", "use",
 ];
 define_literal!(builtin_keyword, "builtin");
 define_literal!(struct_keyword, "struct");
@@ -34,4 +34,6 @@ define_literal!(trait_keyword, "trait");
 define_literal!(impl_keyword, "impl");
 define_literal!(fun_keyword, "fun");
 define_literal!(let_keyword, "let");
+define_literal!(pub_keyword, "pub");
 define_literal!(switch_keyword, "switch");
+define_literal!(use_keyword, "use");

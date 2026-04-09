@@ -1,0 +1,124 @@
+use .text
+
+struct Int = builtin
+impl Int: ToText {
+  fun toText(self: Int) Text {
+    self.builtinIntToText()
+  }
+}
+impl Int: Compare {
+  fun compareTo(self: Int, other: Int) Ordering {
+    self.builtinIntCompareTo(other)
+  }
+}
+fun isPositive(self: Int) Bool {
+  self.isGreaterThan(0)
+}
+fun isNonPositive(self: Int) Bool {
+  self.isAtMost(0)
+}
+fun isNegative(self: Int) Bool {
+  self.isLessThan(0)
+}
+fun isNonNegative(self: Int) Bool {
+  self.isAtLeast(0)
+}
+fun absolute(self: Int) Int {
+  switch self.isNegative() {
+    true => self.negate(),
+    false => self,
+  }
+}
+impl Int: Add {
+  fun add(self: Int, other: Int) Int {
+    self.builtinIntAdd(other)
+  }
+}
+impl Int: Subtract {
+  fun subtract(self: Int, other: Int) Int {
+    self.builtinIntSubtract(other)
+  }
+}
+fun negate(self: Int) Int {
+  0.subtract(self)
+}
+fun multiply(self: Int, other: Int) Int {
+  self.builtinIntMultiply(other)
+}
+fun square(self: Int) Int {
+  self.multiply(self)
+}
+fun divideTruncating(dividend: Int, divisor: Int) Int {
+  needs(divisor.equals(0).not())
+
+  dividend.builtinIntDivideTruncating(divisor)
+}
+fun remainder(dividend: Int, divisor: Int) Int {
+  # Returns the remainder you get when dividing the `dividend` by the `divisor`.
+  #
+  # The result has the same sign as the `dividend`.
+  #
+  # | `dividend` | `divisor` | `dividend.remainder(divisor)` |
+  # |-----------:|----------:|---------------------------:|
+  # |          6 |         3 |                          0 |
+  # |          5 |         3 |                          2 |
+  # |         -5 |         3 |                         -2 |
+  # |          5 |        -3 |                          2 |
+  # |         -5 |        -3 |                         -2 |
+  needs(divisor.equals(0).not())
+
+  dividend.builtinIntRemainder(divisor)
+}
+fun modulo(dividend: Int, divisor: Int) Int {
+  # Returns `dividend` % `divisor`.
+  #
+  # The result of a modulo operation is the smallest non-negative number $x$
+  # such that there exists a $y$ with $dividend = y * divisor + x$.
+  #
+  # | `dividend` | `divisor` | `dividend.modulo(divisor)` |
+  # |-----------:|----------:|---------------------------:|
+  # |          6 |         3 |                          0 |
+  # |          5 |         3 |                          2 |
+  # |          5 |        -3 |                          2 |
+  # |         -5 |         3 |                          1 |
+  # |         -5 |        -3 |                          1 |
+  needs(divisor.equals(0).not())
+
+  let remainder = dividend.remainder(divisor)
+  switch remainder.isNegative() {
+    true => switch divisor.isNegative() {
+      true => remainder.subtract(divisor),
+      false => remainder.add(divisor),
+    },
+    false => remainder,
+  }
+}
+fun shiftLeft(value: Int, amount: Int) Int {
+  value.builtinIntShiftLeft(amount)
+}
+fun shiftRight(value: Int, amount: Int) Int {
+  value.builtinIntShiftRight(amount)
+}
+fun bitwiseAnd(self: Int, other: Int) Int {
+  self.builtinIntBitwiseAnd(other)
+}
+fun bitwiseOr(self: Int, other: Int) Int {
+  self.builtinIntBitwiseOr(other)
+}
+fun bitwiseXor(self: Int, other: Int) Int {
+  self.builtinIntBitwiseXor(other)
+}
+fun isEven(self: Int) Bool {
+  self.remainder(2).equals(0)
+}
+fun isOdd(self: Int) Bool {
+  self.remainder(2).equals(1)
+}
+fun lowestBits(value: Int, bitCount: Int) Int {
+  needs(bitCount.isNonNegative())
+  let mask = 1.shiftLeft(bitCount).subtract(1)
+  value.bitwiseAnd(mask)
+}
+fun parseInt(text: Text) Result[Int, Text] {
+  text.builtinIntParse()
+}

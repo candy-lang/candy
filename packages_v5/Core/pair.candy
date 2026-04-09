@@ -1,0 +1,23 @@
+use collections
+use maybe
+use operators
+
+struct Pair[T0, T1] {
+  first: T0,
+  second: T1,
+}
+fun toPair[T](list: List[T]) Maybe[Pair[T, T]] {
+  switch list.length().equals(2) {
+    true => some(Pair[T, T](list.get(0).unwrap(), list.get(1).unwrap())),
+    false => none[Pair[T, T]](),
+  }
+}
+# TODO: Use this impl when it compiles
+# impl[T0: Equal, T1: Equal] Pair[T0, T1]: Equal {
+#   fun equals(self: Pair[T0, T1], other: Pair[T0, T1]) Bool {
+#     self.first.equals(other.first).and(self.second.equals(other.second))
+#   }
+# }
+fun equals[T: Equal](self: Pair[T, T], other: Pair[T, T]) Bool {
+  self.first.equals(other.first).and(self.second.equals(other.second))
+}

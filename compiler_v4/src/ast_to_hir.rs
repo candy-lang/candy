@@ -9,8 +9,9 @@ use crate::{
     hir::{
         self, Assignment, Body, BodyOrBuiltin, BuiltinFunction, BuiltinType, ContainsError,
         Expression, ExpressionKind, Function, FunctionSignature, FunctionType, Hir, Id, Impl,
-        NamedType, Parameter, ParameterType, SliceOfTypeParameter, StructField, SwitchCase, Trait,
-        TraitDefinition, TraitFunction, Type, TypeDeclaration, TypeDeclarationKind, TypeParameter,
+        Module, NamedType, Parameter, ParameterType, SliceOfTypeParameter, StructField, SwitchCase,
+        Trait, TraitDefinition, TraitFunction, Type, TypeDeclaration, TypeDeclarationKind,
+        TypeParameter,
     },
     id::IdGenerator,
     position::Offset,
@@ -35,8 +36,8 @@ use std::{
 };
 use strum::VariantArray;
 
-pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
-    let mut context = Context::new(path, ast);
+pub fn ast_to_hir(path: &Path, module: Module, ast: &Ast) -> (Hir, Vec<CompilerError>) {
+    let mut context = Context::new(path, module, ast);
     context.add_builtin_functions();
     context.lower_declarations();
     context.into_hir()
@@ -45,6 +46,7 @@ pub fn ast_to_hir(path: &Path, ast: &Ast) -> (Hir, Vec<CompilerError>) {
 #[derive(Debug)]
 struct Context<'a> {
     path: &'a Path,
+    module: Module,
     ast: &'a Ast,
     id_generator: IdGenerator<Id>,
     traits: FxHashMap<Box<str>, TraitDeclaration<'a>>,
@@ -238,9 +240,10 @@ impl Display for Signature {
 }
 
 impl<'a> Context<'a> {
-    fn new(path: &'a Path, ast: &'a Ast) -> Self {
+    fn new(path: &'a Path, module: Module, ast: &'a Ast) -> Self {
         Self {
             path,
+            module,
             ast,
             id_generator: IdGenerator::start_at(BuiltinFunction::VARIANTS.len()),
             traits: FxHashMap::default(),
@@ -425,13 +428,13 @@ impl<'a> Context<'a> {
         // TODO: remove these vecs?
         let mut assignments_to_lower = vec![];
         let mut functions_to_lower = vec![];
-        for declaration in self.ast {
+        for declaration in &self.ast.declarations {
             let AstDeclaration::Trait(trait_) = declaration else {
                 continue;
             };
             self.lower_trait_definition(trait_);
         }
-        for declaration in self.ast {
+        for declaration in &self.ast.declarations {
             match declaration {
                 AstDeclaration::Struct(struct_) => self.lower_struct(struct_),
                 AstDeclaration::Enum(enum_) => self.lower_enum(enum_),
@@ -699,7 +702,7 @@ impl<'a> Context<'a> {
                     .collect::<Box<_>>()
             });
 
-        let type_parameters = match self.ast.iter().find_map(|it| match it {
+        let type_parameters = match self.ast.declarations.iter().find_map(|it| match it {
             AstDeclaration::Trait(AstTrait {
                 name: it_name,
                 type_parameters,
@@ -947,29 +950,33 @@ impl<'a> Context<'a> {
                     .collect::<Box<_>>()
             });
 
-        let type_parameters = match self.ast.iter().find_map(|it| match it {
-            AstDeclaration::Struct(AstStruct {
-                name: it_name,
-                type_parameters,
-                ..
-            })
-            | AstDeclaration::Enum(AstEnum {
-                name: it_name,
-                type_parameters,
-                ..
-            }) if it_name.value().map(|it| &it.string) == Some(&name.string) => {
-                Some(Ok(type_parameters
-                    .as_ref()
-                    .map_or::<&[AstTypeParameter], _>(&[], |it| &it.parameters)))
-            }
-            AstDeclaration::Trait(AstTrait { name: it_name, .. })
-                if it_name.value().map(|it| &it.string) == Some(&name.string) =>
-            {
-                self.add_error(name.span.clone(), "Traits can't be used as types");
-                Some(Err(()))
-            }
-            _ => None,
-        }) {
+        let type_parameters = match self
+            .ast
+            .declarations
+            .iter()
+            .find_map(|it: &AstDeclaration| match it {
+                AstDeclaration::Struct(AstStruct {
+                    name: it_name,
+                    type_parameters,
+                    ..
+                })
+                | AstDeclaration::Enum(AstEnum {
+                    name: it_name,
+                    type_parameters,
+                    ..
+                }) if it_name.value().map(|it| &it.string) == Some(&name.string) => {
+                    Some(Ok(type_parameters
+                        .as_ref()
+                        .map_or::<&[AstTypeParameter], _>(&[], |it| &it.parameters)))
+                }
+                AstDeclaration::Trait(AstTrait { name: it_name, .. })
+                    if it_name.value().map(|it| &it.string) == Some(&name.string) =>
+                {
+                    self.add_error(name.span.clone(), "Traits can't be used as types");
+                    Some(Err(()))
+                }
+                _ => None,
+            }) {
             Some(Ok(type_parameters)) => type_parameters,
             Some(Err(())) => return Type::Error,
             None => {

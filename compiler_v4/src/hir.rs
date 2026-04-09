@@ -5,11 +5,15 @@ use crate::{
     to_text::{TextBuilder, ToText},
     type_solver::goals::{Environment, SolverGoal},
 };
+use arcstr::ArcStr;
 use derive_more::{Deref, From};
 use extension_trait::extension_trait;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    sync::Arc,
+};
 use strum::VariantArray;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -55,6 +59,28 @@ impl ToText for Id {
     fn build_text(&self, builder: &mut TextBuilder) {
         builder.push(format!("${self}"));
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Package {
+    pub name: ArcStr,
+}
+pub static PACKAGE_CORE: Package = Package {
+    name: arcstr::literal!("core"),
+};
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Module {
+    pub package: Package,
+    pub path: Arc<[ArcStr]>,
+}
+macro_rules! core_module {
+    ($($segment:ident).*) => {
+        Module {
+            package: PACKAGE_CORE.clone(),
+            path: Arc::new([$(arcstr::literal!(stringify!($segment))),*]),
+        }
+    };
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -208,6 +234,7 @@ impl ToText for (&str, &TraitDefinition) {
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Trait {
+    pub module: Module,
     pub name: Box<str>,
     pub type_arguments: Box<[Type]>,
 }
@@ -215,6 +242,7 @@ impl Trait {
     #[must_use]
     pub fn substitute(&self, environment: &FxHashMap<ParameterType, Type>) -> Self {
         Self {
+            module: self.module.clone(),
             name: self.name.clone(),
             type_arguments: self
                 .type_arguments
@@ -227,6 +255,7 @@ impl Trait {
 impl Display for Trait {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         NamedType {
+            module: self.module.clone(),
             name: self.name.clone(),
             type_arguments: self.type_arguments.clone(),
         }
@@ -344,13 +373,19 @@ pub enum Type {
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct NamedType {
+    pub module: Module,
     pub name: Box<str>,
     pub type_arguments: Box<[Type]>,
 }
 impl NamedType {
     #[must_use]
-    pub fn new(name: impl Into<Box<str>>, type_arguments: impl Into<Box<[Type]>>) -> Self {
+    pub fn new(
+        module: Module,
+        name: impl Into<Box<str>>,
+        type_arguments: impl Into<Box<[Type]>>,
+    ) -> Self {
         Self {
+            module,
             name: name.into(),
             type_arguments: type_arguments.into(),
         }
@@ -359,37 +394,37 @@ impl NamedType {
     // Builtin types
     #[must_use]
     pub fn int() -> Self {
-        Self::new("Int", [])
+        Self::new(core_module!(int), "Int", [])
     }
     #[must_use]
     pub fn list(t: impl Into<Type>) -> Self {
-        Self::new("List", [t.into()])
+        Self::new(core_module!(collections.list), "List", [t.into()])
     }
     #[must_use]
     pub fn text() -> Self {
-        Self::new("Text", [])
+        Self::new(core_module!(text), "Text", [])
     }
 
     // Standard library types
     #[must_use]
     pub fn maybe(t: impl Into<Type>) -> Self {
-        Self::new("Maybe", [t.into()])
+        Self::new(core_module!(maybe), "Maybe", [t.into()])
     }
     #[must_use]
     pub fn never() -> Self {
-        Self::new("Never", [])
+        Self::new(core_module!(primitives), "Never", [])
     }
     #[must_use]
     pub fn nothing() -> Self {
-        Self::new("Nothing", [])
+        Self::new(core_module!(primitives), "Nothing", [])
     }
     #[must_use]
     pub fn ordering() -> Self {
-        Self::new("Ordering", [])
+        Self::new(core_module!(operators.comparison), "Ordering", [])
     }
     #[must_use]
     pub fn result(t: impl Into<Type>, e: impl Into<Type>) -> Self {
-        Self::new("Result", [t.into(), e.into()])
+        Self::new(core_module!(result), "Result", [t.into(), e.into()])
     }
 }
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -465,7 +500,8 @@ impl Type {
     #[must_use]
     pub fn substitute(&self, environment: &FxHashMap<ParameterType, Self>) -> Self {
         match self {
-            Self::Named(NamedType { name, type_arguments }) => Self::Named(NamedType {
+            Self::Named(NamedType { module, name, type_arguments }) => Self::Named(NamedType {
+                module: module.clone(),
                 name: name.clone(),
                 type_arguments: type_arguments.iter().map(|it| it.substitute(environment)).collect(),
             }),

@@ -9,6 +9,7 @@ name = "candy_v4"
 path = "src/main.rs"
 
 [dependencies]
+arcstr = "1.2.0"
 # candy_compiler_v4_derive = { path = "../compiler_v4_derive" }
 clap = { version = "4.1.8", features = ["derive"] }
 derive_more = "0.99.17"

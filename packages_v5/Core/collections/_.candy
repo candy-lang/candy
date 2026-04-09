@@ -1,0 +1,8 @@
+export list
+
+trait HasLength {
+  fun length(self: Self) Int
+}
+fun isEmpty[T: HasLength](t: T) Bool {
+  t.length().equals(0)
+}

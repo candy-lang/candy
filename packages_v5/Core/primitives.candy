@@ -1,0 +1,3 @@
+struct Nothing {}
+
+enum Never {}

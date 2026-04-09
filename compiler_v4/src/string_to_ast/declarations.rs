@@ -14,10 +14,13 @@ use super::{
     },
     word::raw_identifier,
 };
-use crate::ast::{
-    AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstImpl,
-    AstParameter, AstParameters, AstString, AstStruct, AstStructField, AstStructKind, AstTrait,
-    AstTypeParameter, AstTypeParameters,
+use crate::{
+    ast::{
+        AstAssignment, AstDeclaration, AstEnum, AstEnumVariant, AstError, AstFunction, AstImpl,
+        AstParameter, AstParameters, AstString, AstStruct, AstStructField, AstStructKind, AstTrait,
+        AstTypeParameter, AstTypeParameters,
+    },
+    string_to_ast::literal::pub_keyword,
 };
 use tracing::instrument;
 
@@ -32,7 +35,18 @@ pub fn declaration<'a>(parser: Parser) -> Option<(Parser, AstDeclaration)> {
 }
 
 #[instrument(level = "trace")]
+fn is_pub(parser: Parser) -> (Parser, bool) {
+    if let Some(parser) = pub_keyword(parser) {
+        (parser.and_trailing_whitespace(), true)
+    } else {
+        (parser, false)
+    }
+}
+
+#[instrument(level = "trace")]
 fn struct_<'a>(parser: Parser) -> Option<(Parser, AstStruct)> {
+    let (parser, is_pub) = is_pub(parser);
+
     let parser = struct_keyword(parser)?.and_trailing_whitespace();
 
     let (parser, name) = raw_identifier(parser)
@@ -49,6 +63,7 @@ fn struct_<'a>(parser: Parser) -> Option<(Parser, AstStruct)> {
     Some((
         parser,
         AstStruct {
+            is_pub,
             name,
             type_parameters,
             kind,
@@ -132,6 +147,8 @@ fn struct_field<'a>(parser: Parser) -> Option<(Parser, AstStructField, Option<Pa
 
 #[instrument(level = "trace")]
 fn enum_<'a>(parser: Parser) -> Option<(Parser, AstEnum)> {
+    let (parser, is_pub) = is_pub(parser);
+
     let parser = enum_keyword(parser)?.and_trailing_whitespace();
 
     let (parser, name) = raw_identifier(parser)
@@ -168,6 +185,7 @@ fn enum_<'a>(parser: Parser) -> Option<(Parser, AstEnum)> {
     Some((
         parser,
         AstEnum {
+            is_pub,
             name,
             type_parameters,
             opening_curly_brace_error,
@@ -206,6 +224,8 @@ fn enum_variant<'a>(parser: Parser) -> Option<(Parser, AstEnumVariant, Option<Pa
 
 #[instrument(level = "trace")]
 fn trait_<'a>(parser: Parser) -> Option<(Parser, AstTrait)> {
+    let (parser, is_pub) = is_pub(parser);
+
     let parser = trait_keyword(parser)?.and_trailing_whitespace();
 
     let (parser, name) = raw_identifier(parser)
@@ -228,6 +248,7 @@ fn trait_<'a>(parser: Parser) -> Option<(Parser, AstTrait)> {
     Some((
         parser,
         AstTrait {
+            is_pub,
             name,
             type_parameters,
             opening_curly_brace_error,
@@ -285,6 +306,8 @@ fn impl_<'a>(parser: Parser) -> Option<(Parser, AstImpl)> {
 
 #[instrument(level = "trace")]
 pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
+    let (parser, is_pub) = is_pub(parser);
+
     let let_keyword_start = parser.offset();
     let parser = let_keyword(parser)?.and_trailing_whitespace();
     let let_keyword_span = let_keyword_start..parser.offset();
@@ -315,6 +338,7 @@ pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
     Some((
         parser,
         AstAssignment {
+            is_pub,
             display_span,
             name,
             type_,
@@ -326,6 +350,8 @@ pub fn assignment<'a>(parser: Parser) -> Option<(Parser, AstAssignment)> {
 
 #[instrument(level = "trace")]
 fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
+    let (parser, is_pub) = is_pub(parser);
+
     let fun_keyword_start = parser.offset();
     let parser = fun_keyword(parser)?;
     let fun_keyword_span = fun_keyword_start..parser.offset();
@@ -345,6 +371,7 @@ fn function<'a>(parser: Parser) -> Option<(Parser, AstFunction)> {
     Some((
         parser,
         AstFunction {
+            is_pub,
             display_span,
             name,
             type_parameters,

@@ -1,0 +1,58 @@
+use bool
+use text
+
+enum Result[T, E] {
+  ok: T,
+  error: E,
+}
+fun ok[T, E](value: T) Result[T, E] {
+  Result.ok[T, E](value)
+}
+fun error[T, E](value: E) Result[T, E] {
+  Result.error[T, E](value)
+}
+fun unwrap[T, E](self: Result[T, E]) T {
+  # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+  # self.unwrapOrElse((error: E) { panic("`unwrap()` called on `error()`") })
+  switch self {
+    ok(value) => value,
+    error(error) => panic("`unwrap()` called on `error()`"),
+  }
+}
+fun unwrapOr[T, E](self: Result[T, E], defaultValue: T) T {
+  self.unwrapOrElse((error: E) { defaultValue })
+}
+fun unwrapOrElse[T, E](self: Result[T, E], getDefaultValue: (E) T) T {
+  switch self {
+    ok(value) => value,
+    error(error) => getDefaultValue(error),
+  }
+}
+fun isOk[T, E](self: Result[T, E]) Bool {
+  switch self {
+    ok(value) => true,
+    error(value) => false,
+  }
+}
+fun isError[T, E](self: Result[T, E]) Bool {
+  switch self {
+    ok(value) => false,
+    error(value) => true,
+  }
+}
+# impl[T: ToText, E: ToText] Result[T, E]: ToText {
+#   fun toText(self: Result[T, E]) Text {
+#     switch self {
+#       ok(value) => "ok({value.toText()})",
+#       error(error) => "error({error.toText()})",
+#     }
+#   }
+# }
+impl[T: ToText] Result[T, Text]: ToText {
+  fun toText(self: Result[T, Text]) Text {
+    switch self {
+      ok(value) => "ok({value.toText()})",
+      error(error) => "error({error})",
+    }
+  }
+}

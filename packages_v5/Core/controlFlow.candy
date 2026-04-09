@@ -1,0 +1,17 @@
+use int
+use primitives
+
+pub fun loop(body: () Nothing) {
+  body()
+  loop(body)
+}
+pub fun repeat(times: Int, body: () Nothing) {
+  needs(times.isNonNegative())
+  switch times.isGreaterThan(0) {
+    false => {},
+    true => {
+      body()
+      repeat(times.subtract(1), body)
+    },
+  }
+}
