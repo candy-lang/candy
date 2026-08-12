@@ -6,8 +6,12 @@ import 'package:supernova/supernova.dart';
 class SourceFile {
   const SourceFile(this.file, this.content);
 
+  factory SourceFile.fromJson(String json) => SourceFile(File(json), '');
+
   final File file;
   final String content;
+
+  String toJson() => file.path;
 
   @override
   bool operator ==(Object other) {

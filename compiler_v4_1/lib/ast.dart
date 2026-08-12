@@ -1,9 +1,11 @@
 import 'package:supernova/supernova.dart';
 
+import 'json_converters.dart';
 import 'lexer/token.dart';
 import 'position.dart';
 
 part 'ast.freezed.dart';
+part 'ast.g.dart';
 
 /// The result of parsing a syntax element that is required, but might be
 /// missing or malformed.
@@ -24,17 +26,21 @@ sealed class AstDeclaration with _$AstDeclaration {
   const factory AstDeclaration.function(AstFunction function) =
       AstDeclaration_Function;
 
+  factory AstDeclaration.fromJson(Map<String, dynamic> json) =>
+      _$AstDeclarationFromJson(json);
   const AstDeclaration._();
 }
 
 @freezed
 sealed class AstStruct with _$AstStruct {
   const factory AstStruct({
-    required AstErrorOr<Token> name,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,
     required AstStructKind kind,
   }) = _AstStruct;
 
+  factory AstStruct.fromJson(Map<String, dynamic> json) =>
+      _$AstStructFromJson(json);
   const AstStruct._();
 }
 
@@ -45,48 +51,58 @@ sealed class AstStructKind with _$AstStructKind {
     required List<AstStructField> fields,
   }) = AstStructKind_UserDefined;
 
+  factory AstStructKind.fromJson(Map<String, dynamic> json) =>
+      _$AstStructKindFromJson(json);
   const AstStructKind._();
 }
 
 @freezed
 sealed class AstStructField with _$AstStructField {
   const factory AstStructField({
-    required AstErrorOr<Token> name,
-    required AstErrorOr<AstType> type,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType> type,
   }) = _AstStructField;
 
+  factory AstStructField.fromJson(Map<String, dynamic> json) =>
+      _$AstStructFieldFromJson(json);
   const AstStructField._();
 }
 
 @freezed
 sealed class AstEnum with _$AstEnum {
   const factory AstEnum({
-    required AstErrorOr<Token> name,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,
     required List<AstEnumVariant> variants,
   }) = _AstEnum;
 
+  factory AstEnum.fromJson(Map<String, dynamic> json) =>
+      _$AstEnumFromJson(json);
   const AstEnum._();
 }
 
 @freezed
 sealed class AstEnumVariant with _$AstEnumVariant {
   const factory AstEnumVariant({
-    required AstErrorOr<Token> name,
-    required AstErrorOr<AstType>? type,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType>? type,
   }) = _AstEnumVariant;
 
+  factory AstEnumVariant.fromJson(Map<String, dynamic> json) =>
+      _$AstEnumVariantFromJson(json);
   const AstEnumVariant._();
 }
 
 @freezed
 sealed class AstTrait with _$AstTrait {
   const factory AstTrait({
-    required AstErrorOr<Token> name,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,
     required List<AstFunction> functions,
   }) = _AstTrait;
 
+  factory AstTrait.fromJson(Map<String, dynamic> json) =>
+      _$AstTraitFromJson(json);
   const AstTrait._();
 }
 
@@ -95,11 +111,13 @@ sealed class AstImpl with _$AstImpl {
   const factory AstImpl({
     required Token implKeyword,
     required AstTypeParameters? typeParameters,
-    required AstErrorOr<AstType> type,
-    required AstErrorOr<AstType> trait,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType> type,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType> trait,
     required List<AstFunction> functions,
   }) = _AstImpl;
 
+  factory AstImpl.fromJson(Map<String, dynamic> json) =>
+      _$AstImplFromJson(json);
   const AstImpl._();
 }
 
@@ -107,11 +125,13 @@ sealed class AstImpl with _$AstImpl {
 sealed class AstAssignment with _$AstAssignment {
   const factory AstAssignment({
     required SourceSpan displaySpan,
-    required AstErrorOr<Token> name,
-    required AstErrorOr<AstType>? type,
-    required AstErrorOr<AstExpression> value,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType>? type,
+    @_AstExpressionOptionConverter() required AstErrorOr<AstExpression> value,
   }) = _AstAssignment;
 
+  factory AstAssignment.fromJson(Map<String, dynamic> json) =>
+      _$AstAssignmentFromJson(json);
   const AstAssignment._();
 }
 
@@ -119,32 +139,39 @@ sealed class AstAssignment with _$AstAssignment {
 sealed class AstFunction with _$AstFunction {
   const factory AstFunction({
     required SourceSpan displaySpan,
-    required AstErrorOr<Token> name,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,
+    @_AstValueParametersOptionConverter()
     required AstErrorOr<AstValueParameters> valueParameters,
     required AstType? returnType,
     required AstBody? body,
   }) = _AstFunction;
 
+  factory AstFunction.fromJson(Map<String, dynamic> json) =>
+      _$AstFunctionFromJson(json);
   const AstFunction._();
 }
 
 @freezed
-sealed class AstValueParameters with _$AstValueParameters {
+sealed class AstValueParameters with _$AstValueParameters implements ToJsonMap {
   const factory AstValueParameters({
     required List<AstValueParameter> valueParameters,
   }) = _AstValueParameters;
 
+  factory AstValueParameters.fromJson(Map<String, dynamic> json) =>
+      _$AstValueParametersFromJson(json);
   const AstValueParameters._();
 }
 
 @freezed
 sealed class AstValueParameter with _$AstValueParameter {
   const factory AstValueParameter({
-    required AstErrorOr<Token> name,
-    required AstErrorOr<AstType> type,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType> type,
   }) = _AstValueParameter;
 
+  factory AstValueParameter.fromJson(Map<String, dynamic> json) =>
+      _$AstValueParameterFromJson(json);
   const AstValueParameter._();
 }
 
@@ -154,32 +181,38 @@ sealed class AstTypeParameters with _$AstTypeParameters {
     required List<AstTypeParameter> parameters,
   }) = _AstTypeParameters;
 
+  factory AstTypeParameters.fromJson(Map<String, dynamic> json) =>
+      _$AstTypeParametersFromJson(json);
   const AstTypeParameters._();
 }
 
 @freezed
 sealed class AstTypeParameter with _$AstTypeParameter {
   const factory AstTypeParameter({
-    required AstErrorOr<Token> name,
-    required AstErrorOr<AstType>? upperBound,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType>? upperBound,
   }) = _AstTypeParameter;
 
+  factory AstTypeParameter.fromJson(Map<String, dynamic> json) =>
+      _$AstTypeParameterFromJson(json);
   const AstTypeParameter._();
 }
 
 // Types
 
 @freezed
-sealed class AstType with _$AstType {
+sealed class AstType with _$AstType implements ToJsonMap {
   const factory AstType.named({
     required Token name,
     required AstTypeArguments? typeArguments,
   }) = AstType_Named;
   const factory AstType.function({
     required List<AstType> parameterTypes,
-    required AstErrorOr<AstType> returnType,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType> returnType,
   }) = AstType_Function;
 
+  factory AstType.fromJson(Map<String, dynamic> json) =>
+      _$AstTypeFromJson(json);
   const AstType._();
 }
 
@@ -188,13 +221,15 @@ sealed class AstTypeArguments with _$AstTypeArguments {
   const factory AstTypeArguments({required List<AstType> arguments}) =
       _AstTypeArguments;
 
+  factory AstTypeArguments.fromJson(Map<String, dynamic> json) =>
+      _$AstTypeArgumentsFromJson(json);
   const AstTypeArguments._();
 }
 
 // Expressions
 
 @freezed
-sealed class AstExpression with _$AstExpression {
+sealed class AstExpression with _$AstExpression implements ToJsonMap {
   const factory AstExpression.int({required int value, required Token token}) =
       AstExpression_Int;
   const factory AstExpression.identifier(Token identifier) =
@@ -212,6 +247,8 @@ sealed class AstExpression with _$AstExpression {
   const factory AstExpression.body(AstBody body) = AstExpression_Body;
   const factory AstExpression.switch_(AstSwitch switch_) = AstExpression_Switch;
 
+  factory AstExpression.fromJson(Map<String, dynamic> json) =>
+      _$AstExpressionFromJson(json);
   const AstExpression._();
 }
 
@@ -222,17 +259,23 @@ sealed class AstTextPart with _$AstTextPart {
     required String value,
   }) = AstTextPart_Text;
   const factory AstTextPart.interpolation({
+    @_AstExpressionOptionConverter()
     required AstErrorOr<AstExpression> expression,
   }) = AstTextPart_Interpolation;
 
+  factory AstTextPart.fromJson(Map<String, dynamic> json) =>
+      _$AstTextPartFromJson(json);
   const AstTextPart._();
 }
 
 @freezed
 sealed class AstParenthesized with _$AstParenthesized {
-  const factory AstParenthesized({required AstErrorOr<AstExpression> inner}) =
-      _AstParenthesized;
+  const factory AstParenthesized({
+    @_AstExpressionOptionConverter() required AstErrorOr<AstExpression> inner,
+  }) = _AstParenthesized;
 
+  factory AstParenthesized.fromJson(Map<String, dynamic> json) =>
+      _$AstParenthesizedFromJson(json);
   const AstParenthesized._();
 }
 
@@ -241,19 +284,23 @@ sealed class AstCall with _$AstCall {
   const factory AstCall({
     required AstExpression receiver,
     required AstTypeArguments? typeArguments,
-    required AstErrorOr<AstArguments> arguments,
+    @_AstArgumentsOptionConverter() required AstErrorOr<AstArguments> arguments,
   }) = _AstCall;
 
+  factory AstCall.fromJson(Map<String, dynamic> json) =>
+      _$AstCallFromJson(json);
   const AstCall._();
 }
 
 @freezed
-sealed class AstArguments with _$AstArguments {
+sealed class AstArguments with _$AstArguments implements ToJsonMap {
   const factory AstArguments({
     required SourceSpan openingParenthesisSpan,
     required List<AstExpression> arguments,
   }) = _AstArguments;
 
+  factory AstArguments.fromJson(Map<String, dynamic> json) =>
+      _$AstArgumentsFromJson(json);
   const AstArguments._();
 }
 
@@ -266,9 +313,11 @@ extension AstErrorOrAstArguments on AstErrorOr<AstArguments> {
 sealed class AstNavigation with _$AstNavigation {
   const factory AstNavigation({
     required AstExpression receiver,
-    required AstErrorOr<Token> key,
+    @_TokenOptionConverter() required AstErrorOr<Token> key,
   }) = _AstNavigation;
 
+  factory AstNavigation.fromJson(Map<String, dynamic> json) =>
+      _$AstNavigationFromJson(json);
   const AstNavigation._();
 }
 
@@ -279,6 +328,8 @@ sealed class AstLambda with _$AstLambda {
     required AstBody body,
   }) = _AstLambda;
 
+  factory AstLambda.fromJson(Map<String, dynamic> json) =>
+      _$AstLambdaFromJson(json);
   const AstLambda._();
 }
 
@@ -286,6 +337,8 @@ sealed class AstLambda with _$AstLambda {
 sealed class AstBody with _$AstBody {
   const factory AstBody({required List<AstStatement> statements}) = _AstBody;
 
+  factory AstBody.fromJson(Map<String, dynamic> json) =>
+      _$AstBodyFromJson(json);
   const AstBody._();
 }
 
@@ -296,26 +349,59 @@ sealed class AstStatement with _$AstStatement {
   const factory AstStatement.expression(AstExpression expression) =
       AstStatement_Expression;
 
+  factory AstStatement.fromJson(Map<String, dynamic> json) =>
+      _$AstStatementFromJson(json);
   const AstStatement._();
 }
 
 @freezed
 sealed class AstSwitch with _$AstSwitch {
   const factory AstSwitch({
-    required AstErrorOr<AstExpression> value,
+    @_AstExpressionOptionConverter() required AstErrorOr<AstExpression> value,
     required List<AstSwitchCase> cases,
   }) = _AstSwitch;
 
+  factory AstSwitch.fromJson(Map<String, dynamic> json) =>
+      _$AstSwitchFromJson(json);
   const AstSwitch._();
 }
 
 @freezed
 sealed class AstSwitchCase with _$AstSwitchCase {
   const factory AstSwitchCase({
-    required AstErrorOr<Token> variant,
-    required AstErrorOr<Token>? valueName,
+    @_TokenOptionConverter() required AstErrorOr<Token> variant,
+    @_TokenOptionConverter() required AstErrorOr<Token>? valueName,
+    @_AstExpressionOptionConverter()
     required AstErrorOr<AstExpression> expression,
   }) = _AstSwitchCase;
 
+  factory AstSwitchCase.fromJson(Map<String, dynamic> json) =>
+      _$AstSwitchCaseFromJson(json);
   const AstSwitchCase._();
+}
+
+class _TokenOptionConverter
+    extends OptionConverter<Token, Map<String, dynamic>> {
+  const _TokenOptionConverter() : super(Token.fromJson);
+}
+
+class _AstTypeOptionConverter
+    extends OptionConverter<AstType, Map<String, dynamic>> {
+  const _AstTypeOptionConverter() : super(AstType.fromJson);
+}
+
+class _AstExpressionOptionConverter
+    extends OptionConverter<AstExpression, Map<String, dynamic>> {
+  const _AstExpressionOptionConverter() : super(AstExpression.fromJson);
+}
+
+class _AstArgumentsOptionConverter
+    extends OptionConverter<AstArguments, Map<String, dynamic>> {
+  const _AstArgumentsOptionConverter() : super(AstArguments.fromJson);
+}
+
+class _AstValueParametersOptionConverter
+    extends OptionConverter<AstValueParameters, Map<String, dynamic>> {
+  const _AstValueParametersOptionConverter()
+    : super(AstValueParameters.fromJson);
 }

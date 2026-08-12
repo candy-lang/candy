@@ -4,3 +4,8 @@ targets:
       freezed:
         options:
           generic_argument_factories: true
+          union_key: _type
+      json_serializable:
+        options:
+          explicit_to_json: true
+          generic_argument_factories: true

@@ -2,6 +2,7 @@ import 'package:deranged/deranged.dart';
 import 'package:supernova/supernova.dart';
 
 import 'file.dart';
+import 'json_converters.dart';
 
 part 'position.freezed.dart';
 part 'position.g.dart';
@@ -27,8 +28,13 @@ sealed class Offset with _$Offset implements Comparable<Offset> {
 
 @freezed
 sealed class SourceSpan with _$SourceSpan {
-  const factory SourceSpan(SourceFile file, RangeInclusive<Offset> span) =
-      _SourceSpan;
+  const factory SourceSpan(
+    SourceFile file,
+    @OffsetRangeInclusiveConverter() RangeInclusive<Offset> span,
+  ) = _SourceSpan;
+
+  factory SourceSpan.fromJson(Map<String, dynamic> json) =>
+      _$SourceSpanFromJson(json);
   const SourceSpan._();
 
   @override

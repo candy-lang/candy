@@ -6,13 +6,32 @@ part 'token.freezed.dart';
 part 'token.g.dart';
 
 @freezed
-sealed class Token with _$Token {
-  const factory Token({required SourceSpan span, required TokenKind kind}) =
-      _Token;
+sealed class Token with _$Token implements ToJsonMap {
+  const factory Token({
+    required SourceSpan span,
+    required TokenKind kind,
+    @protected String? text,
+  }) = _Token;
+
+  factory Token.fromJson(Map<String, dynamic> json) {
+    return Token(
+      span: SourceSpan.fromJson(json['span'] as Map<String, dynamic>),
+      kind: TokenKind.fromJson(json['kind'] as Map<String, dynamic>),
+      text: json['rawText']! as String,
+    );
+  }
   const Token._();
 
   String get rawText =>
+      text ??
       span.file.content.substring(span.span.start.value, span.span.end.value);
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'span': span.toJson(),
+    'kind': kind.toJson(),
+    'rawText': rawText,
+  };
 }
 
 @freezed
