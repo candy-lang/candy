@@ -2,26 +2,36 @@ name: compiler_v4_1
 publish_to: none
 
 environment:
-  sdk: ^3.11.4
+  sdk: ^3.12.0
 
 dependencies:
+  chrono:
   deranged:
-    git:
-      url: https://github.com/JonasWanke/deranged.git
-      ref: 8a20a7ab836fb51c8d3fac89a67a4ce537d42a11
-  path: ^1.9.0
   supernova:
-    git:
-      url: https://github.com/JonasWanke/supernova.git
-      path: supernova
-      ref: f5428ed74cd38cc8e36a39df507df370122b5908
   supernova_lints:
-    git:
-      url: https://github.com/JonasWanke/supernova.git
-      path: supernova_lints
-      ref: f5428ed74cd38cc8e36a39df507df370122b5908
 
 dev_dependencies:
   build_runner: ^2.10.5
   freezed: ^3.2.3
   json_serializable: ^6.13.1
+
+dependency_overrides:
+  chrono:
+    git:
+      url: https://github.com/JonasWanke/chrono.git
+      path: chrono
+      ref: e9306b9af7f622a4bb887351a0dfff9f5585e554
+  deranged:
+    git:
+      url: https://github.com/JonasWanke/deranged.git
+      ref: d38153c57df8cbc5130161109b3610eaac0f1e6a
+  supernova:
+    git:
+      url: https://github.com/JonasWanke/supernova.git
+      path: supernova
+      ref: 94fac8de440b5e3f164e9bae16d914c2d2ecef34
+  supernova_lints:
+    git:
+      url: https://github.com/JonasWanke/supernova.git
+      path: supernova_lints
+      ref: 94fac8de440b5e3f164e9bae16d914c2d2ecef34

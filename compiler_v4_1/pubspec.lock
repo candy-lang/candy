@@ -130,12 +130,13 @@ packages:
     source: hosted
     version: "2.0.4"
   chrono:
-    dependency: transitive
+    dependency: "direct main"
     description:
-      name: chrono
-      sha256: ec0e43e7268e2b13664a53e91249a10de423032975308d01b3aa455bd9911e35
-      url: "https://pub.dev"
-    source: hosted
+      path: chrono
+      ref: e9306b9af7f622a4bb887351a0dfff9f5585e554
+      resolved-ref: e9306b9af7f622a4bb887351a0dfff9f5585e554
+      url: "https://github.com/JonasWanke/chrono.git"
+    source: git
     version: "0.1.0"
   cli_config:
     dependency: transitive
@@ -225,20 +226,12 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.0"
-  decimal:
-    dependency: transitive
-    description:
-      name: decimal
-      sha256: "24a261d5d5c87e86c7651c417a5dbdf8bcd7080dd592533910e8d0505a279f21"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.3.3"
   deranged:
     dependency: "direct main"
     description:
       path: "."
-      ref: "8a20a7ab836fb51c8d3fac89a67a4ce537d42a11"
-      resolved-ref: "8a20a7ab836fb51c8d3fac89a67a4ce537d42a11"
+      ref: d38153c57df8cbc5130161109b3610eaac0f1e6a
+      resolved-ref: d38153c57df8cbc5130161109b3610eaac0f1e6a
       url: "https://github.com/JonasWanke/deranged.git"
     source: git
     version: "0.0.0"
@@ -266,14 +259,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.1"
-  fixed:
-    dependency: transitive
-    description:
-      name: fixed
-      sha256: "0d55e0a083026060f0b50c7f6e00d40a772d6a6b5e1812bc6e57c75ea58c21cc"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.3.0"
   fixnum:
     dependency: transitive
     description:
@@ -459,7 +444,7 @@ packages:
     source: hosted
     version: "2.2.0"
   path:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: path
       sha256: "75cca69d1490965be98c73ceaea117e8a04dd21217b37b292c9ddbec0d955bc5"
@@ -490,14 +475,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
-  rational:
-    dependency: transitive
-    description:
-      name: rational
-      sha256: cb808fb6f1a839e6fc5f7d8cb3b0a10e1db48b3be102de73938c627f0b636336
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.3"
   rxdart:
     dependency: transitive
     description:
@@ -623,8 +600,8 @@ packages:
     dependency: "direct main"
     description:
       path: supernova
-      ref: f5428ed74cd38cc8e36a39df507df370122b5908
-      resolved-ref: f5428ed74cd38cc8e36a39df507df370122b5908
+      ref: "94fac8de440b5e3f164e9bae16d914c2d2ecef34"
+      resolved-ref: "94fac8de440b5e3f164e9bae16d914c2d2ecef34"
       url: "https://github.com/JonasWanke/supernova.git"
     source: git
     version: "0.0.0"
@@ -632,8 +609,8 @@ packages:
     dependency: "direct main"
     description:
       path: supernova_lints
-      ref: f5428ed74cd38cc8e36a39df507df370122b5908
-      resolved-ref: f5428ed74cd38cc8e36a39df507df370122b5908
+      ref: "94fac8de440b5e3f164e9bae16d914c2d2ecef34"
+      resolved-ref: "94fac8de440b5e3f164e9bae16d914c2d2ecef34"
       url: "https://github.com/JonasWanke/supernova.git"
     source: git
     version: "0.0.0"
@@ -758,4 +735,4 @@ packages:
     source: hosted
     version: "2.2.4"
 sdks:
-  dart: ">=3.11.4 <4.0.0"
+  dart: ">=3.12.0 <4.0.0"
