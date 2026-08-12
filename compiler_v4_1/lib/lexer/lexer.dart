@@ -1,32 +1,30 @@
 import 'package:deranged/deranged.dart';
 import 'package:supernova/supernova.dart';
 
+import '../context.dart';
 import '../error.dart';
 import '../file.dart';
 import '../position.dart';
 import 'token.dart';
 
 class Lexer {
-  Lexer._(this.file, this.source);
+  Lexer._(this.context, this.file, this.source);
 
+  static List<Token> lex(Context context, SourceFile file, String source) {
+    final lexer = Lexer._(context, file, source);
+    lexer._scanTokens();
+    return lexer._result;
+  }
+
+  final Context context;
   final SourceFile file;
   final String source;
-
-  static (List<Token>, List<CompilerError>) lex(
-    SourceFile file,
-    String source,
-  ) {
-    final lexer = Lexer._(file, source);
-    lexer._scanTokens();
-    return (lexer._result, lexer._errors);
-  }
 
   late final _characters = source.characters.iterator;
   var _start = const Offset(0);
   var _current = const Offset(0);
   bool _isAtEnd() => _current.value == source.length;
   final _result = <Token>[];
-  final _errors = <CompilerError>[];
 
   void _add(TokenKind kind, {Offset? end}) {
     end ??= _current;
@@ -95,7 +93,7 @@ class Lexer {
       case _ when char.isAsciiLetter || char == '_':
         _scanIdentifierOrKeyword();
       default:
-        _errors.add(
+        context.addError(
           CompilerError(
             span: SourceSpan(file, _start.rangeTo(_current)),
             message: 'Unexpected character `$char`',
@@ -138,7 +136,7 @@ class Lexer {
               _add(const .escapedChar(r'\'));
             case final char:
               _add(const .regularStringPart());
-              _errors.add(
+              context.addError(
                 CompilerError(
                   span: SourceSpan(file, _start.rangeTo(_current)),
                   message: 'Incomplete escape sequence',
@@ -149,7 +147,7 @@ class Lexer {
         case null:
           maybeFinishPrecedingRegular();
           _add(const .regularStringPart());
-          _errors.add(
+          context.addError(
             CompilerError(
               span: SourceSpan(file, _start.rangeTo(_current)),
               message: 'Unterminated string literal',
@@ -173,7 +171,7 @@ class Lexer {
     while (true) {
       final next = _peek();
       if (next == null) {
-        _errors.add(
+        context.addError(
           CompilerError(
             span: SourceSpan(file, _start.rangeTo(_current)),
             message: 'Unterminated text interpolation',

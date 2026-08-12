@@ -11,14 +11,14 @@ import '../position.dart';
 class Parser {
   Parser._(this.context, this.file, this.tokens);
 
-  final Context context;
-  final SourceFile file;
-  final List<Token> tokens;
-
   static Ast parse(Context context, SourceFile file, List<Token> tokens) {
     final parser = Parser._(context, file, tokens);
     return parser._parse();
   }
+
+  final Context context;
+  final SourceFile file;
+  final List<Token> tokens;
 
   // Token kinds that can start a top-level declaration. They are used for error
   // recovery: When something can't be parsed, we don't skip tokens that could
