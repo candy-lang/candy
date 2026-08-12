@@ -11,8 +11,8 @@
   },
   "//": "https://github.com/ewanharris/vscode-versions",
   "engines": {
-    "node": "^18.17.1",
-    "vscode": "^1.86.0"
+    "node": "^22.22.0",
+    "vscode": "^1.110.0"
   },
   "categories": [
     "Programming Languages"
