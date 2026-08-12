@@ -296,7 +296,7 @@ fun split(self: Text, character: Text) List[Text] {
   self.splitIf((char: Text) { char.equals(character) })
 }
 fun splitIf(self: Text, predicate: (Text) Bool) List[Text] {
-  self.splitIfHelper(predicate, 0, 0 listOf[Text]())
+  self.splitIfHelper(predicate, 0, 0, listOf[Text]())
 }
 fun splitIfHelper(self: Text, predicate: (Text) Bool, currentStartOffset: Int, offset: Int, result: List[Text]) List[Text] {
   switch self.get(offset) {
