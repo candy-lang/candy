@@ -1,0 +1,16 @@
+[
+  {
+    "label": "pub get",
+    "command": "direnv allow && dart pub get",
+    "cwd": "compiler_v4_1/",
+    "shell": {
+      "program": "bash",
+    },
+  },
+  {
+    "label": "build_runner watch",
+    "command": "direnv allow && dart run build_runner watch --delete-conflicting-outputs",
+    "cwd": "compiler_v4_1/",
+    "reveal": "never",
+  },
+]
