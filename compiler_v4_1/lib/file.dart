@@ -20,4 +20,7 @@ class SourceFile {
 
   @override
   int get hashCode => file.path.hashCode ^ content.hashCode;
+
+  @override
+  String toString() => file.path;
 }

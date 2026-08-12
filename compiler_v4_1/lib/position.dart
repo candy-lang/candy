@@ -20,6 +20,9 @@ sealed class Offset with _$Offset implements Comparable<Offset> {
 
   Offset operator +(int other) => Offset(value + other);
   Offset operator -(int other) => Offset(value - other);
+
+  @override
+  String toString() => value.toString();
 }
 
 @freezed
@@ -27,4 +30,7 @@ sealed class SourceSpan with _$SourceSpan {
   const factory SourceSpan(SourceFile file, RangeInclusive<Offset> span) =
       _SourceSpan;
   const SourceSpan._();
+
+  @override
+  String toString() => '$file:${span.start}-${span.end}';
 }
