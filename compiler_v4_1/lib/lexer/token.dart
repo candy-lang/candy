@@ -40,6 +40,10 @@ sealed class TokenKind with _$TokenKind {
   const factory TokenKind.openingQuote() = TokenKind_OpeningQuote;
   const factory TokenKind.regularStringPart() = TokenKind_RegularStringPart;
   const factory TokenKind.escapedChar(String value) = TokenKind_EscapedChar;
+  const factory TokenKind.textInterpolationStart() =
+      TokenKind_TextInterpolationStart;
+  const factory TokenKind.textInterpolationEnd() =
+      TokenKind_TextInterpolationEnd;
   const factory TokenKind.closingQuote() = TokenKind_ClosingQuote;
 
   const factory TokenKind.builtinKeyword() = TokenKind_BuiltinKeyword;

@@ -28,11 +28,10 @@ class Lexer {
   final _result = <Token>[];
   final _errors = <CompilerError>[];
 
-  void _add(TokenKind kind) {
-    _result.add(
-      Token(span: SourceSpan(file, _start.rangeTo(_current)), kind: kind),
-    );
-    _start = _current;
+  void _add(TokenKind kind, {Offset? end}) {
+    end ??= _current;
+    _result.add(Token(span: SourceSpan(file, _start.rangeTo(end)), kind: kind));
+    _start = end;
   }
 
   String _currentString() => source.substring(_start.value, _current.value);
@@ -65,11 +64,11 @@ class Lexer {
         _add(const .comma());
       case '.':
         _add(const .dot());
-      case '=':
-        _add(const .equal());
-      case '-' when _peek() == '>':
+      case '=' when _peek() == '>':
         _advance();
         _add(const .arrow());
+      case '=':
+        _add(const .equal());
       case '#':
         while (true) {
           final next = _peek();
@@ -95,6 +94,14 @@ class Lexer {
         _scanNumber();
       case _ when char.isAsciiLetter || char == '_':
         _scanIdentifierOrKeyword();
+      default:
+        _errors.add(
+          CompilerError(
+            span: SourceSpan(file, _start.rangeTo(_current)),
+            message: 'Unexpected character `$char`',
+          ),
+        );
+        _start = _current;
     }
   }
 
@@ -103,8 +110,7 @@ class Lexer {
     void maybeFinishPrecedingRegular() {
       if (regularEnd == _start) return;
 
-      _add(const .regularStringPart());
-      _start = regularEnd;
+      _add(const .regularStringPart(), end: regularEnd);
     }
 
     while (true) {
@@ -113,6 +119,10 @@ class Lexer {
           maybeFinishPrecedingRegular();
           _add(const .closingQuote());
           return;
+        case '{':
+          maybeFinishPrecedingRegular();
+          _add(const .textInterpolationStart());
+          if (!_scanTextInterpolation()) return;
         case r'\':
           maybeFinishPrecedingRegular();
           switch (_advance()) {
@@ -150,6 +160,42 @@ class Lexer {
         // Handled by [maybeFinishPrecedingRegular].
       }
       regularEnd = _current;
+    }
+  }
+
+  /// Scans the tokens of a text interpolation, i.e., everything between `{` and
+  /// the matching `}` (both exclusive).
+  ///
+  /// Returns whether the interpolation was closed. If it wasn't, the end of the
+  /// file was reached and the enclosing text isn't terminated either.
+  bool _scanTextInterpolation() {
+    var depth = 0;
+    while (true) {
+      final next = _peek();
+      if (next == null) {
+        _errors.add(
+          CompilerError(
+            span: SourceSpan(file, _start.rangeTo(_current)),
+            message: 'Unterminated text interpolation',
+          ),
+        );
+        return false;
+      }
+
+      if (next == '}') {
+        _advance();
+        if (depth == 0) {
+          _add(const .textInterpolationEnd());
+          return true;
+        }
+
+        depth--;
+        _add(const .closingBrace());
+        continue;
+      }
+
+      if (next == '{') depth++;
+      _scanToken();
     }
   }
 
