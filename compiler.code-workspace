@@ -1,61 +1,19 @@
 {
   "folders": [
-    {
-      "name": "🍭 Candy",
-      "path": "."
-    },
-    {
-      "name": "Compiler v4",
-      "path": "compiler_v4"
-    },
-    {
-      "name": "VS Code Extension v4",
-      "path": "vscode_extension_v4"
-    },
-    {
-      "name": "Packages v5",
-      "path": "packages_v5"
-    },
-    {
-      "name": "Compiler: Frontend",
-      "path": "compiler/frontend"
-    },
-    {
-      "name": "Compiler: VM",
-      "path": "compiler/vm"
-    },
-    {
-      "name": "Compiler: Inkwell Backend",
-      "path": "compiler/backend_inkwell"
-    },
-    {
-      "name": "Compiler: Fuzzer",
-      "path": "compiler/fuzzer"
-    },
-    {
-      "name": "Compiler: Formatter",
-      "path": "compiler/formatter"
-    },
-    {
-      "name": "Compiler: Language Server",
-      "path": "compiler/language_server"
-    },
-    {
-      "name": "Compiler: CLI",
-      "path": "compiler/cli"
-    },
-    {
-      "name": "VS Code Extension",
-      "path": "vscode_extension"
-    },
-    {
-      "name": "Packages",
-      "path": "packages"
-    },
-    {
-      "name": "Old Packages",
-      "path": "old-packages"
-    }
+    { "name": "🍭 Candy", "path": "./" },
+    { "name": "Compiler v4", "path": "compiler_v4/" },
+    { "name": "VS Code Extension v4", "path": "vscode_extension_v4/" },
+    { "name": "Packages v5", "path": "packages_v5/" },
+    { "name": "Compiler: Frontend", "path": "compiler/frontend/" },
+    { "name": "Compiler: VM", "path": "compiler/vm/" },
+    { "name": "Compiler: Inkwell Backend", "path": "compiler/backend_inkwell/" },
+    { "name": "Compiler: Fuzzer", "path": "compiler/fuzzer/" },
+    { "name": "Compiler: Formatter", "path": "compiler/formatter/" },
+    { "name": "Compiler: Language Server", "path": "compiler/language_server/" },
+    { "name": "Compiler: CLI", "path": "compiler/cli/" },
+    { "name": "VS Code Extension", "path": "vscode_extension/" },
+    { "name": "Packages", "path": "packages/" },
+    { "name": "Old Packages", "path": "old-packages/" }
   ],
   "settings": {
     // Please keep these settings in sync with ./packages/candy.code-workspace.
