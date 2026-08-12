@@ -1,0 +1,34 @@
+include: package:supernova_lints/lints.yaml
+
+analyzer:
+  exclude:
+    - '**/generated/**'
+    - '*.g.dart'
+    - '*.freezed.dart'
+
+linter:
+  rules:
+    type_annotate_public_apis: false
+
+plugins:
+  essential_lints:
+    version: ^0.1.7
+    diagnostics:
+      - boolean_assignment
+      - border_radius_all
+      - completer_error_no_stack
+      - duplicate_value
+      - empty_container
+      - is_future
+      - last_getter
+      - new_instance_cascade
+      - numeric_constant_style
+      - padding_over_container
+      - pending_listener
+  prefer_shorthands: ^0.4.7
+  squiggly:
+    version: ^1.0.4
+    diagnostics:
+      equality_incomplete: true
+      copywith_incomplete: true
+      tostring_incomplete: true

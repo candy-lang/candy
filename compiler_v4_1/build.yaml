@@ -1,0 +1,6 @@
+targets:
+  $default:
+    builders:
+      freezed:
+        options:
+          generic_argument_factories: true

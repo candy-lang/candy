@@ -2,6 +2,7 @@
   "folders": [
     { "name": "🍭 Candy", "path": "./" },
     { "name": "Compiler v4", "path": "compiler_v4/" },
+    { "name": "Compiler v4.1", "path": "compiler_v4_1/" },
     { "name": "VS Code Extension v4", "path": "vscode_extension_v4/" },
     { "name": "Packages v5", "path": "packages_v5/" },
     { "name": "Compiler: Frontend", "path": "compiler/frontend/" },
