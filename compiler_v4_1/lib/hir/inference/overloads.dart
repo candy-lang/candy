@@ -1,0 +1,449 @@
+import 'package:supernova/supernova.dart';
+
+import '../../lowering/modules.dart';
+import '../../lowering/signatures.dart';
+import '../hir/hir.dart';
+import '../hir/ids.dart';
+import '../traits/hir_bridge.dart';
+import '../traits/solver.dart';
+import '../traits/solver_values.dart';
+import 'inference.dart';
+
+/// The type parameters in scope where a call appears. Their bounds are what
+/// the solver may assume; they're opaque so nothing else can be proven of them.
+class SolverContext {
+  const SolverContext(this.inScopeTypeParameters);
+
+  final List<HirTypeParameter> inScopeTypeParameters;
+
+  List<SolverGoal> get conditions => solverGoalsOfBounds(inScopeTypeParameters);
+  Set<SolverVariable> get opaqueVariables =>
+      solverVariablesOf(inScopeTypeParameters);
+}
+
+/// A function that could be called, before its type parameters are given
+/// variables to stand in for them.
+class CandidateSource {
+  const CandidateSource({
+    required this.function,
+    required this.preset,
+    required this.group,
+    required this.goals,
+  });
+
+  final LoweredFunction function;
+
+  /// Already-known substitutions: `Self`, the trait's type arguments, and the
+  /// enclosing impl's type parameters.
+  final Map<TypeParameterId, HirType> preset;
+
+  /// Lower binds tighter. Only the lowest non-empty group is considered.
+  final int group;
+
+  /// Trait obligations this candidate brings, e.g. from a blanket impl.
+  final List<SolverGoal> goals;
+
+  HirFunctionSignature get signature => function.signature;
+
+  OverloadCandidate instantiate(TypeVariables variables) {
+    final substitutions = {
+      ...preset,
+      for (final parameter in signature.typeParameters)
+        parameter.id: variables.fresh(),
+    };
+    return OverloadCandidate(
+      source: this,
+      signature: signature.copyWith(
+        parameters: signature.parameters
+            .map((it) => it.copyWith(type: it.type.substitute(substitutions)))
+            .toList(),
+        returnType: signature.returnType.substitute(substitutions),
+      ),
+      substitutions: substitutions,
+    );
+  }
+}
+
+class OverloadCandidate {
+  const OverloadCandidate({
+    required this.source,
+    required this.signature,
+    required this.substitutions,
+  });
+
+  final CandidateSource source;
+
+  /// [CandidateSource.signature] with variables in place of type parameters.
+  final HirFunctionSignature signature;
+  final Map<TypeParameterId, HirType> substitutions;
+
+  DeclarationId get id => source.signature.id;
+  bool get isGeneric => source.signature.typeParameters.isNotEmpty;
+}
+
+sealed class OverloadResolution {
+  const OverloadResolution();
+}
+
+class OverloadResolved extends OverloadResolution {
+  const OverloadResolved(this.candidate);
+  final OverloadCandidate candidate;
+}
+
+class OverloadNotFound extends OverloadResolution {
+  const OverloadNotFound(this.rejections);
+
+  /// Every candidate considered, with why it didn't apply.
+  final List<(HirFunctionSignature, String)> rejections;
+}
+
+class OverloadAmbiguous extends OverloadResolution {
+  const OverloadAmbiguous(this.candidates);
+  final List<CandidateSource> candidates;
+}
+
+class OverloadResolver {
+  OverloadResolver(this.signatures);
+
+  final Signatures signatures;
+
+  Unifier _unifier(TypeVariables variables) =>
+      Unifier(variables: variables, wellKnownTypes: signatures.wellKnownTypes);
+
+  /// Candidates for `receiver.name(…)`.
+  ///
+  /// UFCS is deliberately absent: top-level functions are never candidates
+  /// here, so a method call only ever finds trait and impl members.
+  List<CandidateSource> memberCandidates(
+    HirType receiver,
+    String name,
+    SolverContext solverContext,
+  ) {
+    final candidates = <CandidateSource>[];
+
+    // A type parameter is only usable through the traits it's bounded by.
+    if (receiver is HirType_Parameter) {
+      final parameter = solverContext.inScopeTypeParameters
+          .where((it) => it.id == receiver.id)
+          .firstOrNull;
+      if (parameter?.upperBound case Some(some: final bound)) {
+        _addTraitFunctions(
+          candidates,
+          bound,
+          receiver,
+          name,
+          group: 0,
+          goals: const [],
+        );
+      }
+      return candidates;
+    }
+
+    for (final impl in signatures.impls) {
+      if (impl.trait case Some(some: final traitRef)) {
+        final match = _matchImpl(impl, receiver, traitRef);
+        if (match == null) continue;
+
+        final (implType, instantiatedTrait, goals, implSubstitutions) = match;
+        final isBlanket = impl.type is HirType_Parameter;
+        if (isBlanket) {
+          final goal = solverGoalOf(instantiatedTrait, implType);
+          if (goal == null) continue;
+          final solution = signatures.solverEnvironment.solve(
+            goal,
+            solverContext.conditions,
+            opaqueVariables: solverContext.opaqueVariables,
+          );
+          if (!solution.isUnique) continue;
+        }
+
+        _addTraitFunctions(
+          candidates,
+          instantiatedTrait,
+          implType,
+          name,
+          group: isBlanket ? 1 : 0,
+          goals: goals,
+          impl: impl,
+          implSubstitutions: implSubstitutions,
+        );
+      }
+    }
+    return candidates;
+  }
+
+  /// Unifies the impl's self type with [receiver] in a throwaway store, so a
+  /// failed attempt leaves nothing behind.
+  (HirType, HirTrait, List<SolverGoal>, Map<TypeParameterId, HirType>)?
+  _matchImpl(LoweredImpl impl, HirType receiver, HirTrait traitRef) {
+    final scratch = TypeVariables();
+    final substitutions = {
+      for (final parameter in impl.typeParameters)
+        parameter.id: scratch.fresh(),
+    };
+
+    final implType = impl.type.substitute(substitutions);
+    if (!_unifier(scratch).unify(implType, receiver)) return null;
+
+    final resolved = {
+      for (final MapEntry(:key, :value) in substitutions.entries)
+        key: scratch.finalize(value),
+    };
+    return (
+      scratch.finalize(implType),
+      traitRef.substitute(resolved),
+      solverGoalsOfBounds(
+        impl.typeParameters,
+      ).map((it) => substituteGoal(it, resolved)).toList(),
+      resolved,
+    );
+  }
+
+  void _addTraitFunctions(
+    List<CandidateSource> candidates,
+    HirTrait traitRef,
+    HirType selfType,
+    String name, {
+    required int group,
+    required List<SolverGoal> goals,
+    LoweredImpl? impl,
+    Map<TypeParameterId, HirType> implSubstitutions = const {},
+  }) {
+    final trait = signatures.traits[traitRef.declaration];
+    if (trait == null) return;
+
+    final traitSubstitutions = {
+      ...HirType.buildEnvironment(trait.typeParameters, traitRef.typeArguments),
+      TypeParameterId.self(trait.id): selfType,
+    };
+
+    for (final traitFunctionId in trait.functionIds) {
+      final traitFunction = signatures.functions[traitFunctionId];
+      if (traitFunction == null) continue;
+      if (traitFunction.signature.name != name) continue;
+
+      // An impl that doesn't override a defaulted trait function inherits it.
+      // Without an impl the receiver is a type parameter, so the trait
+      // function itself is the callee and needs no body.
+      final implFunctionId = impl?.functionsByTraitFunction[traitFunctionId];
+      if (impl != null &&
+          implFunctionId == null &&
+          traitFunction.ast?.body == null) {
+        continue;
+      }
+
+      // An impl function's parameters are written in terms of the impl's own
+      // type parameters, so those substitutions have to travel with it.
+      candidates.add(
+        CandidateSource(
+          function: implFunctionId == null
+              ? traitFunction
+              : signatures.functions[implFunctionId]!,
+          preset: {...traitSubstitutions, ...implSubstitutions},
+          group: group,
+          goals: goals,
+        ),
+      );
+    }
+  }
+
+  /// Candidates for a bare `name(…)` call. Group 0 is reserved for a local of
+  /// function type, which body lowering handles before asking here.
+  List<CandidateSource> freeCandidates(ImportScope scope, String name) {
+    final found = scope.lookup(name);
+    if (found is! NamedFunctions) return const [];
+
+    return [
+      for (final id in found.ids)
+        if (signatures.functions[id] case final function?)
+          CandidateSource(
+            function: function,
+            preset: const {},
+            group: 1 + scope.layerOf(id),
+            goals: const [],
+          ),
+    ];
+  }
+
+  /// Picks the best candidate for the given arguments.
+  ///
+  /// Only the lowest non-empty group is considered, so a member always wins
+  /// over an import. Within it, applicable candidates are ranked by
+  /// specificity, and a non-generic candidate beats a generic one on a tie.
+  ///
+  /// The winner is re-instantiated in [variables], committing its bindings;
+  /// rejected candidates leave none.
+  OverloadResolution resolve({
+    required List<CandidateSource> candidates,
+    required List<HirType> argumentTypes,
+    required List<HirType>? typeArguments,
+    required TypeVariables variables,
+    required SolverContext solverContext,
+  }) {
+    if (candidates.isEmpty) return const OverloadNotFound([]);
+
+    final rejections = <(HirFunctionSignature, String)>[];
+    var applicable = <(CandidateSource, OverloadCandidate)>[];
+
+    final groups = candidates.map((it) => it.group).toSet().toList()..sort();
+    for (final group in groups) {
+      for (final source in candidates.where((it) => it.group == group)) {
+        final scratch = variables.speculate();
+        final candidate = source.instantiate(scratch);
+        final rejection = _reject(
+          candidate,
+          argumentTypes,
+          typeArguments,
+          scratch,
+          solverContext,
+        );
+        if (rejection == null) {
+          applicable.add((source, candidate));
+        } else {
+          rejections.add((source.signature, rejection));
+        }
+      }
+      if (applicable.isNotEmpty) break;
+    }
+
+    if (applicable.isEmpty) return OverloadNotFound(rejections);
+
+    if (applicable.length > 1) {
+      final best = _mostSpecific(applicable.map((it) => it.$2).toList());
+      if (best == null) {
+        return OverloadAmbiguous(applicable.map((it) => it.$1).toList());
+      }
+      applicable = applicable.where((it) => identical(it.$2, best)).toList();
+    }
+
+    final winner = applicable.single.$1.instantiate(variables);
+    _reject(winner, argumentTypes, typeArguments, variables, solverContext);
+    return OverloadResolved(winner);
+  }
+
+  /// `null` when the candidate applies, otherwise why it doesn't.
+  String? _reject(
+    OverloadCandidate candidate,
+    List<HirType> argumentTypes,
+    List<HirType>? typeArguments,
+    TypeVariables variables,
+    SolverContext solverContext,
+  ) {
+    final original = candidate.source.signature;
+    if (typeArguments != null &&
+        typeArguments.length != original.typeParameters.length) {
+      return 'wrong number of type arguments';
+    }
+    if (argumentTypes.length != candidate.signature.parameters.length) {
+      return 'wrong number of arguments';
+    }
+
+    final unifier = _unifier(variables);
+
+    if (typeArguments != null) {
+      for (final (index, parameter) in original.typeParameters.indexed) {
+        if (!unifier.unify(
+          candidate.substitutions[parameter.id]!,
+          typeArguments[index],
+        )) {
+          return 'type arguments are not assignable';
+        }
+      }
+    }
+
+    for (final (index, parameter) in candidate.signature.parameters.indexed) {
+      if (!unifier.assignable(argumentTypes[index], parameter.type)) {
+        final expected = variables.resolve(parameter.type);
+        final got = variables.resolve(argumentTypes[index]);
+        return 'expected `$expected` for `${parameter.name}`, got `$got`';
+      }
+    }
+
+    final resolvedSubstitutions = {
+      for (final MapEntry(:key, :value) in candidate.substitutions.entries)
+        key: variables.resolve(value),
+    };
+    // Bounds over a type that isn't pinned down yet can't be decided. Treating
+    // them as unproven would reject candidates that a later constraint makes
+    // valid, and turn one earlier error into a cascade of them.
+    final hasUnknown = resolvedSubstitutions.values.any(
+      (it) => it.containsError || variables.isUnresolved(it),
+    );
+    for (final goal in [
+      ...candidate.source.goals,
+      ...solverGoalsOfBounds(original.typeParameters),
+    ]) {
+      if (hasUnknown) continue;
+
+      final solution = signatures.solverEnvironment.solve(
+        substituteGoal(goal, resolvedSubstitutions),
+        solverContext.conditions,
+        opaqueVariables: solverContext.opaqueVariables,
+      );
+      switch (solution) {
+        case SolverSolution_Unique():
+          continue;
+        case SolverSolution_Ambiguous():
+          return 'the bound `$goal` is reachable via multiple impls';
+        case SolverSolution_Impossible():
+          return 'the bound `$goal` is not satisfied';
+      }
+    }
+
+    return null;
+  }
+
+  /// The single candidate that every other one is at least as general as.
+  OverloadCandidate? _mostSpecific(List<OverloadCandidate> candidates) {
+    OverloadCandidate? best;
+    for (final candidate in candidates) {
+      if (best == null || _isMoreSpecific(candidate, best)) best = candidate;
+    }
+    if (best == null) return null;
+
+    for (final candidate in candidates) {
+      if (identical(candidate, best)) continue;
+      if (!_isMoreSpecific(best, candidate)) return null;
+    }
+    return best;
+  }
+
+  bool _isMoreSpecific(OverloadCandidate a, OverloadCandidate b) {
+    if (!_acceptsAllOf(a, b)) return false;
+    // Interchangeable both ways: prefer the concrete signature, as Kotlin does
+    // when a generic and a non-generic overload both apply.
+    if (_acceptsAllOf(b, a)) return !a.isGeneric && b.isGeneric;
+    return true;
+  }
+
+  /// Whether every argument [a] accepts is also accepted by [b].
+  bool _acceptsAllOf(OverloadCandidate a, OverloadCandidate b) {
+    if (a.signature.parameters.length != b.signature.parameters.length) {
+      return false;
+    }
+    final unifier = _unifier(TypeVariables());
+    for (final (index, parameter) in a.signature.parameters.indexed) {
+      if (!unifier.assignable(
+        parameter.type,
+        b.signature.parameters[index].type,
+      )) {
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
+SolverGoal substituteGoal(
+  SolverGoal goal,
+  Map<TypeParameterId, HirType> substitutions,
+) => SolverGoal(
+  trait: goal.trait,
+  parameters: goal.parameters.map((it) {
+    if (it is! SolverType_Variable) return it;
+    final id = it.variable.id;
+    if (id is! SolverVariableId_Parameter) return it;
+    final replacement = substitutions[id.id];
+    return replacement == null ? it : (solverTypeOf(replacement) ?? it);
+  }).toList(),
+);

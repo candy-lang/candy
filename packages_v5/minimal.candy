@@ -4,6 +4,6 @@ struct Int = builtin
 struct Text = builtin
 
 fun main() Int {
-  builtinPrint(42.builtinIntToText())
+  builtinPrint(builtinIntToText(42))
   0
 }
