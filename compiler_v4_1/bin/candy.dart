@@ -52,9 +52,11 @@ class Exit implements Exception {
 /// no package is found, so single-file invocations still work.
 Directory findPackageRoot(File file) {
   for (var directory = file.absolute.parent; ;) {
-    if (File('${directory.path}/_package.candy').existsSync()) return directory;
+    if ((directory ~/ '_package.candy').existsSync()) return directory;
+
     final parent = directory.parent;
     if (parent.path == directory.path) return file.absolute.parent;
+
     directory = parent;
   }
 }
