@@ -1,7 +1,6 @@
 // ignore_for_file: avoid_print
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
@@ -15,6 +14,8 @@ import 'package:compiler_v4_1/mono/backend/mono_to_c.dart';
 import 'package:compiler_v4_1/mono/hir_to_mono.dart';
 import 'package:compiler_v4_1/mono/mono/to_text.dart';
 import 'package:compiler_v4_1/parser/parser.dart';
+import 'package:supernova/supernova.dart';
+import 'package:supernova/supernova_io.dart';
 
 Future<void> main(List<String> arguments) async {
   final runner = CommandRunner<void>('candy', 'The 🍭 Candy CLI.')
@@ -72,10 +73,7 @@ LoadedPackage loadPackageForFile(File file) {
   }
 
   final root = findPackageRoot(file);
-  final package = Package(
-    name: root.path.split(Platform.pathSeparator).last,
-    rootDirectory: root,
-  );
+  final package = Package(name: root.name, rootDirectory: root);
   return loadPackage(package, package.discoverFiles());
 }
 
@@ -110,6 +108,15 @@ void printErrors(Context context) {
 // `check`
 
 class CheckCommand extends Command<void> {
+  CheckCommand() {
+    argParser.addFlag(
+      'watch',
+      abbr: 'w',
+      negatable: false,
+      help: 'Re-check whenever the file or its package changes.',
+    );
+  }
+
   @override
   final name = 'check';
   @override
@@ -118,12 +125,44 @@ class CheckCommand extends Command<void> {
   @override
   Future<void> run() async {
     final path = _requirePath(argResults!);
-    final loaded = loadPackageForFile(File(path));
-    astToHir(loaded.context, loaded.modules);
 
-    if (loaded.context.errors.isNotEmpty) {
-      printErrors(loaded.context);
-      throw const Exit(Exit.codeContainsErrors);
+    if (!argResults!.flag('watch')) {
+      _check(path);
+      return;
+    }
+
+    final root = findPackageRoot(File(path));
+    _check(path, exitOnError: false, clearScreen: true);
+
+    await for (final _
+        in root
+            .watch(recursive: true)
+            .where((it) => it.path.endsWith('.candy'))
+            .debounceTime(const Duration(milliseconds: 100))) {
+      _check(path, exitOnError: false, clearScreen: true);
+    }
+  }
+
+  void _check(
+    String path, {
+    bool exitOnError = true,
+    bool clearScreen = false,
+  }) {
+    // Move the cursor home and clear the screen so each re-check overwrites
+    // the previous one instead of scrolling the terminal.
+    if (clearScreen) stdout.write('\x1B[2J\x1B[H');
+
+    try {
+      final loaded = loadPackageForFile(File(path));
+      astToHir(loaded.context, loaded.modules);
+
+      if (loaded.context.errors.isNotEmpty) {
+        printErrors(loaded.context);
+        throw const Exit(Exit.codeContainsErrors);
+      }
+      if (clearScreen) print('✅ No errors found');
+    } on Exit {
+      if (exitOnError) rethrow;
     }
   }
 }
@@ -131,6 +170,15 @@ class CheckCommand extends Command<void> {
 // `compile`
 
 class CompileCommand extends Command<void> {
+  CompileCommand() {
+    argParser.addFlag(
+      'watch',
+      abbr: 'w',
+      negatable: false,
+      help: 'Recompile whenever the file or its package changes.',
+    );
+  }
+
   @override
   final name = 'compile';
   @override
@@ -139,38 +187,62 @@ class CompileCommand extends Command<void> {
   @override
   Future<void> run() async {
     final path = _requirePath(argResults!);
-    final loaded = loadPackageForFile(File(path));
-    final hir = astToHir(loaded.context, loaded.modules);
 
-    if (loaded.context.errors.isNotEmpty) {
-      printErrors(loaded.context);
-      throw const Exit(Exit.codeContainsErrors);
+    if (!argResults!.flag('watch')) {
+      await _compile(path);
+      return;
     }
 
-    final mono = hirToMono(hir);
-    if (mono == null) {
-      stderr.writeln('No `main` function found.');
-      throw const Exit(Exit.codeContainsErrors);
+    final root = findPackageRoot(File(path));
+    await _compile(path, exitOnError: false);
+
+    await for (final _
+        in root
+            .watch(recursive: true)
+            .where((it) => it.path.endsWith('.candy'))
+            .debounceTime(const Duration(milliseconds: 100))) {
+      print('Detected changes, recompiling...');
+      await _compile(path, exitOnError: false);
     }
+  }
 
-    final cCode = monoToC(mono);
-    final cPath = '${path.substring(0, path.lastIndexOf('.'))}.c';
-    File(cPath).writeAsStringSync(cCode);
-    await Process.run('clang-format', ['-i', cPath]);
+  Future<void> _compile(String path, {bool exitOnError = true}) async {
+    try {
+      final loaded = loadPackageForFile(File(path));
+      final hir = astToHir(loaded.context, loaded.modules);
 
-    final executablePath = path.substring(0, path.lastIndexOf('.'));
-    final gcc = await Process.run('gcc', [
-      cPath,
-      '-O3',
-      '-o',
-      executablePath,
-    ]);
-    if (gcc.exitCode != 0) {
-      stderr.write(gcc.stderr);
-      throw const Exit(Exit.codeContainsErrors);
+      if (loaded.context.errors.isNotEmpty) {
+        printErrors(loaded.context);
+        throw const Exit(Exit.codeContainsErrors);
+      }
+
+      final mono = hirToMono(hir);
+      if (mono == null) {
+        stderr.writeln('No `main` function found.');
+        throw const Exit(Exit.codeContainsErrors);
+      }
+
+      final cCode = monoToC(mono);
+      final cPath = '${path.substring(0, path.lastIndexOf('.'))}.c';
+      File(cPath).writeAsStringSync(cCode);
+      await Process.run('clang-format', ['-i', cPath]);
+
+      final executablePath = path.substring(0, path.lastIndexOf('.'));
+      final gcc = await Process.run('gcc', [
+        cPath,
+        '-O3',
+        '-o',
+        executablePath,
+      ]);
+      if (gcc.exitCode != 0) {
+        stderr.write(gcc.stderr);
+        throw const Exit(Exit.codeContainsErrors);
+      }
+
+      print('Done 🎉');
+    } on Exit {
+      if (exitOnError) rethrow;
     }
-
-    print('Done 🎉');
   }
 }
 
@@ -342,9 +414,7 @@ abstract class DebugGoldSubcommand extends Command<void> {
 
   Directory get outputDirectory {
     final option = argResults!['output-directory'] as String?;
-    final result = option != null
-        ? Directory(option)
-        : Directory('${directory.path}/.goldens');
+    final result = option != null ? Directory(option) : directory / '.goldens';
     result.createSync(recursive: true);
     return result;
   }
