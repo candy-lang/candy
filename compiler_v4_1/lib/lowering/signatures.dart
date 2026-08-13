@@ -217,6 +217,7 @@ class _SignatureLowerer {
               HirStructField(
                 name: name.rawText,
                 type: lowerer.lowerType(field.type.toNullable(), typeScope),
+                visibility: field.visibility,
               ),
         ],
       ),

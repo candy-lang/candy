@@ -74,6 +74,9 @@ sealed class TokenKind with _$TokenKind {
   const factory TokenKind.funKeyword() = TokenKind_FunKeyword;
   const factory TokenKind.letKeyword() = TokenKind_LetKeyword;
   const factory TokenKind.switchKeyword() = TokenKind_SwitchKeyword;
+  const factory TokenKind.useKeyword() = TokenKind_UseKeyword;
+  const factory TokenKind.packageKeyword() = TokenKind_PackageKeyword;
+  const factory TokenKind.publicKeyword() = TokenKind_PublicKeyword;
 
   const factory TokenKind.endOfFile() = TokenKind_EndOfFile;
 

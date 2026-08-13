@@ -24,6 +24,9 @@ class Parser {
   // recovery: When something can't be parsed, we don't skip tokens that could
   // start the next declaration.
   static const _declarationFirstSet = SyntaxElementTypeSet.of({
+    TokenKind_UseKeyword,
+    TokenKind_PackageKeyword,
+    TokenKind_PublicKeyword,
     TokenKind_StructKeyword,
     TokenKind_EnumKeyword,
     TokenKind_TraitKeyword,
@@ -201,9 +204,21 @@ class Parser {
   // Declarations
 
   Ast _parse() {
+    final uses = <AstUse>[];
+    while (at<TokenKind_UseKeyword>()) {
+      uses.add(parseUse());
+    }
+
     final declarations = <AstDeclaration>[];
     while (!_isAtEnd) {
-      final declaration = parseDeclaration();
+      if (at<TokenKind_UseKeyword>()) {
+        error('`use` must come before all declarations.');
+        uses.add(parseUse());
+        continue;
+      }
+
+      final visibility = _parseVisibility();
+      final declaration = parseDeclaration(visibility);
       if (declaration == null) {
         errorAndAdvance('Expected a declaration.');
         continue;
@@ -211,20 +226,52 @@ class Parser {
 
       declarations.add(declaration);
     }
-    return declarations;
+    return Ast(uses: uses, declarations: declarations);
   }
 
-  AstDeclaration? parseDeclaration() => switch (_peek().kind) {
-    TokenKind_StructKeyword() => .struct(parseStruct()),
-    TokenKind_EnumKeyword() => .enum_(parseEnum()),
-    TokenKind_TraitKeyword() => .trait(parseTrait()),
-    TokenKind_ImplKeyword() => .impl(parseImpl()),
-    TokenKind_LetKeyword() => .assignment(parseAssignment()),
-    TokenKind_FunKeyword() => .function(parseFunction()),
-    _ => null,
-  };
+  AstVisibility _parseVisibility() {
+    if (_advanceIfKind<TokenKind_PackageKeyword>() != null) return .package;
+    if (_advanceIfKind<TokenKind_PublicKeyword>() != null) return .public;
+    return .private;
+  }
 
-  AstStruct parseStruct() {
+  AstUse parseUse() {
+    final useKeyword = advance();
+
+    final path = <Token>[];
+    if (_advanceIfKind<TokenKind_PackageKeyword>() case final root?) {
+      path.add(root);
+    } else {
+      final name = expectIdentifier(
+        'This `use` is missing a module path.',
+        recoverySet: _declarationFirstSet,
+      );
+      if (name.toNullable() case final token?) path.add(token);
+    }
+
+    while (_advanceIfKind<TokenKind_Dot>() != null) {
+      final segment = expectIdentifier(
+        'This `use` path is missing a segment after the dot.',
+        recoverySet: _declarationFirstSet,
+      );
+      if (segment.toNullable() case final token?) path.add(token);
+    }
+
+    return AstUse(useKeyword: useKeyword, path: path);
+  }
+
+  AstDeclaration? parseDeclaration(AstVisibility visibility) =>
+      switch (_peek().kind) {
+        TokenKind_StructKeyword() => .struct(parseStruct(visibility)),
+        TokenKind_EnumKeyword() => .enum_(parseEnum(visibility)),
+        TokenKind_TraitKeyword() => .trait(parseTrait(visibility)),
+        TokenKind_ImplKeyword() => .impl(parseImpl(visibility)),
+        TokenKind_LetKeyword() => .assignment(parseAssignment(visibility)),
+        TokenKind_FunKeyword() => .function(parseFunction(visibility)),
+        _ => null,
+      };
+
+  AstStruct parseStruct(AstVisibility visibility) {
     advance(); // `struct`
 
     final name = expectIdentifier(
@@ -262,12 +309,22 @@ class Parser {
       kind = .userDefined(fields: fields);
     }
 
-    return AstStruct(name: name, typeParameters: typeParameters, kind: kind);
+    return AstStruct(
+      visibility: visibility,
+      name: name,
+      typeParameters: typeParameters,
+      kind: kind,
+    );
   }
 
   AstStructField? parseStructField() {
-    if (!at<TokenKind_Identifier>()) return null;
+    if (!at<TokenKind_Identifier>() &&
+        !at<TokenKind_PackageKeyword>() &&
+        !at<TokenKind_PublicKeyword>()) {
+      return null;
+    }
 
+    final visibility = _parseVisibility();
     final name = expectIdentifier('This struct field is missing a name.');
     expect<TokenKind_Colon>(
       'This struct field is missing a colon.',
@@ -275,10 +332,10 @@ class Parser {
     );
     final type = parseTypeOrError('This struct field is missing a type.');
 
-    return AstStructField(name: name, type: type);
+    return AstStructField(visibility: visibility, name: name, type: type);
   }
 
-  AstEnum parseEnum() {
+  AstEnum parseEnum(AstVisibility visibility) {
     advance(); // `enum`
 
     final name = expectIdentifier(
@@ -307,6 +364,7 @@ class Parser {
     );
 
     return AstEnum(
+      visibility: visibility,
       name: name,
       typeParameters: typeParameters,
       variants: variants,
@@ -326,7 +384,7 @@ class Parser {
     return AstEnumVariant(name: name, type: type);
   }
 
-  AstTrait parseTrait() {
+  AstTrait parseTrait(AstVisibility visibility) {
     advance(); // `trait`
 
     final name = expectIdentifier(
@@ -351,13 +409,18 @@ class Parser {
     );
 
     return AstTrait(
+      visibility: visibility,
       name: name,
       typeParameters: typeParameters,
       functions: functions,
     );
   }
 
-  AstImpl parseImpl() {
+  AstImpl parseImpl(AstVisibility visibility) {
+    if (visibility != .private) {
+      error("An `impl` can't have a visibility modifier.");
+    }
+
     final implKeyword = advance(); // `impl`
 
     final typeParameters = at<TokenKind_OpeningBracket>()
@@ -403,19 +466,28 @@ class Parser {
   List<AstFunction> parseFunctions() {
     final functions = <AstFunction>[];
     while (!at<TokenKind_ClosingBrace>() && !_isAtEnd) {
+      final visibility = _parseVisibility();
+      if (visibility != .private) {
+        error(
+          "A function inside a trait or impl can't have a visibility modifier.",
+        );
+      }
+
       if (!at<TokenKind_FunKeyword>()) {
-        if (atSet(_declarationFirstSet)) break;
+        if (visibility == .private && atSet(_declarationFirstSet)) {
+          break;
+        }
 
         errorAndAdvance('Expected a function.');
         continue;
       }
 
-      functions.add(parseFunction());
+      functions.add(parseFunction(.private));
     }
     return functions;
   }
 
-  AstAssignment parseAssignment() {
+  AstAssignment parseAssignment(AstVisibility visibility) {
     final letKeyword = advance(); // `let`
 
     final name = expectIdentifier(
@@ -439,6 +511,7 @@ class Parser {
     );
 
     return AstAssignment(
+      visibility: visibility,
       displaySpan: name.toNullable()?.span ?? letKeyword.span,
       name: name,
       type: type,
@@ -446,7 +519,7 @@ class Parser {
     );
   }
 
-  AstFunction parseFunction() {
+  AstFunction parseFunction(AstVisibility visibility) {
     final funKeyword = advance(); // `fun`
 
     final name = expectIdentifier(
@@ -476,6 +549,7 @@ class Parser {
     final body = at<TokenKind_OpeningBrace>() ? parseBody() : null;
 
     return AstFunction(
+      visibility: visibility,
       displaySpan: name.toNullable()?.span ?? funKeyword.span,
       name: name,
       typeParameters: typeParameters,
@@ -864,7 +938,7 @@ class Parser {
 
   AstStatement? parseStatement() {
     if (at<TokenKind_LetKeyword>()) {
-      return AstStatement.assignment(parseAssignment());
+      return AstStatement.assignment(parseAssignment(.private));
     }
 
     final expression = parseExpression();

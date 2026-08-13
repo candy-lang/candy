@@ -224,6 +224,9 @@ class Lexer {
       'fun' => const .funKeyword(),
       'let' => const .letKeyword(),
       'switch' => const .switchKeyword(),
+      'use' => const .useKeyword(),
+      'package' => const .packageKeyword(),
+      'public' => const .publicKeyword(),
       _ => const .identifier(),
     });
   }

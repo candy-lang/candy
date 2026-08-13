@@ -1,5 +1,6 @@
 import 'package:supernova/supernova.dart';
 
+import '../../ast.dart';
 import '../traits/solver.dart';
 import 'builtins.dart';
 import 'ids.dart';
@@ -200,8 +201,11 @@ sealed class HirTypeDeclarationKind with _$HirTypeDeclarationKind {
 
 @freezed
 sealed class HirStructField with _$HirStructField {
-  const factory HirStructField({required String name, required HirType type}) =
-      _HirStructField;
+  const factory HirStructField({
+    required String name,
+    required HirType type,
+    @Default(AstVisibility.private) AstVisibility visibility,
+  }) = _HirStructField;
 }
 
 @freezed

@@ -12,6 +12,7 @@ sealed class CollectedDeclaration {
 
   DeclarationId get id;
   ModuleId get module => id.module;
+  AstVisibility get visibility;
 }
 
 class CollectedStruct extends CollectedDeclaration {
@@ -19,6 +20,8 @@ class CollectedStruct extends CollectedDeclaration {
   @override
   final DeclarationId id;
   final AstStruct ast;
+  @override
+  AstVisibility get visibility => ast.visibility;
 }
 
 class CollectedEnum extends CollectedDeclaration {
@@ -26,6 +29,8 @@ class CollectedEnum extends CollectedDeclaration {
   @override
   final DeclarationId id;
   final AstEnum ast;
+  @override
+  AstVisibility get visibility => ast.visibility;
 }
 
 class CollectedTrait extends CollectedDeclaration {
@@ -38,6 +43,8 @@ class CollectedTrait extends CollectedDeclaration {
   final DeclarationId id;
   final AstTrait ast;
   final List<CollectedFunction> functions;
+  @override
+  AstVisibility get visibility => ast.visibility;
 }
 
 class CollectedImpl extends CollectedDeclaration {
@@ -50,6 +57,10 @@ class CollectedImpl extends CollectedDeclaration {
   final DeclarationId id;
   final AstImpl ast;
   final List<CollectedFunction> functions;
+
+  /// Impls are never named, so they are never imported.
+  @override
+  AstVisibility get visibility => .private;
 }
 
 class CollectedFunction extends CollectedDeclaration {
@@ -57,6 +68,8 @@ class CollectedFunction extends CollectedDeclaration {
   @override
   final DeclarationId id;
   final AstFunction ast;
+  @override
+  AstVisibility get visibility => ast.visibility;
 }
 
 class CollectedAssignment extends CollectedDeclaration {
@@ -64,6 +77,8 @@ class CollectedAssignment extends CollectedDeclaration {
   @override
   final DeclarationId id;
   final AstAssignment ast;
+  @override
+  AstVisibility get visibility => ast.visibility;
 }
 
 class CollectedDeclarations {
@@ -101,14 +116,23 @@ class _Collector {
       context.addError(CompilerError(span: span, message: message));
 
   CollectedDeclarations _collect(List<Module> modules) {
-    final prelude = buildPrelude();
     for (final module in modules) {
       _scopes[module.id] = ImportScope(
         moduleDeclarations: _collectModule(module),
         imports: {},
-        prelude: prelude,
+        prelude: {},
       );
     }
+
+    final byId = {for (final module in modules) module.id: module};
+    final knownPackages = {
+      ...byId.keys.map((it) => it.packageName),
+      ModuleId.builtinPackageName,
+    };
+    for (final module in modules) {
+      _resolveImports(module, byId, knownPackages);
+    }
+    _fillPrelude(modules);
 
     return CollectedDeclarations(
       modules: modules,
@@ -116,6 +140,144 @@ class _Collector {
       declarations: _declarations,
       wellKnownTypes: _findWellKnownTypes(),
     );
+  }
+
+  void _resolveImports(
+    Module module,
+    Map<ModuleId, Module> byId,
+    Set<String> knownPackages,
+  ) {
+    final imports = _scopes[module.id]!.imports;
+    final seen = <ModuleId>{};
+
+    for (final use in module.ast.uses) {
+      if (use.path.isEmpty) continue;
+
+      final span = use.useKeyword.span;
+      final root = use.path.first;
+      final packageName = root.kind is TokenKind_PackageKeyword
+          ? module.id.packageName
+          : root.rawText;
+      final target = ModuleId(
+        packageName: packageName,
+        path: [for (final segment in use.path.skip(1)) segment.rawText],
+      );
+
+      if (target == module.id) {
+        _error(span, "A module can't import itself.");
+        continue;
+      }
+      if (target == ModuleId.builtin) {
+        if (!seen.add(target)) {
+          _error(span, '`${_pathText(use)}` is already imported.');
+          continue;
+        }
+        for (final MapEntry(key: name, value: declarations)
+            in buildBuiltins().entries) {
+          _merge(imports, name, declarations);
+        }
+        continue;
+      }
+      if (!knownPackages.contains(packageName)) {
+        _error(span, 'Unknown package: `$packageName`.');
+        continue;
+      }
+      if (!byId.containsKey(target)) {
+        _error(span, 'Unknown module: `${_pathText(use)}`.');
+        continue;
+      }
+      if (!seen.add(target)) {
+        _error(span, '`${_pathText(use)}` is already imported.');
+        continue;
+      }
+
+      _importFrom(imports, target, module.id.packageName);
+    }
+  }
+
+  /// Core's public declarations are ambient everywhere except inside Core,
+  /// which would otherwise merge its own overload sets into themselves.
+  void _fillPrelude(List<Module> modules) {
+    final core = <String, NamedDeclarations>{};
+    for (final module in modules) {
+      if (module.id.packageName != ModuleId.corePackageName) continue;
+
+      for (final MapEntry(key: name, value: declarations)
+          in _scopes[module.id]!.moduleDeclarations.entries) {
+        final visible = _visibleOnly(declarations, false);
+        if (visible != null) _merge(core, name, visible);
+      }
+    }
+    if (core.isEmpty) return;
+
+    for (final module in modules) {
+      if (module.id.packageName == ModuleId.corePackageName) continue;
+      _scopes[module.id]!.prelude.addAll(core);
+    }
+  }
+
+  String _pathText(AstUse use) => use.path.map((it) => it.rawText).join('.');
+
+  void _importFrom(
+    Map<String, NamedDeclarations> imports,
+    ModuleId target,
+    String importingPackage,
+  ) {
+    final samePackage = target.packageName == importingPackage;
+    for (final MapEntry(key: name, value: declarations)
+        in _scopes[target]!.moduleDeclarations.entries) {
+      final visible = _visibleOnly(declarations, samePackage);
+      if (visible != null) _merge(imports, name, visible);
+    }
+  }
+
+  NamedDeclarations? _visibleOnly(
+    NamedDeclarations declarations,
+    bool samePackage,
+  ) {
+    bool isVisible(DeclarationId id) => switch (_declarations[id]!.visibility) {
+      .private => false,
+      .package => samePackage,
+      .public => true,
+    };
+
+    switch (declarations) {
+      case NamedFunctions(:final ids):
+        final visible = ids.where(isVisible).toList();
+        return visible.isEmpty ? null : NamedFunctions(visible);
+      case NamedType(:final id):
+      case NamedTrait(:final id):
+      case NamedAssignment(:final id):
+        return isVisible(id) ? declarations : null;
+      case NamedAmbiguous():
+        // A module's own declarations are never ambiguous.
+        return null;
+    }
+  }
+
+  List<DeclarationId> _idsOf(NamedDeclarations declarations) =>
+      switch (declarations) {
+        NamedFunctions(:final ids) || NamedAmbiguous(:final ids) => ids,
+        NamedType(:final id) ||
+        NamedTrait(:final id) ||
+        NamedAssignment(:final id) => [id],
+      };
+
+  void _merge(
+    Map<String, NamedDeclarations> imports,
+    String name,
+    NamedDeclarations incoming,
+  ) {
+    final existing = imports[name];
+    if (existing == null) {
+      imports[name] = incoming;
+      return;
+    }
+    if (existing is NamedFunctions && incoming is NamedFunctions) {
+      imports[name] = NamedFunctions([...existing.ids, ...incoming.ids]);
+      return;
+    }
+    imports[name] = NamedAmbiguous([..._idsOf(existing), ..._idsOf(incoming)]);
   }
 
   Map<String, NamedDeclarations> _collectModule(Module module) {
@@ -137,6 +299,8 @@ class _Collector {
           NamedFunctions() =>
             "A top-level declaration can't have the same name as a "
                 'top-level function: `$name`.',
+          NamedAmbiguous() =>
+            'A top-level declaration named `$name` already exists.',
         });
         return false;
       }
@@ -158,7 +322,7 @@ class _Collector {
       return id;
     }
 
-    for (final declaration in module.ast) {
+    for (final declaration in module.ast.declarations) {
       switch (declaration) {
         case AstDeclaration_Struct(:final struct):
           final id = declare(struct.name, NamedType.new);
@@ -265,6 +429,8 @@ class _Collector {
       if (declaration is! CollectedStruct && declaration is! CollectedEnum) {
         continue;
       }
+      if (declaration.module.packageName != ModuleId.corePackageName) continue;
+
       final name = declaration.id.name;
       if (WellKnownTypes.names.contains(name)) {
         found.putIfAbsent(name, () => declaration.id);

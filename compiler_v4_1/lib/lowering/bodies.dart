@@ -426,6 +426,12 @@ class _Builder {
           'Referencing a function as a value is not supported yet.',
         );
         return const _LoweringError();
+      case NamedAmbiguous(:final originsText):
+        _error(
+          identifier.span,
+          'Ambiguous name `$name`, imported from $originsText.',
+        );
+        return const _LoweringError();
       case null:
         if (lowerer.typeScope.find(name) != null) {
           _error(identifier.span, "A type parameter can't be used as a value.");
@@ -486,6 +492,11 @@ class _Builder {
           .where((it) => it.name == key.rawText)
           .firstOrNull;
       if (field != null) {
+        if (!_isFieldVisible(field, resolved.declaration)) {
+          _error(key.span, _fieldVisibilityMessage(field, key.rawText));
+          return const _LoweringError();
+        }
+
         final type = field.type.substitute(
           HirType.buildEnvironment(
             declaration!.typeParameters,
@@ -511,6 +522,18 @@ class _Builder {
     );
     return const _LoweringError();
   }
+
+  bool _isFieldVisible(HirStructField field, DeclarationId owner) =>
+      switch (field.visibility) {
+        .private => owner.module == lowerer.module,
+        .package => owner.module.packageName == lowerer.module.packageName,
+        .public => true,
+      };
+
+  String _fieldVisibilityMessage(HirStructField field, String name) =>
+      field.visibility == .private
+      ? 'The field `$name` is private.'
+      : 'The field `$name` is not visible here.';
 
   _Lowered _lowerLambda(AstLambda lambda, HirType? expectedType) {
     final expected = expectedType == null
@@ -741,6 +764,13 @@ class _Builder {
         }
 
         final found = lowerer.scope.lookup(name);
+        if (found is NamedAmbiguous) {
+          _error(
+            identifier.span,
+            'Ambiguous name `$name`, imported from ${found.originsText}.',
+          );
+          return const _LoweringError();
+        }
         if (found is NamedType || found is NamedTrait) {
           return _lowerStructCreation(
             (found as dynamic).id as DeclarationId,
@@ -936,6 +966,18 @@ class _Builder {
     }
 
     final fields = (kind as HirTypeDeclarationKind_Struct).fields;
+    for (final field in fields) {
+      if (_isFieldVisible(field, declaration)) continue;
+
+      final reason = field.visibility == .private ? 'private' : 'not visible';
+      _error(
+        receiverSpan,
+        'Cannot construct `${declaration.name}` here: '
+        'the field `${field.name}` is $reason.',
+      );
+      return const _LoweringError();
+    }
+
     final substitutions = _instantiate(
       type.typeParameters,
       typeArguments,

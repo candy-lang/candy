@@ -7,8 +7,10 @@ import 'package:args/command_runner.dart';
 import 'package:compiler_v4_1/context.dart';
 import 'package:compiler_v4_1/file.dart';
 import 'package:compiler_v4_1/hir/ast_to_hir.dart';
+import 'package:compiler_v4_1/hir/hir/ids.dart';
 import 'package:compiler_v4_1/hir/hir/to_text.dart';
 import 'package:compiler_v4_1/lexer/lexer.dart';
+import 'package:compiler_v4_1/lexer/token.dart';
 import 'package:compiler_v4_1/lowering/modules.dart';
 import 'package:compiler_v4_1/mono/backend/mono_to_c.dart';
 import 'package:compiler_v4_1/mono/hir_to_mono.dart';
@@ -68,6 +70,9 @@ class LoadedPackage {
   final List<Module> modules;
 }
 
+/// Loads the file's own package plus every package reachable through `use`
+/// lines. Loading only what is reachable keeps an unrelated broken package in
+/// the same directory from breaking the build.
 LoadedPackage loadPackageForFile(File file) {
   if (!file.existsSync()) {
     stderr.writeln('The given file does not exist.');
@@ -75,15 +80,44 @@ LoadedPackage loadPackageForFile(File file) {
   }
 
   final root = findPackageRoot(file);
-  final package = Package(name: root.name, rootDirectory: root);
-  return loadPackage(package, package.discoverFiles());
-}
+  final entry = Package(name: root.name, rootDirectory: root);
 
-LoadedPackage loadPackage(Package package, List<File> files) {
+  // A file inside a package sits alongside its siblings; a loose file's own
+  // directory is itself the packages directory, so sibling packages — Core
+  // above all — stay reachable either way.
+  final isInPackage = (root ~/ '_package.candy').existsSync();
+  final workspace = Workspace({
+    entry.name: entry,
+    ...Workspace.discover(isInPackage ? root.parent : root).packages,
+  });
+
   final context = Context();
-  final modules = <Module>[
-    for (final file in files) parseModule(context, package, file),
-  ];
+  final modules = <Module>[];
+  final loaded = <String>{};
+
+  // Core is always loaded, not just when imported: its public declarations are
+  // ambient in every module.
+  final pending = <String>[entry.name, ModuleId.corePackageName];
+
+  while (pending.isNotEmpty) {
+    final name = pending.removeLast();
+    if (!loaded.add(name)) continue;
+
+    final package = workspace[name] ?? (name == entry.name ? entry : null);
+    if (package == null) continue;
+
+    for (final packageFile in package.discoverFiles()) {
+      final module = parseModule(context, package, packageFile);
+      modules.add(module);
+      for (final use in module.ast.uses) {
+        final rootSegment = use.path.firstOrNull;
+        if (rootSegment == null) continue;
+        if (rootSegment.kind is TokenKind_PackageKeyword) continue;
+        pending.add(rootSegment.rawText);
+      }
+    }
+  }
+
   return LoadedPackage(context, modules);
 }
 
@@ -231,8 +265,15 @@ class CompileCommand extends Command<void> {
       await Process.run('clang-format', ['-i', cPath]);
 
       final executablePath = path.substring(0, path.lastIndexOf('.'));
+      final flags = await Process.run('pkg-config', [
+        '--cflags',
+        '--libs',
+        'cairo',
+        'sdl3',
+      ]);
       final gcc = await Process.run('gcc', [
         cPath,
+        ...flags.stdout.toString().trim().split(' '),
         '-O3',
         '-o',
         executablePath,

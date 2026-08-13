@@ -97,6 +97,12 @@ class TypeLowerer {
       case NamedTrait():
         error(name.span, "Traits can't be used as types.");
         return const HirType.error();
+      case NamedAmbiguous(:final originsText):
+        error(
+          name.span,
+          'Ambiguous name `$text`, imported from $originsText.',
+        );
+        return const HirType.error();
       case _:
         error(name.span, 'Unknown type: `$text`.');
         return const HirType.error();
@@ -141,6 +147,12 @@ class TypeLowerer {
             );
           case NamedType():
             error(name.span, "Types can't be used as traits.");
+            return const None();
+          case NamedAmbiguous(:final originsText):
+            error(
+              name.span,
+              'Ambiguous name `$text`, imported from $originsText.',
+            );
             return const None();
           case _:
             error(name.span, 'Unknown trait: `$text`.');

@@ -4,6 +4,16 @@ import 'package:test/test.dart';
 import 'harness.dart';
 
 void main() {
+  test('lowers signatures across several modules', () {
+    final harness = LoweringHarness.modules({
+      'a': 'struct A {}\nfun fromA() A { A() }',
+      'b/c': 'struct C {}\nfun fromC() C { C() }',
+    });
+    harness.expectNoErrors();
+    expect(harness.signatureOf('fromA'), 'fromA() A');
+    expect(harness.signatureOf('fromC'), 'fromC() C');
+  });
+
   group('types', () {
     test('lowers parameter and return types', () {
       final harness = _lower('fun f(a: Int, b: Text) Int { a }');

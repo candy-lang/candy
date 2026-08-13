@@ -11,7 +11,29 @@ part 'ast.g.dart';
 /// missing or malformed.
 typedef AstErrorOr<T> = Option<T>;
 
-typedef Ast = List<AstDeclaration>;
+enum AstVisibility { private, package, public }
+
+@freezed
+sealed class Ast with _$Ast {
+  const factory Ast({
+    required List<AstUse> uses,
+    required List<AstDeclaration> declarations,
+  }) = _Ast;
+
+  factory Ast.fromJson(Map<String, dynamic> json) => _$AstFromJson(json);
+  const Ast._();
+}
+
+@freezed
+sealed class AstUse with _$AstUse {
+  const factory AstUse({
+    required Token useKeyword,
+    required List<Token> path,
+  }) = _AstUse;
+
+  factory AstUse.fromJson(Map<String, dynamic> json) => _$AstUseFromJson(json);
+  const AstUse._();
+}
 
 // Declarations
 
@@ -34,6 +56,7 @@ sealed class AstDeclaration with _$AstDeclaration {
 @freezed
 sealed class AstStruct with _$AstStruct {
   const factory AstStruct({
+    @Default(AstVisibility.private) AstVisibility visibility,
     @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,
     required AstStructKind kind,
@@ -59,6 +82,7 @@ sealed class AstStructKind with _$AstStructKind {
 @freezed
 sealed class AstStructField with _$AstStructField {
   const factory AstStructField({
+    @Default(AstVisibility.private) AstVisibility visibility,
     @_TokenOptionConverter() required AstErrorOr<Token> name,
     @_AstTypeOptionConverter() required AstErrorOr<AstType> type,
   }) = _AstStructField;
@@ -71,6 +95,7 @@ sealed class AstStructField with _$AstStructField {
 @freezed
 sealed class AstEnum with _$AstEnum {
   const factory AstEnum({
+    @Default(AstVisibility.private) AstVisibility visibility,
     @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,
     required List<AstEnumVariant> variants,
@@ -96,6 +121,7 @@ sealed class AstEnumVariant with _$AstEnumVariant {
 @freezed
 sealed class AstTrait with _$AstTrait {
   const factory AstTrait({
+    @Default(AstVisibility.private) AstVisibility visibility,
     @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,
     required List<AstFunction> functions,
@@ -124,6 +150,7 @@ sealed class AstImpl with _$AstImpl {
 @freezed
 sealed class AstAssignment with _$AstAssignment {
   const factory AstAssignment({
+    @Default(AstVisibility.private) AstVisibility visibility,
     required SourceSpan displaySpan,
     @_TokenOptionConverter() required AstErrorOr<Token> name,
     @_AstTypeOptionConverter() required AstErrorOr<AstType>? type,
@@ -138,6 +165,7 @@ sealed class AstAssignment with _$AstAssignment {
 @freezed
 sealed class AstFunction with _$AstFunction {
   const factory AstFunction({
+    @Default(AstVisibility.private) AstVisibility visibility,
     required SourceSpan displaySpan,
     @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,

@@ -15,8 +15,8 @@ void main() {
       ''');
       harness.expectNoErrors();
       expect(harness.callsIn('main'), [
-        r'$builtin:builtinIntToText',
-        r'$builtin:builtinPrint',
+        'Builtins:builtinIntToText',
+        'Builtins:builtinPrint',
       ]);
     });
 
@@ -247,7 +247,7 @@ void main() {
         fun main() Int { f(1) }
       ''');
       harness.expectNoErrors();
-      expect(harness.callsIn('main').single, 'test.test:f');
+      expect(harness.callsIn('main').single, 'Core.test:f');
     });
 
     test('reports genuinely incomparable candidates as ambiguous', () {
@@ -380,7 +380,7 @@ void main() {
     test('resolves a valid main function', () {
       final harness = _lower('fun main() Int { 0 }');
       harness.expectNoErrors();
-      expect('${harness.hir.mainFunction}', 'test.test:main');
+      expect('${harness.hir.mainFunction}', 'Core.test:main');
     });
 
     test('reports a missing main function', () {

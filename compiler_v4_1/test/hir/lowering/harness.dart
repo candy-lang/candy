@@ -28,6 +28,67 @@ class LoweringHarness {
     return harness;
   }
 
+  /// Several modules in one package named `test`. Keys are slash-separated
+  /// module paths.
+  factory LoweringHarness.modules(Map<String, String> sources) {
+    final harness = LoweringHarness._(sources.values.join('\n'), Context());
+    final modules = [
+      for (final MapEntry(key: path, value: source) in sources.entries)
+        harness._parseModule(path, source),
+    ];
+    harness
+      ..declarations = collectDeclarations(harness.context, modules)
+      ..signatures = lowerSignatures(harness.context, harness.declarations);
+    return harness;
+  }
+
+  /// Like [LoweringHarness.modules], but runs bodies too, so name resolution
+  /// inside function bodies is actually exercised. One module must define
+  /// `main`.
+  factory LoweringHarness.fullModules(Map<String, String> sources) {
+    final harness = LoweringHarness._(sources.values.join('\n'), Context());
+    harness.hir = astToHir(harness.context, [
+      for (final MapEntry(key: path, value: source) in sources.entries)
+        harness._parseModule(path, source),
+    ]);
+    return harness;
+  }
+
+  /// Several packages at once. Outer keys are package names, inner keys are
+  /// module paths within that package.
+  factory LoweringHarness.packages(Map<String, Map<String, String>> sources) {
+    final harness = LoweringHarness._(
+      [for (final package in sources.values) ...package.values].join('\n'),
+      Context(),
+    );
+    final modules = [
+      for (final MapEntry(key: package, value: files) in sources.entries)
+        for (final MapEntry(key: path, value: source) in files.entries)
+          harness._parseModule(path, source, packageName: package),
+    ];
+    harness
+      ..declarations = collectDeclarations(harness.context, modules)
+      ..signatures = lowerSignatures(harness.context, harness.declarations);
+    return harness;
+  }
+
+  /// Like [LoweringHarness.packages], but runs bodies too. One module must
+  /// define `main`.
+  factory LoweringHarness.fullPackages(
+    Map<String, Map<String, String>> sources,
+  ) {
+    final harness = LoweringHarness._(
+      [for (final package in sources.values) ...package.values].join('\n'),
+      Context(),
+    );
+    harness.hir = astToHir(harness.context, [
+      for (final MapEntry(key: package, value: files) in sources.entries)
+        for (final MapEntry(key: path, value: source) in files.entries)
+          harness._parseModule(path, source, packageName: package),
+    ]);
+    return harness;
+  }
+
   /// Lexes and parses only, keeping whatever errors that produced.
   factory LoweringHarness.parseOnly(String source) {
     final harness = LoweringHarness._(source, Context());
@@ -54,6 +115,25 @@ class LoweringHarness {
   late final Signatures signatures;
   late final Hir hir;
 
+  Module _parseModule(
+    String path,
+    String source, {
+    String packageName = ModuleId.corePackageName,
+  }) {
+    final file = SourceFile(File('$path.candy'), source);
+    final ast = Parser.parse(context, file, Lexer.lex(context, file, source));
+    expect(
+      context.errors,
+      isEmpty,
+      reason: 'Module `$path` failed to lex or parse.',
+    );
+    return Module(
+      id: ModuleId(packageName: packageName, path: path.split('/')),
+      file: file,
+      ast: ast,
+    );
+  }
+
   Module _parse() {
     final file = SourceFile(File('test.candy'), source);
     final ast = Parser.parse(context, file, Lexer.lex(context, file, source));
@@ -63,7 +143,7 @@ class LoweringHarness {
       reason: 'The source failed to lex or parse.',
     );
     return Module(
-      id: const ModuleId(packageName: 'test', path: ['test']),
+      id: const ModuleId(packageName: ModuleId.corePackageName, path: ['test']),
       file: file,
       ast: ast,
     );
@@ -137,6 +217,7 @@ class LoweringHarness {
 /// A minimal set of declarations that most tests need in scope.
 // ignore: avoid-top-level-members-in-tests
 const preludeSource = '''
+use Builtins
 struct Nothing {}
 enum Never {}
 struct Int = builtin
