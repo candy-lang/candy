@@ -52,6 +52,22 @@ SolverGoal? solverGoalOfBound(HirTypeParameter parameter) {
   return solverGoalOf(bound.some, parameter.type);
 }
 
+/// Replaces the goal's type-parameter variables with what [substitutions] maps
+/// them to. Anything the solver can't represent is left as-is.
+SolverGoal substituteGoal(
+  SolverGoal goal,
+  Map<TypeParameterId, HirType> substitutions,
+) => SolverGoal(
+  trait: goal.trait,
+  parameters: goal.parameters.map((it) {
+    if (it is! SolverType_Variable) return it;
+    final id = it.variable.id;
+    if (id is! SolverVariableId_Parameter) return it;
+    final replacement = substitutions[id.id];
+    return replacement == null ? it : (solverTypeOf(replacement) ?? it);
+  }).toList(),
+);
+
 List<SolverGoal> solverGoalsOfBounds(List<HirTypeParameter> parameters) =>
     parameters.map(solverGoalOfBound).nonNulls.toList();
 
