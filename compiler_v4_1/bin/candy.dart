@@ -100,10 +100,11 @@ Module parseModule(Context context, Package package, File file) {
 
 void printErrors(Context context) {
   for (final error in context.errors) {
+    final path = error.span.file.file.relativeFrom(.current).path;
     final source = error.span.file.content;
     final start = error.span.span.start.value.clamp(0, source.length);
     final line = '\n'.allMatches(source.substring(0, start)).length + 1;
-    stderr.writeln('  ${error.span.file.file.path}:$line: ${error.message}');
+    stderr.writeln('  $path:$line: ${error.message}');
   }
 }
 
