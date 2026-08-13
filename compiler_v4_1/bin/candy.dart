@@ -79,7 +79,16 @@ LoadedPackage loadPackageForFile(File file) {
     throw const Exit(Exit.fileNotFound);
   }
 
-  final root = findPackageRoot(file);
+  return _loadPackageFromRoot(findPackageRoot(file));
+}
+
+/// Like [loadPackageForFile], but also accepts a package directory (one
+/// containing `_package.candy` directly), so a whole package can be checked
+/// without naming one of its files.
+LoadedPackage loadPackageForPath(String path) =>
+    _loadPackageFromRoot(resolvePackageRoot(path));
+
+LoadedPackage _loadPackageFromRoot(Directory root) {
   final entry = Package(name: root.name, rootDirectory: root);
 
   // A file inside a package sits alongside its siblings; a loose file's own
@@ -121,6 +130,28 @@ LoadedPackage loadPackageForFile(File file) {
   return LoadedPackage(context, modules);
 }
 
+/// The package root for [path], which may be a file or a package directory.
+Directory resolvePackageRoot(String path) {
+  if (FileSystemEntity.isDirectorySync(path)) {
+    final directory = Directory(path);
+    if (!(directory ~/ '_package.candy').existsSync()) {
+      stderr.writeln(
+        'The given directory is not a Candy package '
+        '(missing `_package.candy`).',
+      );
+      throw const Exit(Exit.directoryNotFound);
+    }
+    return directory;
+  }
+
+  final file = File(path);
+  if (!file.existsSync()) {
+    stderr.writeln('The given file does not exist.');
+    throw const Exit(Exit.fileNotFound);
+  }
+  return findPackageRoot(file);
+}
+
 Module parseModule(Context context, Package package, File file) {
   final source = file.readAsStringSync();
   final sourceFile = SourceFile(file, source);
@@ -157,7 +188,8 @@ class CheckCommand extends Command<void> {
   @override
   final name = 'check';
   @override
-  final description = 'Check a Candy program for obvious errors.';
+  final description =
+      'Check a Candy program or package for obvious errors.';
 
   @override
   Future<void> run() async {
@@ -168,7 +200,7 @@ class CheckCommand extends Command<void> {
       return;
     }
 
-    final root = findPackageRoot(File(path));
+    final root = resolvePackageRoot(path);
     _check(path, exitOnError: false, clearScreen: true);
 
     await for (final _
@@ -190,7 +222,7 @@ class CheckCommand extends Command<void> {
     if (clearScreen) stdout.write('\x1B[2J\x1B[H');
 
     try {
-      final loaded = loadPackageForFile(File(path));
+      final loaded = loadPackageForPath(path);
       astToHir(loaded.context, loaded.modules);
 
       if (loaded.context.errors.isNotEmpty) {
