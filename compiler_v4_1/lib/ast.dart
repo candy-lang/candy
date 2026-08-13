@@ -167,7 +167,9 @@ sealed class AstValueParameters with _$AstValueParameters implements ToJsonMap {
 sealed class AstValueParameter with _$AstValueParameter {
   const factory AstValueParameter({
     @_TokenOptionConverter() required AstErrorOr<Token> name,
-    @_AstTypeOptionConverter() required AstErrorOr<AstType> type,
+
+    /// `null` when the parameter has no annotation, which only lambdas allow.
+    @_AstTypeOptionConverter() required AstErrorOr<AstType>? type,
   }) = _AstValueParameter;
 
   factory AstValueParameter.fromJson(Map<String, dynamic> json) =>

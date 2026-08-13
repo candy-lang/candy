@@ -52,14 +52,10 @@ class _Entry {
     required this.name,
     required this.type,
     required this.kind,
-    this.span,
   });
 
   final HirId id;
   final String? name;
-
-  /// Only set for named bindings, to report an un-inferrable type.
-  final SourceSpan? span;
   HirType type;
   HirExpressionKind kind;
   _PendingCall? pendingCall;
@@ -117,6 +113,14 @@ class BodyLowerer {
 
   final _locals = <(String, HirId, HirType)>[];
   final _retries = <void Function()>[];
+  final _inferredTypeChecks = <(String, SourceSpan, HirType Function())>[];
+
+  /// Reports, once the body has settled, that [name]'s type never got pinned
+  /// down. Deferred because a lambda parameter is often bound by the overload
+  /// resolution of the call the lambda is an argument to, which runs after the
+  /// lambda's own body is finished.
+  void checkInferred(String name, SourceSpan span, HirType Function() type) =>
+      _inferredTypeChecks.add((name, span, type));
 
   void _error(SourceSpan span, String message) =>
       context.addError(CompilerError(span: span, message: message));
@@ -147,6 +151,15 @@ class BodyLowerer {
     }
 
     _runRetries();
+
+    for (final (name, span, type) in _inferredTypeChecks) {
+      if (variables.isUnresolved(type())) {
+        _error(
+          span,
+          "The type of `$name` can't be inferred. Add a type annotation.",
+        );
+      }
+    }
     return builder.finish();
   }
 
@@ -185,33 +198,17 @@ class _Builder {
 
   void _error(SourceSpan span, String message) => lowerer._error(span, message);
 
-  HirBody finish() {
-    for (final entry in _entries) {
-      final span = entry.span;
-      if (entry.name == null || span == null) continue;
-      // A binding whose type never got pinned down. Reported here rather than
-      // at each use, so one missing annotation is one error.
-      if (variables.isUnresolved(entry.type)) {
-        _error(
-          span,
-          "The type of `${entry.name}` can't be inferred. "
-          'Add a type annotation.',
-        );
-      }
-    }
-
-    return HirBody([
-      for (final entry in _entries)
-        HirBodyEntry(
-          id: entry.id,
-          name: entry.name,
-          expression: HirExpression(
-            kind: _finalKind(entry),
-            type: variables.finalize(entry.type),
-          ),
+  HirBody finish() => HirBody([
+    for (final entry in _entries)
+      HirBodyEntry(
+        id: entry.id,
+        name: entry.name,
+        expression: HirExpression(
+          kind: _finalKind(entry),
+          type: variables.finalize(entry.type),
         ),
-    ]);
-  }
+      ),
+  ]);
 
   HirExpressionKind _finalKind(_Entry entry) {
     final pending = entry.pendingCall;
@@ -227,17 +224,10 @@ class _Builder {
     );
   }
 
-  HirId push(
-    HirExpressionKind kind,
-    HirType type, {
-    String? name,
-    SourceSpan? span,
-  }) {
+  HirId push(HirExpressionKind kind, HirType type, {String? name}) {
     final id = lowerer.ids.generate();
     if (name != null) lowerer._locals.add((name, id, type));
-    _entries.add(
-      _Entry(id: id, name: name, type: type, kind: kind, span: span),
-    );
+    _entries.add(_Entry(id: id, name: name, type: type, kind: kind));
     return id;
   }
 
@@ -294,12 +284,15 @@ class _Builder {
               ? (pushError(), const HirType.error())
               : lowerExpression(value, declared);
           if (name != null) {
+            final bindingType = declared ?? type;
             push(
               HirExpressionKind.reference(id),
-              declared ?? type,
+              bindingType,
               name: name.rawText,
-              span: name.span,
             );
+            if (declared == null) {
+              lowerer.checkInferred(name.rawText, name.span, () => bindingType);
+            }
           }
           last = null;
 
@@ -531,14 +524,23 @@ class _Builder {
       final name = parameter.name.toNullable();
       if (name == null) continue;
 
-      final annotated = parameter.type.toNullable();
-      final type = annotated != null
-          ? lowerer.typeLowerer.lowerType(annotated, lowerer.typeScope)
-          // Without an annotation, take the parameter type from the context.
-          : (expectedFunction != null &&
-                    index < expectedFunction.parameterTypes.length
-                ? expectedFunction.parameterTypes[index]
-                : variables.fresh());
+      final annotation = parameter.type;
+      final HirType type;
+      if (annotation != null) {
+        type = lowerer.typeLowerer.lowerType(
+          annotation.toNullable(),
+          lowerer.typeScope,
+        );
+      } else if (expectedFunction != null &&
+          index < expectedFunction.parameterTypes.length) {
+        // The expected type says what this parameter is.
+        type = expectedFunction.parameterTypes[index];
+      } else {
+        // Nothing to go on yet. Overload resolution of the call this lambda is
+        // an argument to usually binds this by unifying the whole lambda type.
+        type = variables.fresh();
+        lowerer.checkInferred(name.rawText, name.span, () => type);
+      }
       parameters.add(
         HirParameter(
           id: lowerer.ids.generate(),

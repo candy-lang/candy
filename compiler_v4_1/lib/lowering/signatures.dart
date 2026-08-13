@@ -500,7 +500,7 @@ class _SignatureLowerer {
         HirParameter(
           id: _ids.generate(),
           name: name.rawText,
-          type: lowerer.lowerType(parameter.type.toNullable(), typeScope),
+          type: lowerer.lowerType(parameter.type?.toNullable(), typeScope),
         ),
       );
     }

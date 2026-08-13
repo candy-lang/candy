@@ -485,14 +485,14 @@ class Parser {
     );
   }
 
-  AstValueParameters parseValueParameters() {
+  AstValueParameters parseValueParameters({bool typeIsOptional = false}) {
     advance(); // `(`
 
     // TODO(JonasWanke): error on duplicate parameter names
     final parameters = _parseCommaSeparated(
       'parameter',
       () => at<TokenKind_ClosingParenthesis>(),
-      parseValueParameter,
+      () => parseValueParameter(typeIsOptional: typeIsOptional),
     );
 
     expect<TokenKind_ClosingParenthesis>(
@@ -503,10 +503,14 @@ class Parser {
     return AstValueParameters(valueParameters: parameters);
   }
 
-  AstValueParameter? parseValueParameter() {
+  AstValueParameter? parseValueParameter({bool typeIsOptional = false}) {
     if (!at<TokenKind_Identifier>()) return null;
 
     final name = expectIdentifier('This parameter is missing a name.');
+    if (typeIsOptional && !at<TokenKind_Colon>()) {
+      return AstValueParameter(name: name, type: null);
+    }
+
     expect<TokenKind_Colon>(
       'This parameter is missing a colon.',
       recoverySet: _typeFirstSet,
@@ -780,7 +784,7 @@ class Parser {
   }
 
   AstLambda parseLambda() {
-    final parameters = parseValueParameters();
+    final parameters = parseValueParameters(typeIsOptional: true);
     final body = parseBody();
     return AstLambda(parameters: parameters, body: body);
   }

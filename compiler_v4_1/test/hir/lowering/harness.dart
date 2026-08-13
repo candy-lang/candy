@@ -28,6 +28,18 @@ class LoweringHarness {
     return harness;
   }
 
+  /// Lexes and parses only, keeping whatever errors that produced.
+  factory LoweringHarness.parseOnly(String source) {
+    final harness = LoweringHarness._(source, Context());
+    final file = SourceFile(File('test.candy'), source);
+    Parser.parse(
+      harness.context,
+      file,
+      Lexer.lex(harness.context, file, source),
+    );
+    return harness;
+  }
+
   /// Runs the whole pipeline, bodies included.
   factory LoweringHarness.full(String source) {
     final harness = LoweringHarness._(source, Context());

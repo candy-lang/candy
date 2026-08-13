@@ -142,14 +142,79 @@ void main() {
     });
 
     test('checks a lambda against the expected function type', () {
-      // Lambda parameters still need annotations: the parser requires them,
-      // so the inference path for un-annotated ones isn't reachable yet.
       final harness = _lower('''
         fun apply(f: (Int) Int) Int { 0 }
         fun main() Int { apply((x: Int) { x }) }
       ''');
       harness.expectNoErrors();
       expect(harness.callsIn('main').single, endsWith(':apply'));
+    });
+
+    test('infers an un-annotated lambda parameter from the callee', () {
+      final harness = _lower('''
+        fun apply(f: (Int) Int) Int { 0 }
+        fun main() Int { apply((x) { x }) }
+      ''');
+      harness.expectNoErrors();
+      expect(harness.callsIn('main').single, endsWith(':apply'));
+    });
+
+    test('infers un-annotated parameters of a multi-parameter lambda', () {
+      final harness = _lower('''
+        fun apply(f: (Int, Text) Text) Int { 0 }
+        fun main() Int { apply((a, b) { b }) }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('allows mixing annotated and un-annotated parameters', () {
+      final harness = _lower('''
+        fun apply(f: (Int, Text) Text) Int { 0 }
+        fun main() Int { apply((a: Int, b) { b }) }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('resolves member calls on an inferred lambda parameter', () {
+      // `x`'s type is only known once `apply` resolves, which happens after
+      // the lambda's own body has been lowered.
+      final harness = _lower('''
+        $_traitsSource
+        fun apply(f: (Int) Text) Int { 0 }
+        fun main() Int { apply((x) { x.toText() }) }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('takes the parameter type from an annotated binding', () {
+      final harness = _lower('''
+        fun main() Int {
+          let f: (Int) Int = (x) { x }
+          0
+        }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('reports an un-annotated lambda parameter it cannot infer', () {
+      final harness = _lower('''
+        fun main() Int {
+          let f = (x) { 0 }
+          0
+        }
+      ''');
+      expect(
+        harness.errorMessages,
+        contains("The type of `x` can't be inferred. Add a type annotation."),
+      );
+    });
+
+    test('still requires annotations on function parameters', () {
+      final harness = LoweringHarness.parseOnly('fun f(a) Int { 0 }');
+      expect(harness.errorMessages, [
+        'This parameter is missing a colon.',
+        'This parameter is missing a type.',
+      ]);
     });
 
     test('reports a lambda whose type does not match', () {
