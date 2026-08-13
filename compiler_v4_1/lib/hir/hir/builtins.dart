@@ -179,30 +179,30 @@ enum BuiltinFunction {
     );
 
     return switch (this) {
-      BuiltinFunction.intAdd => intBinary('a', 'b'),
-      BuiltinFunction.intBitwiseAnd => intBinary('a', 'b'),
-      BuiltinFunction.intBitwiseOr => intBinary('a', 'b'),
-      BuiltinFunction.intBitwiseXor => intBinary('a', 'b'),
-      BuiltinFunction.intCompareTo => build([
+      .intAdd => intBinary('a', 'b'),
+      .intBitwiseAnd => intBinary('a', 'b'),
+      .intBitwiseOr => intBinary('a', 'b'),
+      .intBitwiseXor => intBinary('a', 'b'),
+      .intCompareTo => build([
         ('a', intType),
         ('b', intType),
       ], types.orderingType),
-      BuiltinFunction.intDivideTruncating => intBinary('dividend', 'divisor'),
-      BuiltinFunction.intMultiply => intBinary('factorA', 'factorB'),
-      BuiltinFunction.intParse => build([
+      .intDivideTruncating => intBinary('dividend', 'divisor'),
+      .intMultiply => intBinary('factorA', 'factorB'),
+      .intParse => build([
         ('text', textType),
       ], types.resultType(intType, textType)),
-      BuiltinFunction.intRemainder => intBinary('dividend', 'divisor'),
-      BuiltinFunction.intShiftLeft => intBinary('value', 'amount'),
-      BuiltinFunction.intShiftRight => intBinary('value', 'amount'),
-      BuiltinFunction.intSubtract => intBinary('minuend', 'subtrahend'),
-      BuiltinFunction.intToText => build([('int', intType)], textType),
-      BuiltinFunction.listFilled => build(
+      .intRemainder => intBinary('dividend', 'divisor'),
+      .intShiftLeft => intBinary('value', 'amount'),
+      .intShiftRight => intBinary('value', 'amount'),
+      .intSubtract => intBinary('minuend', 'subtrahend'),
+      .intToText => build([('int', intType)], textType),
+      .listFilled => build(
         [('length', intType), ('item', t)],
         types.listType(t),
         isGeneric: true,
       ),
-      BuiltinFunction.listGenerate => build(
+      .listGenerate => build(
         [
           ('length', intType),
           (
@@ -213,59 +213,54 @@ enum BuiltinFunction {
         types.listType(t),
         isGeneric: true,
       ),
-      BuiltinFunction.listGet => build(
+      .listGet => build(
         [('list', types.listType(t)), ('index', intType)],
         types.maybeType(t),
         isGeneric: true,
       ),
-      BuiltinFunction.listInsert => build(
+      .listInsert => build(
         [('list', types.listType(t)), ('index', intType), ('item', t)],
         types.listType(t),
         isGeneric: true,
       ),
-      BuiltinFunction.listLength => build(
+      .listLength => build(
         [('list', types.listType(t))],
         intType,
         isGeneric: true,
       ),
-      BuiltinFunction.listOf0 => listOf(0),
-      BuiltinFunction.listOf1 => listOf(1),
-      BuiltinFunction.listOf2 => listOf(2),
-      BuiltinFunction.listOf3 => listOf(3),
-      BuiltinFunction.listOf4 => listOf(4),
-      BuiltinFunction.listOf5 => listOf(5),
-      BuiltinFunction.listRemoveAt => build(
+      .listOf0 => listOf(0),
+      .listOf1 => listOf(1),
+      .listOf2 => listOf(2),
+      .listOf3 => listOf(3),
+      .listOf4 => listOf(4),
+      .listOf5 => listOf(5),
+      .listRemoveAt => build(
         [('list', types.listType(t)), ('index', intType)],
         types.listType(t),
         isGeneric: true,
       ),
-      BuiltinFunction.listReplace => build(
+      .listReplace => build(
         [('list', types.listType(t)), ('index', intType), ('newItem', t)],
         types.listType(t),
         isGeneric: true,
       ),
-      BuiltinFunction.panic => build([('message', textType)], types.neverType),
-      BuiltinFunction.print => build([
-        ('message', textType),
-      ], types.nothingType),
-      BuiltinFunction.textCompareTo => build([
+      .panic => build([('message', textType)], types.neverType),
+      .print => build([('message', textType)], types.nothingType),
+      .textCompareTo => build([
         ('a', textType),
         ('b', textType),
       ], types.orderingType),
-      BuiltinFunction.textConcat => build([
-        ('a', textType),
-        ('b', textType),
-      ], textType),
-      BuiltinFunction.textGetRange => build([
+      .textConcat => build([('a', textType), ('b', textType)], textType),
+      .textGetRange => build([
         ('text', textType),
         ('startInclusive', intType),
         ('endExclusive', intType),
       ], textType),
-      BuiltinFunction.textIndexOf => build([
+      .textIndexOf => build([
         ('a', textType),
         ('b', textType),
       ], types.maybeType(intType)),
-      BuiltinFunction.textLength => build([('text', textType)], intType),
+      .textLength => build([('text', textType)], intType),
     };
   }
 }

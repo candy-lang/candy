@@ -15,6 +15,7 @@ class TypeLayouts {
 
   factory TypeLayouts.compute(Map<MonoType, MonoTypeDeclaration> declarations) {
     final context = _Context(declarations);
+    // ignore: prefer_foreach
     for (final type in declarations.keys) {
       context._layOut(type);
     }

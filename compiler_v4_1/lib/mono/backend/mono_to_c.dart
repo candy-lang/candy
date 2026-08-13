@@ -1,5 +1,6 @@
 import '../../hir/hir/builtins.dart';
 import '../../hir/hir/ids.dart';
+import '../hir_to_mono.dart';
 import '../mono/ids.dart';
 import '../mono/mono.dart';
 import 'type_layout.dart';
@@ -27,7 +28,8 @@ class _Context {
   /// never needs to store their result.
   bool _isUninhabited(MonoType type) {
     final declaration = mono.typeDeclarations[type];
-    return declaration is MonoTypeDeclaration_Enum && declaration.variants.isEmpty;
+    return declaration is MonoTypeDeclaration_Enum &&
+        declaration.variants.isEmpty;
   }
 
   void _lowerMono() {
@@ -116,7 +118,10 @@ class _Context {
             }
           }
           _push('} value;\n};\n');
-        case MonoTypeDeclaration_Function(:final parameterTypes, :final returnType):
+        case MonoTypeDeclaration_Function(
+          :final parameterTypes,
+          :final returnType,
+        ):
           _push('void* closure;\n');
           _push('$returnType (*function)(void*');
           for (final parameterType in parameterTypes) {
@@ -175,7 +180,11 @@ class _Context {
     for (final MapEntry(key: id, value: function) in mono.functions.entries) {
       final body = function.body;
       if (body is MonoBodyOrBuiltin_Body) {
-        _lowerLambdaDefinitionsIn(id.toString(), function.parameters, body.body);
+        _lowerLambdaDefinitionsIn(
+          id.toString(),
+          function.parameters,
+          body.body,
+        );
       }
 
       _lowerFunctionSignature(id.toString(), function);
@@ -221,7 +230,9 @@ class _Context {
     MonoExpressionKind_Lambda lambda,
   ) {
     _push(
-      '${lambda.body.returnType} $declarationName\$lambda${id}_function(void* raw_closure',
+      // ignore: missing_whitespace_between_adjacent_strings
+      '${lambda.body.returnType} $declarationName\$lambda${id}_function('
+      'void* raw_closure',
     );
     for (final parameter in lambda.parameters) {
       _push(', ${parameter.type} ${parameter.id}');
@@ -287,7 +298,11 @@ class _Context {
     }
   }
 
-  void _lowerExpression(String declarationName, HirId id, MonoExpression expression) {
+  void _lowerExpression(
+    String declarationName,
+    HirId id,
+    MonoExpression expression,
+  ) {
     final type = expression.type;
     switch (expression.kind) {
       case MonoExpressionKind_Int(:final value):
@@ -295,7 +310,8 @@ class _Context {
       case MonoExpressionKind_Text(:final value):
         _push('$type $id = {.value = "${_escapeCString(value)}"};');
       case MonoExpressionKind_CreateStruct(:final fields):
-        final declaration = mono.typeDeclarations[type]! as MonoTypeDeclaration_Struct;
+        final declaration =
+            mono.typeDeclarations[type]! as MonoTypeDeclaration_Struct;
         _push('$type $id = {');
         for (final (typeField, valueId) in declaration.fields.zip(fields)) {
           _push('\n.${typeField.name} = $valueId,');
@@ -305,7 +321,8 @@ class _Context {
         _push('$type $id = $struct.$field;');
       case MonoExpressionKind_CreateEnum(:final variant, :final value):
         if (_boxedVariants(type).contains(variant)) {
-          final declaration = mono.typeDeclarations[type]! as MonoTypeDeclaration_Enum;
+          final declaration =
+              mono.typeDeclarations[type]! as MonoTypeDeclaration_Enum;
           final valueType = declaration.variants
               .firstWhere((it) => it.name == variant)
               .type!;
@@ -333,7 +350,11 @@ $type $id = {
           _push(', $argument');
         }
         _push(');');
-      case MonoExpressionKind_Switch(:final value, :final enumType, :final cases):
+      case MonoExpressionKind_Switch(
+        :final value,
+        :final enumType,
+        :final cases,
+      ):
         _push('$type $id;\n');
 
         _push('switch ($value.variant) {');
@@ -342,8 +363,12 @@ $type $id = {
           final binding = case_.value;
           if (binding != null) {
             final (valueId, valueType) = binding;
-            final pointer = _boxedVariants(enumType).contains(case_.variant) ? '*' : '';
-            _push('$valueType $valueId = $pointer$value.value.${case_.variant};\n');
+            final pointer = _boxedVariants(enumType).contains(case_.variant)
+                ? '*'
+                : '';
+            _push(
+              '$valueType $valueId = $pointer$value.value.${case_.variant};\n',
+            );
           }
 
           _lowerBodyExpressions(declarationName, case_.body);
@@ -403,7 +428,9 @@ $type $id = {
     }
     final found = _findExpression(declarationBody, id);
     if (found == null) {
-      throw StateError("Couldn't find expression $id in declaration body $declarationBody");
+      throw StateError(
+        "Couldn't find expression $id in declaration body $declarationBody",
+      );
     }
     return found;
   }
@@ -439,11 +466,19 @@ $type $id = {
           for (final case_ in cases) {
             final binding = case_.value;
             if (binding != null) referencedIds.add(binding.$1);
-            _collectDefinedAndReferencedIds(case_.body, definedIds, referencedIds);
+            _collectDefinedAndReferencedIds(
+              case_.body,
+              definedIds,
+              referencedIds,
+            );
           }
         case final MonoExpressionKind_Lambda lambda:
           definedIds.addAll(lambda.parameters.map((it) => it.id));
-          _collectDefinedAndReferencedIds(lambda.body, definedIds, referencedIds);
+          _collectDefinedAndReferencedIds(
+            lambda.body,
+            definedIds,
+            referencedIds,
+          );
       }
     }
   }
@@ -486,13 +521,11 @@ $type $id = {
   /// function's own type.
   MonoType _builtinType(BuiltinType builtin) => _builtinTypeCache.putIfAbsent(
     builtin,
-    () => mono.typeDeclarations.entries
-        .firstWhere((entry) {
-          final declaration = entry.value;
-          return declaration is MonoTypeDeclaration_Builtin &&
-              declaration.type == builtin;
-        })
-        .key,
+    () => mono.typeDeclarations.entries.firstWhere((entry) {
+      final declaration = entry.value;
+      return declaration is MonoTypeDeclaration_Builtin &&
+          declaration.type == builtin;
+    }).key,
   );
 
   /// The backend fabricates calls to `panic` for cases the program itself
@@ -512,23 +545,23 @@ $type $id = {
     final intType = _builtinType(BuiltinType.int);
 
     switch (builtinFunction) {
-      case BuiltinFunction.intAdd:
+      case .intAdd:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value + ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intBitwiseAnd:
+      case .intBitwiseAnd:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value & ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intBitwiseOr:
+      case .intBitwiseOr:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value | ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intBitwiseXor:
+      case .intBitwiseXor:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value ^ ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intCompareTo:
+      case .intCompareTo:
         final a = parameters[0].id;
         final b = parameters[1].id;
         _push('''
@@ -536,15 +569,15 @@ $returnType result = {.variant = $a.value < $b.value    ? ${returnType}_less
                               : $a.value == $b.value ? ${returnType}_equal
                                                        : ${returnType}_greater};
 return result;''');
-      case BuiltinFunction.intDivideTruncating:
+      case .intDivideTruncating:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value / ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intMultiply:
+      case .intMultiply:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value * ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intParse:
+      case .intParse:
         final text = parameters[0].id;
         _push('''
 $returnType result;
@@ -552,12 +585,12 @@ char *end_pointer;
 errno = 0;
 uint64_t value = strtol($text.value, &end_pointer, 10);
 if (errno == ERANGE) {
-    result = (${returnType}) {
+    result = ($returnType) {
         .variant = ${returnType}_error,
         .value.error = {.value = "Value is out of range."},
     };
 } else if (end_pointer == $text.value) {
-    result = (${returnType}) {
+    result = ($returnType) {
         .variant = ${returnType}_error,
         .value.error = {.value = "Text is empty."},
     };
@@ -566,41 +599,41 @@ if (errno == ERANGE) {
     int length = snprintf(NULL, 0, message_format, *end_pointer, end_pointer - $text.value);
     char *message = malloc(length + 1);
     snprintf(message, length + 1, message_format, *end_pointer, end_pointer - $text.value);
-    result = (${returnType}) {
+    result = ($returnType) {
         .variant = ${returnType}_error,
         .value.error = {.value = message},
     };
 } else {
-    result = (${returnType}) {
+    result = ($returnType) {
         .variant = ${returnType}_ok,
         .value.ok = {.value = value},
     };
 }
 return result;''');
-      case BuiltinFunction.intRemainder:
+      case .intRemainder:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value % ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intShiftLeft:
+      case .intShiftLeft:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value << ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intShiftRight:
+      case .intShiftRight:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value >> ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intSubtract:
+      case .intSubtract:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value - ${parameters[1].id}.value};
 return result;''');
-      case BuiltinFunction.intToText:
+      case .intToText:
         final int_ = parameters[0].id;
         _push('''
 int length = snprintf(NULL, 0, "%ld", $int_.value);
 $returnType result = {.value = malloc(length + 1)};
 snprintf(result.value, length + 1, "%ld", $int_.value);
 return result;''');
-      case BuiltinFunction.listFilled:
+      case .listFilled:
         final length = parameters[0].id;
         final item = parameters[1].id;
         _push('''
@@ -609,10 +642,10 @@ if ($length.value < 0) {
     int length = snprintf(NULL, 0, message_format, $length.value);
     $textType message = {.value = malloc(length + 1)};
     snprintf(message.value, length + 1, message_format, $length.value);
-    ${_panicFunction}(message);
+    $_panicFunction(message);
 }
 
-${returnType} result = {
+$returnType result = {
     .length = $length.value,
     .values = malloc($length.value * sizeof(${itemType()})),
 };
@@ -620,7 +653,7 @@ for (uint64_t i = 0; i < $length.value; i++) {
     result.values[i] = $item;
 }
 return result;''');
-      case BuiltinFunction.listGenerate:
+      case .listGenerate:
         final length = parameters[0].id;
         final itemGetter = parameters[1].id;
         _push('''
@@ -629,10 +662,10 @@ if ($length.value < 0) {
     int length = snprintf(NULL, 0, message_format, $length.value);
     $textType message = {.value = malloc(length + 1)};
     snprintf(message.value, length + 1, message_format, $length.value);
-    ${_panicFunction}(message);
+    $_panicFunction(message);
 }
 
-${returnType} result = {
+$returnType result = {
     .length = $length.value,
     .values = malloc($length.value * sizeof(${itemType()}*)),
 };
@@ -641,21 +674,21 @@ for (uint64_t i = 0; i < $length.value; i++) {
     result.values[i] = $itemGetter.function($itemGetter.closure, index);
 }
 return result;''');
-      case BuiltinFunction.listGet:
+      case .listGet:
         final list = parameters[0].id;
         final index = parameters[1].id;
         _push('''
-${returnType} result;
+$returnType result;
 if (0 <= $index.value && $index.value < $list.length) {
-    result = (${returnType}) {
+    result = ($returnType) {
         .variant = ${returnType}_some,
         .value.some = $list.values[$index.value],
     };
 } else {
-    result = (${returnType}) {.variant = ${returnType}_none};
+    result = ($returnType) {.variant = ${returnType}_none};
 }
 return result;''');
-      case BuiltinFunction.listInsert:
+      case .listInsert:
         final list = parameters[0].id;
         final index = parameters[1].id;
         final item = parameters[2].id;
@@ -665,11 +698,11 @@ if (0 > $index.value || $index.value > $list.length) {
     int length = snprintf(NULL, 0, message_format, $index.value, $list.length);
     $textType message = {.value = malloc(length + 1)};
     snprintf(message.value, length + 1, message_format, $index.value, $list.length);
-    ${_panicFunction}(message);
+    $_panicFunction(message);
 }
 
 uint64_t length = $list.length + 1;
-${returnType} result = {
+$returnType result = {
     .length = length,
     .values = malloc(length * sizeof(${itemType()})),
 };
@@ -677,37 +710,37 @@ memcpy(result.values, $list.values, $index.value * sizeof(${itemType()}*));
 result.values[$index.value] = $item;
 memcpy(result.values + $index.value + 1, $list.values + $index.value, ($list.length - $index.value) * sizeof(${itemType()}));
 return result;''');
-      case BuiltinFunction.listLength:
+      case .listLength:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.length};
 return result;''');
-      case BuiltinFunction.listOf0:
+      case .listOf0:
         _push('''
-${returnType} result = {
+$returnType result = {
     .length = 0,
     .values = NULL,
 };
 return result;''');
-      case BuiltinFunction.listOf1:
+      case .listOf1:
         _push('''
-${returnType} result = {
+$returnType result = {
     .length = 1,
     .values = malloc(sizeof(${itemType()})),
 };
 result.values[0] = ${parameters[0].id};
 return result;''');
-      case BuiltinFunction.listOf2:
+      case .listOf2:
         _push('''
-${returnType} result = {
+$returnType result = {
     .length = 2,
     .values = malloc(2 * sizeof(${itemType()})),
 };
 result.values[0] = ${parameters[0].id};
 result.values[1] = ${parameters[1].id};
 return result;''');
-      case BuiltinFunction.listOf3:
+      case .listOf3:
         _push('''
-${returnType} result = {
+$returnType result = {
     .length = 3,
     .values = malloc(3 * sizeof(${itemType()})),
 };
@@ -715,9 +748,9 @@ result.values[0] = ${parameters[0].id};
 result.values[1] = ${parameters[1].id};
 result.values[2] = ${parameters[2].id};
 return result;''');
-      case BuiltinFunction.listOf4:
+      case .listOf4:
         _push('''
-${returnType} result = {
+$returnType result = {
     .length = 4,
     .values = malloc(4 * sizeof(${itemType()})),
 };
@@ -726,9 +759,9 @@ result.values[1] = ${parameters[1].id};
 result.values[2] = ${parameters[2].id};
 result.values[3] = ${parameters[3].id};
 return result;''');
-      case BuiltinFunction.listOf5:
+      case .listOf5:
         _push('''
-${returnType} result = {
+$returnType result = {
     .length = 5,
     .values = malloc(5 * sizeof(${itemType()})),
 };
@@ -738,7 +771,7 @@ result.values[2] = ${parameters[2].id};
 result.values[3] = ${parameters[3].id};
 result.values[4] = ${parameters[4].id};
 return result;''');
-      case BuiltinFunction.listRemoveAt:
+      case .listRemoveAt:
         final list = parameters[0].id;
         final index = parameters[1].id;
         _push('''
@@ -747,18 +780,18 @@ if (0 > $index.value || $index.value >= $list.length) {
     int length = snprintf(NULL, 0, message_format, $index.value, $list.length);
     $textType message = {.value = malloc(length + 1)};
     snprintf(message.value, length + 1, message_format, $index.value, $list.length);
-    ${_panicFunction}(message);
+    $_panicFunction(message);
 }
 
 uint64_t length = $list.length - 1;
-${returnType} result = {
+$returnType result = {
     .length = length,
     .values = malloc(length * sizeof(${itemType()})),
 };
 memcpy(result.values, $list.values, $index.value * sizeof(${itemType()}*));
 memcpy(result.values + $index.value, $list.values + $index.value + 1, ($list.length - $index.value - 1) * sizeof(${itemType()}*));
 return result;''');
-      case BuiltinFunction.listReplace:
+      case .listReplace:
         final list = parameters[0].id;
         final index = parameters[1].id;
         final newItem = parameters[2].id;
@@ -768,26 +801,26 @@ if (0 > $index.value || $index.value >= $list.length) {
     int length = snprintf(NULL, 0, message_format, $index.value, $list.length);
     $textType message = {.value = malloc(length + 1)};
     snprintf(message.value, length + 1, message_format, $index.value, $list.length);
-    ${_panicFunction}(message);
+    $_panicFunction(message);
 }
 
-${returnType} result = {
+$returnType result = {
     .length = $list.length,
     .values = malloc($list.length * sizeof(${itemType()})),
 };
 memcpy(result.values, $list.values, $list.length * sizeof(${itemType()}*));
 result.values[$index.value] = $newItem;
 return result;''');
-      case BuiltinFunction.panic:
+      case .panic:
         _push('''
 fputs(${parameters[0].id}.value, stderr);
 exit(1);''');
-      case BuiltinFunction.print:
+      case .print:
         _push('''
 puts(${parameters[0].id}.value);
 $returnType _1 = {};
 return _1;''');
-      case BuiltinFunction.textCompareTo:
+      case .textCompareTo:
         final a = parameters[0].id;
         final b = parameters[1].id;
         _push('''
@@ -796,7 +829,7 @@ $returnType result = {.variant = raw_result < 0    ? ${returnType}_less
                             : raw_result == 0 ? ${returnType}_equal
                                               : ${returnType}_greater};
 return result;''');
-      case BuiltinFunction.textConcat:
+      case .textConcat:
         final a = parameters[0].id;
         final b = parameters[1].id;
         _push('''
@@ -806,7 +839,7 @@ $returnType result = {.value = malloc(lengthA + lengthB + 1)};
 memcpy(result.value, $a.value, lengthA);
 memcpy(result.value + lengthA, $b.value, lengthB + 1);
 return result;''');
-      case BuiltinFunction.textGetRange:
+      case .textGetRange:
         final text = parameters[0].id;
         final startInclusive = parameters[1].id;
         final endExclusive = parameters[2].id;
@@ -818,35 +851,35 @@ if (0 > $startInclusive.value || $startInclusive.value > text_length
     int length = snprintf(NULL, 0, message_format, $startInclusive.value, $endExclusive.value, text_length);
     $textType message = {.value = malloc(length + 1)};
     snprintf(message.value, length + 1, message_format, $startInclusive.value, $endExclusive.value, text_length);
-    ${_panicFunction}(message);
+    $_panicFunction(message);
 } else if ($startInclusive.value > $endExclusive.value) {
     char* message_format = "Invalid range %ld..%ld: `start_inclusive` must be less than or equal to `end_exclusive`.";
     int length = snprintf(NULL, 0, message_format, $startInclusive.value, $endExclusive.value);
     $textType message = {.value = malloc(length + 1)};
     snprintf(message.value, length + 1, message_format, $startInclusive.value, $endExclusive.value);
-    ${_panicFunction}(message);
+    $_panicFunction(message);
 }
 
 size_t length = $endExclusive.value - $startInclusive.value;
 $returnType result = {.value = malloc(length + 1)};
 memcpy(result.value, $text.value + $startInclusive.value, length);
 return result;''');
-      case BuiltinFunction.textIndexOf:
+      case .textIndexOf:
         final a = parameters[0].id;
         final b = parameters[1].id;
         _push('''
-${returnType} result;
+$returnType result;
 char* result_raw = strstr($a.value, $b.value);
 if (result_raw == NULL) {
-    result = (${returnType}) {.variant = ${returnType}_none};
+    result = ($returnType) {.variant = ${returnType}_none};
 } else {
-    result = (${returnType}) {
+    result = ($returnType) {
         .variant = ${returnType}_some,
         .value.some = {.value = result_raw - $a.value},
     };
 }
 return result;''');
-      case BuiltinFunction.textLength:
+      case .textLength:
         _push('''
 $returnType result = {.value = strlen(${parameters[0].id}.value)};
 return result;''');
@@ -859,15 +892,15 @@ String _escapeCString(String text) {
   for (final rune in text.runes) {
     switch (rune) {
       case 0x22:
-        buffer.write('\\"');
+        buffer.write(r'\"');
       case 0x5C:
-        buffer.write('\\\\');
+        buffer.write(r'\\');
       case 0x0A:
-        buffer.write('\\n');
+        buffer.write(r'\n');
       case 0x0D:
-        buffer.write('\\r');
+        buffer.write(r'\r');
       case 0x09:
-        buffer.write('\\t');
+        buffer.write(r'\t');
       default:
         buffer.writeCharCode(rune);
     }
