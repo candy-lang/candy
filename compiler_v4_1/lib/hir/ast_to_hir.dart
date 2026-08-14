@@ -101,6 +101,7 @@ class _Lowerer {
         name: assignment.name,
         type: type,
         body: body,
+        span: assignment.ast.displaySpan,
       );
     }
   }

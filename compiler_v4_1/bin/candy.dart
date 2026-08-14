@@ -167,10 +167,9 @@ Module parseModule(Context context, Package package, File file) {
 void printErrors(Context context) {
   for (final error in context.errors) {
     final path = error.span.file.file.relativeFrom(.current).path;
-    final source = error.span.file.content;
-    final start = error.span.span.start.value.clamp(0, source.length);
-    final line = '\n'.allMatches(source.substring(0, start)).length + 1;
-    stderr.writeln('  $path:$line: ${error.message}');
+    final location = error.span.file.locationOf(error.span.span.start);
+    final position = '${location.line}:${location.column}';
+    stderr.writeln('  $path:$position: ${error.message}');
   }
 }
 
@@ -189,8 +188,7 @@ class CheckCommand extends Command<void> {
   @override
   final name = 'check';
   @override
-  final description =
-      'Check a Candy program or package for obvious errors.';
+  final description = 'Check a Candy program or package for obvious errors.';
 
   @override
   Future<void> run() async {

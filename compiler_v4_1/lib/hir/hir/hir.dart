@@ -1,6 +1,7 @@
 import 'package:supernova/supernova.dart';
 
 import '../../ast.dart';
+import '../../position.dart';
 import '../traits/solver.dart';
 import 'builtins.dart';
 import 'ids.dart';
@@ -177,6 +178,10 @@ sealed class HirTypeDeclaration with _$HirTypeDeclaration {
     required DeclarationId id,
     required List<HirTypeParameter> typeParameters,
     required HirTypeDeclarationKind kind,
+
+    /// The declaration's name in the Candy source, or `null` for
+    /// declarations without one (e.g. malformed code).
+    SourceSpan? span,
   }) = _HirTypeDeclaration;
   const HirTypeDeclaration._();
 
@@ -265,6 +270,9 @@ sealed class HirFunctionSignature with _$HirFunctionSignature {
     required List<HirTypeParameter> typeParameters,
     required List<HirParameter> parameters,
     required HirType returnType,
+
+    /// The declaration's span in the Candy source, or `null` for builtins.
+    SourceSpan? span,
   }) = _HirFunctionSignature;
   const HirFunctionSignature._();
 
@@ -316,6 +324,7 @@ sealed class HirAssignment with _$HirAssignment {
     required String name,
     required HirType type,
     required HirBody body,
+    required SourceSpan span,
   }) = _HirAssignment;
 }
 

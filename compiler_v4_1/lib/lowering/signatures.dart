@@ -235,11 +235,13 @@ class _SignatureLowerer {
       id: struct.id,
       typeParameters: typeParameters,
       kind: kind,
+      span: nameSpan,
     );
   }
 
   void _lowerEnum(CollectedEnum enum_) {
     final lowerer = _lowererFor(enum_.module);
+    final nameSpan = enum_.ast.name.toNullable()!.span;
     final typeParameters = lowerer.lowerTypeParameters(
       enum_.id,
       enum_.ast.typeParameters,
@@ -256,6 +258,7 @@ class _SignatureLowerer {
     _typeDeclarations[enum_.id] = HirTypeDeclaration(
       id: enum_.id,
       typeParameters: typeParameters,
+      span: nameSpan,
       kind: HirTypeDeclarationKind.enum_(
         variants: [
           for (final variant in enum_.ast.variants)
@@ -531,6 +534,7 @@ class _SignatureLowerer {
         returnType: function.ast.returnType == null
             ? declarations.wellKnownTypes.nothingType
             : lowerer.lowerType(function.ast.returnType, typeScope),
+        span: function.ast.displaySpan,
       ),
       ast: function.ast,
       typeScope: typeScope,

@@ -89,6 +89,7 @@ class Monomorphizer {
           },
         ),
       },
+      span: call.signature.span,
     );
     return monoId;
   }
@@ -136,6 +137,7 @@ class Monomorphizer {
       name: assignment.name,
       type: types.monomorphize(assignment.type, const {}),
       body: body,
+      span: assignment.span,
     );
     _assignmentInitializationOrder.add(id);
     return id;

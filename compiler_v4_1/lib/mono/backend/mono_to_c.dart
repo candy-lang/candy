@@ -1,5 +1,6 @@
 import '../../hir/hir/builtins.dart';
 import '../../hir/hir/ids.dart';
+import '../../position.dart';
 import '../hir_to_mono.dart';
 import '../mono/ids.dart';
 import '../mono/mono.dart';
@@ -19,6 +20,37 @@ class _Context {
   final _c = StringBuffer();
 
   void _push(String s) => _c.write(s);
+
+  void _pushDeclarationComment(String name, SourceSpan? span) {
+    if (span == null) return;
+    _push('// $name\n// ${span.startLocation}\n');
+  }
+
+  /// The un-mangled Candy type [type] was mangled from, e.g.
+  /// `(Core:List[Core:Text], Core:Int, Core:Int) Core:List[Core:Text]`.
+  String _readableType(MonoType type) => switch (type) {
+    MonoType_Named(:final declaration, :final typeArguments) => _readableName(
+      declaration,
+      typeArguments,
+    ),
+    MonoType_Function(:final parameterTypes, :final returnType) =>
+      '(${parameterTypes.map(_readableType).join(', ')}) '
+          '${_readableType(returnType)}',
+  };
+
+  /// The un-mangled Candy name of a declaration instantiated with
+  /// [typeArguments], e.g. `Core:print[Core:List[Core:Int]]`.
+  String _readableName(
+    DeclarationId declaration,
+    List<MonoType> typeArguments,
+  ) => typeArguments.isEmpty
+      ? '$declaration'
+      : '$declaration[${typeArguments.map(_readableType).join(', ')}]';
+
+  /// The un-mangled Candy type of a lambda, e.g. `(Core:Int) Core:Int`.
+  String _readableLambdaType(MonoExpressionKind_Lambda lambda) =>
+      '(${lambda.parameters.map((it) => _readableType(it.type)).join(', ')}) '
+      '${_readableType(lambda.body.returnType)}';
 
   Set<String> _boxedVariants(MonoType enumType) =>
       layouts.boxedVariants[enumType] ?? const {};
@@ -78,6 +110,13 @@ class _Context {
   void _lowerTypeDeclarations() {
     for (final type in layouts.declarationOrder) {
       final declaration = mono.typeDeclarations[type]!;
+      if (declaration is MonoTypeDeclaration_Function) {
+        // Lambda types have no declaration in the source to point to, so
+        // print the type they were mangled from instead.
+        _push('// ${_readableType(type)}\n');
+      } else {
+        _pushDeclarationComment(_readableType(type), declaration.span);
+      }
       _push('struct $type {\n');
       switch (declaration) {
         case MonoTypeDeclaration_Builtin(
@@ -96,7 +135,8 @@ class _Context {
           _push('};\n');
         case MonoTypeDeclaration_Struct(:final fields):
           for (final field in fields) {
-            _push('${field.type} ${field.name}; ');
+            _push('// ${field.name}: ${_readableType(field.type)}\n');
+            _push('${field.type} ${field.name};\n');
           }
           _push('};\n');
         case MonoTypeDeclaration_Enum(:final variants):
@@ -108,13 +148,14 @@ class _Context {
             _push('} variant;\n');
           }
 
-          _push('union {');
+          _push('union {\n');
           final boxedVariants = _boxedVariants(type);
           for (final variant in variants) {
             final valueType = variant.type;
             if (valueType != null) {
               final pointer = boxedVariants.contains(variant.name) ? '*' : '';
-              _push('$valueType$pointer ${variant.name};');
+              _push('// ${variant.name}: ${_readableType(valueType)}\n');
+              _push('$valueType$pointer ${variant.name};\n');
             }
           }
           _push('} value;\n};\n');
@@ -137,6 +178,7 @@ class _Context {
     for (final id in mono.assignmentInitializationOrder) {
       final assignment = mono.assignments[id]!;
       _lowerLambdaDeclarationsIn(id.mangled, assignment.body);
+      _pushDeclarationComment('$id', assignment.span);
       _push('${assignment.type} ${id.mangled};\n');
     }
   }
@@ -146,6 +188,7 @@ class _Context {
       final assignment = mono.assignments[id]!;
       _lowerLambdaDefinitionsIn(id.mangled, const [], assignment.body);
 
+      _pushDeclarationComment('$id', assignment.span);
       _push('void ${id.mangled}\$init() {\n');
       _lowerBodyExpressions(id.mangled, assignment.body);
       _push('${id.mangled} = ${assignment.body.returnValueId};\n}\n\n');
@@ -159,6 +202,10 @@ class _Context {
         _lowerLambdaDeclarationsIn(id.toString(), body.body);
       }
 
+      _pushDeclarationComment(
+        _readableName(id.declaration, id.typeArguments),
+        function.span,
+      );
       _lowerFunctionSignature(id.toString(), function);
       _push(';\n');
     }
@@ -171,6 +218,7 @@ class _Context {
         '$declarationName\$lambda${id}_closure;\n',
       );
 
+      _push('// ${_readableLambdaType(lambda)}\n');
       _lowerLambdaSignature(declarationName, id, lambda);
       _push(';\n');
     });
@@ -187,6 +235,10 @@ class _Context {
         );
       }
 
+      _pushDeclarationComment(
+        _readableName(id.declaration, id.typeArguments),
+        function.span,
+      );
       _lowerFunctionSignature(id.toString(), function);
       _push(' {\n');
       _lowerBodyOrBuiltin(id.toString(), function);
@@ -202,10 +254,13 @@ class _Context {
     _visitLambdasInsideBody(body, (id, lambda) {
       final closure = _closureWithTypes(lambda, declarationParameters, body);
 
-      _push('struct $declarationName\$lambda${id}_closure {');
-      closure.forEach((id, type) => _push('$type $id; '));
+      _push('struct $declarationName\$lambda${id}_closure {\n');
+      closure.forEach(
+        (id, type) => _push('$type $id; // $id: ${_readableType(type)}\n'),
+      );
       _push('};\n');
 
+      _push('// ${_readableLambdaType(lambda)}\n');
       _lowerLambdaSignature(declarationName, id, lambda);
       _push(' {\n');
       _push('$declarationName\$lambda${id}_closure* closure = raw_closure;\n');

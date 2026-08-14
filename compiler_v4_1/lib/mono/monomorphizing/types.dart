@@ -82,6 +82,7 @@ class TypeMonomorphizer {
           HirTypeDeclarationKind_Builtin(type: final builtin) => .builtin(
             type: builtin,
             typeArguments: typeArguments,
+            span: hirDeclaration.span,
           ),
           HirTypeDeclarationKind_Struct(:final fields) => .struct(
             fields: [
@@ -91,6 +92,7 @@ class TypeMonomorphizer {
                   type: monomorphize(field.type, environment),
                 ),
             ],
+            span: hirDeclaration.span,
           ),
           HirTypeDeclarationKind_Enum(:final variants) => .enum_(
             variants: [
@@ -102,6 +104,7 @@ class TypeMonomorphizer {
                       : monomorphize(variant.type!, environment),
                 ),
             ],
+            span: hirDeclaration.span,
           ),
         };
     }

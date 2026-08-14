@@ -37,6 +37,16 @@ sealed class SourceSpan with _$SourceSpan {
       _$SourceSpanFromJson(json);
   const SourceSpan._();
 
+  /// `file:line:column`, e.g. for pointing at a single location.
+  String get startLocation {
+    final start = file.locationOf(span.start);
+    return '$file:${start.line}:${start.column}';
+  }
+
   @override
-  String toString() => '$file:${span.start}-${span.end}';
+  String toString() {
+    final start = file.locationOf(span.start);
+    final end = file.locationOf(span.end);
+    return '$file:${start.line}:${start.column}-${end.line}:${end.column}';
+  }
 }

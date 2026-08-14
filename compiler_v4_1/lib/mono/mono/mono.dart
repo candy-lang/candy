@@ -2,6 +2,7 @@ import 'package:supernova/supernova.dart';
 
 import '../../hir/hir/builtins.dart';
 import '../../hir/hir/ids.dart';
+import '../../position.dart';
 import 'ids.dart';
 
 part 'mono.freezed.dart';
@@ -35,12 +36,15 @@ sealed class MonoTypeDeclaration with _$MonoTypeDeclaration {
   const factory MonoTypeDeclaration.builtin({
     required BuiltinType type,
     @Default(<MonoType>[]) List<MonoType> typeArguments,
+    SourceSpan? span,
   }) = MonoTypeDeclaration_Builtin;
   const factory MonoTypeDeclaration.struct({
     required List<MonoStructField> fields,
+    SourceSpan? span,
   }) = MonoTypeDeclaration_Struct;
   const factory MonoTypeDeclaration.enum_({
     required List<MonoEnumVariant> variants,
+    SourceSpan? span,
   }) = MonoTypeDeclaration_Enum;
 
   /// A lambda type. It has no declaration in the source, but the backend needs
@@ -49,6 +53,14 @@ sealed class MonoTypeDeclaration with _$MonoTypeDeclaration {
     required List<MonoType> parameterTypes,
     required MonoType returnType,
   }) = MonoTypeDeclaration_Function;
+  const MonoTypeDeclaration._();
+
+  SourceSpan? get span => switch (this) {
+    MonoTypeDeclaration_Builtin(:final span) ||
+    MonoTypeDeclaration_Struct(:final span) ||
+    MonoTypeDeclaration_Enum(:final span) => span,
+    MonoTypeDeclaration_Function() => null,
+  };
 }
 
 @freezed
@@ -76,6 +88,7 @@ sealed class MonoAssignment with _$MonoAssignment {
     required String name,
     required MonoType type,
     required MonoBody body,
+    required SourceSpan span,
   }) = _MonoAssignment;
 }
 
@@ -86,6 +99,9 @@ sealed class MonoFunction with _$MonoFunction {
     required List<MonoParameter> parameters,
     required MonoType returnType,
     required MonoBodyOrBuiltin body,
+
+    /// The declaration's span in the Candy source, or `null` for builtins.
+    SourceSpan? span,
   }) = _MonoFunction;
 }
 
