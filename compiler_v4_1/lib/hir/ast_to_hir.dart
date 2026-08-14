@@ -219,7 +219,10 @@ class _Lowerer {
     }
 
     for (final impl in _signatures.impls) {
-      for (final id in impl.functionsByTraitFunction.values) {
+      for (final id in [
+        ...impl.functionsByTraitFunction.values,
+        ...impl.inherentFunctionIds,
+      ]) {
         _functions[id] = _lowerFunction(_signatures.functions[id]!);
       }
     }
@@ -266,6 +269,9 @@ class _Lowerer {
               in impl.functionsByTraitFunction.entries)
             if (_functions.containsKey(implFunctionId))
               traitFunctionId: _functions[implFunctionId]!,
+        },
+        inherentFunctions: {
+          for (final id in impl.inherentFunctionIds) id: ?_functions[id],
         },
       ),
   ];

@@ -432,15 +432,12 @@ class Parser {
       recoverySet: _typeRecoverySet,
     );
 
-    expect<TokenKind_Colon>(
-      'This impl is missing a colon after the type.',
-      recoverySet: _typeFirstSet,
-    );
-
-    final trait = parseTypeOrError(
-      'This impl is missing a trait.',
-      recoverySet: _typeRecoverySet,
-    );
+    final trait = _advanceIfKind<TokenKind_Colon>() == null
+        ? null
+        : parseTypeOrError(
+            'This impl is missing a trait.',
+            recoverySet: _typeRecoverySet,
+          );
 
     expect<TokenKind_OpeningBrace>(
       'This impl is missing an opening curly brace.',

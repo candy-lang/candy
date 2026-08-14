@@ -111,12 +111,13 @@ class _TextBuilder {
 
   void writeImpl(HirImpl impl) {
     final trait = switch (impl.trait) {
-      Some(:final some) => '$some',
-      _ => '<error>',
+      null => '',
+      Some(:final some) => ': $some',
+      None() => ': <error>',
     };
     final header =
-        'impl${typeParameters(impl.typeParameters)} ${impl.type}: $trait';
-    if (impl.functions.isEmpty) {
+        'impl${typeParameters(impl.typeParameters)} ${impl.type}$trait';
+    if (impl.functions.isEmpty && impl.inherentFunctions.isEmpty) {
       writeLine('$header {}');
       return;
     }
@@ -125,6 +126,9 @@ class _TextBuilder {
         final function = impl.functions[traitFunctionId]!;
         writeLine('# implements $traitFunctionId');
         writeFunction(function);
+      }
+      for (final id in impl.inherentFunctions.keys.sorted()) {
+        writeFunction(impl.inherentFunctions[id]!);
       }
     }, '}');
   }

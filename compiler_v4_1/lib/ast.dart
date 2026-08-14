@@ -26,10 +26,8 @@ sealed class Ast with _$Ast {
 
 @freezed
 sealed class AstUse with _$AstUse {
-  const factory AstUse({
-    required Token useKeyword,
-    required List<Token> path,
-  }) = _AstUse;
+  const factory AstUse({required Token useKeyword, required List<Token> path}) =
+      _AstUse;
 
   factory AstUse.fromJson(Map<String, dynamic> json) => _$AstUseFromJson(json);
   const AstUse._();
@@ -138,7 +136,7 @@ sealed class AstImpl with _$AstImpl {
     required Token implKeyword,
     required AstTypeParameters? typeParameters,
     @_AstTypeOptionConverter() required AstErrorOr<AstType> type,
-    @_AstTypeOptionConverter() required AstErrorOr<AstType> trait,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType>? trait,
     required List<AstFunction> functions,
   }) = _AstImpl;
 

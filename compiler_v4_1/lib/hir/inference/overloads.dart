@@ -140,6 +140,11 @@ class OverloadResolver {
     }
 
     for (final impl in signatures.impls) {
+      if (impl.isInherent) {
+        _addInherentFunctions(candidates, impl, receiver, name);
+        continue;
+      }
+
       if (impl.trait case Some(some: final traitRef)) {
         final match = _matchImpl(impl, receiver, traitRef);
         if (match == null) continue;
@@ -162,7 +167,7 @@ class OverloadResolver {
           instantiatedTrait,
           implType,
           name,
-          group: isBlanket ? 1 : 0,
+          group: isBlanket ? _blanketTraitGroup : _traitGroup,
           goals: goals,
           impl: impl,
           implSubstitutions: implSubstitutions,
@@ -172,10 +177,61 @@ class OverloadResolver {
     return candidates;
   }
 
-  /// Unifies the impl's self type with [receiver] in a throwaway store, so a
-  /// failed attempt leaves nothing behind.
+  /// An inherent function shadows a trait one of the same name, as in Rust, so
+  /// adding a trait impl can never change what an existing call means.
+  static const _inherentGroup = 0;
+  static const _traitGroup = 1;
+  static const _blanketTraitGroup = 2;
+
+  void _addInherentFunctions(
+    List<CandidateSource> candidates,
+    LoweredImpl impl,
+    HirType receiver,
+    String name,
+  ) {
+    final implSubstitutions = _matchImplType(impl, receiver);
+    if (implSubstitutions == null) return;
+
+    for (final id in impl.inherentFunctionIds) {
+      final function = signatures.functions[id];
+      if (function == null) continue;
+      if (function.signature.name != name) continue;
+
+      candidates.add(
+        CandidateSource(
+          function: function,
+          preset: implSubstitutions,
+          group: _inherentGroup,
+          goals: solverGoalsOfBounds(
+            impl.typeParameters,
+          ).map((it) => substituteGoal(it, implSubstitutions)).toList(),
+        ),
+      );
+    }
+  }
+
   (HirType, HirTrait, List<SolverGoal>, Map<TypeParameterId, HirType>)?
   _matchImpl(LoweredImpl impl, HirType receiver, HirTrait traitRef) {
+    final resolved = _matchImplType(impl, receiver);
+    if (resolved == null) return null;
+
+    return (
+      impl.type.substitute(resolved),
+      traitRef.substitute(resolved),
+      solverGoalsOfBounds(
+        impl.typeParameters,
+      ).map((it) => substituteGoal(it, resolved)).toList(),
+      resolved,
+    );
+  }
+
+  /// Unifies the impl's self type with [receiver] in a throwaway store, so a
+  /// failed attempt leaves nothing behind. Returns what that pins the impl's
+  /// type parameters down to, or `null` if the impl doesn't apply.
+  Map<TypeParameterId, HirType>? _matchImplType(
+    LoweredImpl impl,
+    HirType receiver,
+  ) {
     final scratch = TypeVariables();
     final substitutions = {
       for (final parameter in impl.typeParameters)
@@ -185,18 +241,10 @@ class OverloadResolver {
     final implType = impl.type.substitute(substitutions);
     if (!_unifier(scratch).unify(implType, receiver)) return null;
 
-    final resolved = {
+    return {
       for (final MapEntry(:key, :value) in substitutions.entries)
         key: scratch.finalize(value),
     };
-    return (
-      scratch.finalize(implType),
-      traitRef.substitute(resolved),
-      solverGoalsOfBounds(
-        impl.typeParameters,
-      ).map((it) => substituteGoal(it, resolved)).toList(),
-      resolved,
-    );
   }
 
   void _addTraitFunctions(

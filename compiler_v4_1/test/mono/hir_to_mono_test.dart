@@ -189,6 +189,36 @@ void main() {
     });
   });
 
+  group('inherent impls', () {
+    test('calls a method declared without a trait', () {
+      final harness = MonoHarness.of('''
+        impl Int {
+          fun double(self: Int) Int { builtinIntAdd(self, self) }
+        }
+        fun main() Int {
+          1.double()
+        }
+      ''');
+      expect(harness.callsIn('main'), [r'$impl.double']);
+    });
+
+    test('instantiates a generic inherent impl per receiver type', () {
+      final harness = MonoHarness.of('''
+        impl[T] Maybe[T] {
+          fun orElse(self: Maybe[T], fallback: T) T { fallback }
+        }
+        fun main() Int {
+          Maybe.some("a").orElse("b")
+          Maybe.some(1).orElse(2)
+        }
+      ''');
+      expect(harness.instancesOf('orElse'), [
+        r'$impl.orElse[Int]',
+        r'$impl.orElse[Text]',
+      ]);
+    });
+  });
+
   group('bodies', () {
     test('gives a switch case binding the variant payload type', () {
       final harness = MonoHarness.of('''

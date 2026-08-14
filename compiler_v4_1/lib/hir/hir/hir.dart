@@ -243,10 +243,15 @@ sealed class HirImpl with _$HirImpl {
     required DeclarationId id,
     required List<HirTypeParameter> typeParameters,
     required HirType type,
-    required HirErrorOr<HirTrait> trait,
+
+    /// `null` for an inherent impl, which names no trait.
+    required HirErrorOr<HirTrait>? trait,
 
     /// Keyed by the trait function each one implements.
     required Map<DeclarationId, HirFunction> functions,
+
+    /// The impl's own functions, empty unless this is an inherent impl.
+    required Map<DeclarationId, HirFunction> inherentFunctions,
   }) = _HirImpl;
 }
 

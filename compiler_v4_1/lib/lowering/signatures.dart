@@ -63,13 +63,21 @@ class LoweredImpl {
     required this.type,
     required this.trait,
     required this.functionsByTraitFunction,
+    required this.inherentFunctionIds,
   });
 
   final DeclarationId id;
   final List<HirTypeParameter> typeParameters;
   final HirType type;
-  final HirErrorOr<HirTrait> trait;
+
+  /// `null` for an inherent impl, which names no trait.
+  final HirErrorOr<HirTrait>? trait;
   final Map<DeclarationId, DeclarationId> functionsByTraitFunction;
+
+  /// The impl's own functions, empty unless this is an inherent impl.
+  final List<DeclarationId> inherentFunctionIds;
+
+  bool get isInherent => trait == null;
 }
 
 class LoweredAssignment {
@@ -315,11 +323,10 @@ class _SignatureLowerer {
     final outerScope = TypeScope(typeParameters: typeParameters);
 
     final type = lowerer.lowerType(impl.ast.type.toNullable(), outerScope);
-    final trait = lowerer.lowerTrait(
-      impl.ast.trait.toNullable(),
-      implSpan,
-      outerScope,
-    );
+    final astTrait = impl.ast.trait;
+    final trait = astTrait == null
+        ? null
+        : lowerer.lowerTrait(astTrait.toNullable(), implSpan, outerScope);
     final typeScope = TypeScope(
       typeParameters: typeParameters,
       selfBaseType: type,
@@ -330,7 +337,13 @@ class _SignatureLowerer {
     }
 
     final functionsByTraitFunction = <DeclarationId, DeclarationId>{};
-    if (trait case Some(some: final traitRef)) {
+    if (trait == null) {
+      // A blanket inherent impl would add its functions to every type, which
+      // no bound could then constrain. Rust rules them out the same way.
+      if (type is HirType_Parameter) {
+        _error(implSpan, 'An impl without a trait needs a concrete type.');
+      }
+    } else if (trait case Some(some: final traitRef)) {
       final goal = solverGoalOf(traitRef, type);
       if (goal != null) {
         _solverEnvironment.addRule(
@@ -354,6 +367,9 @@ class _SignatureLowerer {
         type: type,
         trait: trait,
         functionsByTraitFunction: functionsByTraitFunction,
+        inherentFunctionIds: trait == null
+            ? impl.functions.map((it) => it.id).toList()
+            : const [],
       ),
     );
   }
