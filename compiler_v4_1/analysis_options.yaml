@@ -25,10 +25,12 @@ plugins:
       - numeric_constant_style
       - padding_over_container
       - pending_listener
-  prefer_shorthands: ^0.4.7
-  squiggly:
-    version: ^1.0.4
-    diagnostics:
-      equality_incomplete: true
-      copywith_incomplete: true
-      tostring_incomplete: true
+  # TODO(JonasWanke): re-add when newer analyzer version is supported, https://github.com/huanghui1998hhh/prefer_shorthands/issues/28
+  # prefer_shorthands: ^0.4.7
+  # TODO(JonasWanke): re-add when newer analyzer version is supported (squiggly still requires analyzer_plugin ^0.13.11)
+  # squiggly:
+  #   version: ^1.0.4
+  #   diagnostics:
+  #     equality_incomplete: true
+  #     copywith_incomplete: true
+  #     tostring_incomplete: true
