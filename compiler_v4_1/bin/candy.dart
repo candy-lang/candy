@@ -221,8 +221,8 @@ class CheckCommand extends Command<void> {
     if (clearScreen) stdout.write('\x1B[2J\x1B[H');
 
     try {
-      final loaded = loadPackageForPath(path);
-      astToHir(loaded.context, loaded.modules);
+      final loaded = _time('Parsing', () => loadPackageForPath(path));
+      _time('AST → HIR', () => astToHir(loaded.context, loaded.modules));
 
       if (loaded.context.errors.isNotEmpty) {
         printErrors(loaded.context);
@@ -276,24 +276,30 @@ class CompileCommand extends Command<void> {
 
   Future<void> _compile(String path, {bool exitOnError = true}) async {
     try {
-      final loaded = loadPackageForFile(File(path));
-      final hir = astToHir(loaded.context, loaded.modules);
+      final loaded = _time('Parsing', () => loadPackageForFile(File(path)));
+      final hir = _time(
+        'AST → HIR',
+        () => astToHir(loaded.context, loaded.modules),
+      );
 
       if (loaded.context.errors.isNotEmpty) {
         printErrors(loaded.context);
         throw const Exit(Exit.codeContainsErrors);
       }
 
-      final mono = hirToMono(hir);
+      final mono = _time('HIR → Mono', () => hirToMono(hir));
       if (mono == null) {
         stderr.writeln('No `main` function found.');
         throw const Exit(Exit.codeContainsErrors);
       }
 
-      final cCode = monoToC(mono);
+      final cCode = _time('Mono → C', () => monoToC(mono));
       final cPath = '${path.substring(0, path.lastIndexOf('.'))}.c';
       File(cPath).writeAsStringSync(cCode);
-      await Process.run('clang-format', ['-i', cPath]);
+      await _timeAsync(
+        'clang-format',
+        () => Process.run('clang-format', ['-i', cPath]),
+      );
 
       final executablePath = path.substring(0, path.lastIndexOf('.'));
       final flags = await Process.run('pkg-config', [
@@ -302,13 +308,16 @@ class CompileCommand extends Command<void> {
         'cairo',
         'sdl3',
       ]);
-      final gcc = await Process.run('gcc', [
-        cPath,
-        ...flags.stdout.toString().trim().split(' '),
-        '-O3',
-        '-o',
-        executablePath,
-      ]);
+      final gcc = await _timeAsync(
+        'gcc',
+        () => Process.run('gcc', [
+          cPath,
+          ...flags.stdout.toString().trim().split(' '),
+          '-O3',
+          '-o',
+          executablePath,
+        ]),
+      );
       if (gcc.exitCode != 0) {
         stderr.write(gcc.stderr);
         throw const Exit(Exit.codeContainsErrors);
@@ -328,6 +337,25 @@ String _requirePath(ArgResults results) {
   }
   return results.rest.first;
 }
+
+/// Runs [action], printing how long it took under [label].
+T _time<T>(String label, T Function() action) {
+  final stopwatch = Stopwatch()..start();
+  final result = action();
+  print('$label: ${_formatDuration(stopwatch.elapsed)}');
+  return result;
+}
+
+/// Like [_time], but for an asynchronous [action].
+Future<T> _timeAsync<T>(String label, Future<T> Function() action) async {
+  final stopwatch = Stopwatch()..start();
+  final result = await action();
+  print('$label: ${_formatDuration(stopwatch.elapsed)}');
+  return result;
+}
+
+String _formatDuration(Duration duration) =>
+    '${(duration.inMicroseconds / 1000).toStringAsFixed(1)}ms';
 
 // `debug`
 
