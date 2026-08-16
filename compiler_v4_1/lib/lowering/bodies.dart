@@ -75,6 +75,7 @@ class BodyLowerer {
     unifier = Unifier(
       variables: variables,
       wellKnownTypes: signatures.wellKnownTypes,
+      normalize: signatures.normalizer.normalize,
     );
     typeLowerer = TypeLowerer(
       context: context,
@@ -135,7 +136,7 @@ class BodyLowerer {
     AstExpression? expression,
   }) {
     this.typeScope = typeScope;
-    solverContext = SolverContext(typeScope.typeParameters);
+    solverContext = resolver.solverContextFor(typeScope);
     _locals
       ..clear()
       ..addAll(parameters.map((it) => (it.name, it.id, it.type)));

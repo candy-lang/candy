@@ -122,6 +122,7 @@ sealed class AstTrait with _$AstTrait {
     @Default(AstVisibility.private) AstVisibility visibility,
     @_TokenOptionConverter() required AstErrorOr<Token> name,
     required AstTypeParameters? typeParameters,
+    required List<AstAssociatedType> associatedTypes,
     required List<AstFunction> functions,
   }) = _AstTrait;
 
@@ -137,12 +138,29 @@ sealed class AstImpl with _$AstImpl {
     required AstTypeParameters? typeParameters,
     @_AstTypeOptionConverter() required AstErrorOr<AstType> type,
     @_AstTypeOptionConverter() required AstErrorOr<AstType>? trait,
+    required List<AstAssociatedType> associatedTypes,
     required List<AstFunction> functions,
   }) = _AstImpl;
 
   factory AstImpl.fromJson(Map<String, dynamic> json) =>
       _$AstImplFromJson(json);
   const AstImpl._();
+}
+
+/// `type Item: Bound` in a trait, `type Item = Int` in an impl. Both forms
+/// parse everywhere; signature lowering rejects the one that doesn't belong.
+@freezed
+sealed class AstAssociatedType with _$AstAssociatedType {
+  const factory AstAssociatedType({
+    required SourceSpan displaySpan,
+    @_TokenOptionConverter() required AstErrorOr<Token> name,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType>? upperBound,
+    @_AstTypeOptionConverter() required AstErrorOr<AstType>? value,
+  }) = _AstAssociatedType;
+
+  factory AstAssociatedType.fromJson(Map<String, dynamic> json) =>
+      _$AstAssociatedTypeFromJson(json);
+  const AstAssociatedType._();
 }
 
 @freezed
@@ -238,6 +256,13 @@ sealed class AstType with _$AstType implements ToJsonMap {
     required List<AstType> parameterTypes,
     @_AstTypeOptionConverter() required AstErrorOr<AstType> returnType,
   }) = AstType_Function;
+
+  /// `T.Item`: the associated type [name] of whichever trait [baseType] gets it
+  /// from.
+  const factory AstType.associated({
+    required AstType baseType,
+    required Token name,
+  }) = AstType_Associated;
 
   factory AstType.fromJson(Map<String, dynamic> json) =>
       _$AstTypeFromJson(json);

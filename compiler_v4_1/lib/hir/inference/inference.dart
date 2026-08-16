@@ -46,6 +46,14 @@ class TypeVariables {
       HirType_Self(:final baseType) => HirType.self(
         baseType: resolve(baseType),
       ),
+      HirType_Associated(:final trait, :final baseType, :final declaration) =>
+        HirType.associated(
+          trait: trait.copyWith(
+            typeArguments: trait.typeArguments.map(resolve).toList(),
+          ),
+          baseType: resolve(baseType),
+          declaration: declaration,
+        ),
       _ => head,
     };
   }
@@ -67,6 +75,14 @@ class TypeVariables {
       HirType_Self(:final baseType) => HirType.self(
         baseType: finalize(baseType),
       ),
+      HirType_Associated(:final trait, :final baseType, :final declaration) =>
+        HirType.associated(
+          trait: trait.copyWith(
+            typeArguments: trait.typeArguments.map(finalize).toList(),
+          ),
+          baseType: finalize(baseType),
+          declaration: declaration,
+        ),
       _ => resolved,
     };
   }
@@ -92,6 +108,9 @@ class TypeVariables {
       HirType_Function(:final parameterTypes, :final returnType) =>
         parameterTypes.any((it) => _occurs(id, it)) || _occurs(id, returnType),
       HirType_Self(:final baseType) => _occurs(id, baseType),
+      HirType_Associated(:final trait, :final baseType) =>
+        trait.typeArguments.any((it) => _occurs(id, it)) ||
+            _occurs(id, baseType),
       _ => false,
     };
   }
@@ -107,6 +126,9 @@ extension on HirType {
       parameterTypes.any((it) => it.containsVariable) ||
           returnType.containsVariable,
     HirType_Self(:final baseType) => baseType.containsVariable,
+    HirType_Associated(:final trait, :final baseType) =>
+      trait.typeArguments.any((it) => it.containsVariable) ||
+          baseType.containsVariable,
     _ => false,
   };
 }
@@ -116,14 +138,31 @@ extension on HirType {
 /// Candy has no subtyping between named types, so assignability is
 /// unification plus escapes for `Never`, error types, and `Self`.
 class Unifier {
-  Unifier({required this.variables, required this.wellKnownTypes});
+  Unifier({
+    required this.variables,
+    required this.wellKnownTypes,
+    this.normalize,
+  });
 
   final TypeVariables variables;
   final WellKnownTypes wellKnownTypes;
 
+  /// Resolves projections before they're compared, so `Self.Item` and the
+  /// `Int` an impl binds it to are the same type. `null` inside the normalizer
+  /// itself, which would otherwise call back into itself.
+  final HirType Function(HirType)? normalize;
+
+  HirType _head(HirType type) {
+    final resolved = variables.shallow(type);
+    if (resolved is! HirType_Associated) return resolved;
+
+    final normalized = normalize?.call(resolved) ?? resolved;
+    return normalized == resolved ? resolved : variables.shallow(normalized);
+  }
+
   bool unify(HirType a, HirType b) {
-    final left = variables.shallow(a);
-    final right = variables.shallow(b);
+    final left = _head(a);
+    final right = _head(b);
 
     if (left is HirType_Error || right is HirType_Error) return true;
     if (left is HirType_Variable) return variables.bind(left.id, right);
@@ -153,6 +192,22 @@ class Unifier {
         return (left as HirType_Parameter).id ==
             (right as HirType_Parameter).id;
 
+      // A projection that survived normalization is rigid: it stands for one
+      // unknown type, so it only ever equals the same projection.
+      case (HirType_Associated(), HirType_Associated()):
+        final l = left as HirType_Associated;
+        final r = right as HirType_Associated;
+        if (l.declaration != r.declaration) return false;
+        if (l.trait.typeArguments.length != r.trait.typeArguments.length) {
+          return false;
+        }
+        for (var i = 0; i < l.trait.typeArguments.length; i++) {
+          if (!unify(l.trait.typeArguments[i], r.trait.typeArguments[i])) {
+            return false;
+          }
+        }
+        return unify(l.baseType, r.baseType);
+
       // `Self` unifies with whatever it stands for.
       case (HirType_Self(:final baseType), _):
         return unify(baseType, right);
@@ -166,8 +221,8 @@ class Unifier {
 
   /// Whether a value of type [sub] can be used where [sup] is expected.
   bool assignable(HirType sub, HirType sup) {
-    final from = variables.shallow(sub);
-    final to = variables.shallow(sup);
+    final from = _head(sub);
+    final to = _head(sup);
 
     if (from is HirType_Error || to is HirType_Error) return true;
     // `Never` has no values, so it stands in for anything. Allowed at every

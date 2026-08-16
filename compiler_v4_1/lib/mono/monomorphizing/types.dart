@@ -1,5 +1,6 @@
 import '../../hir/hir/hir.dart';
 import '../../hir/hir/ids.dart';
+import '../../hir/traits/projections.dart';
 import '../mono/ids.dart';
 import '../mono/mono.dart';
 
@@ -8,9 +9,10 @@ import '../mono/mono.dart';
 /// Every [MonoType] that appears anywhere in the result has an entry in
 /// [declarations], including ones only reachable as a type argument.
 class TypeMonomorphizer {
-  TypeMonomorphizer(this.hir);
+  TypeMonomorphizer(this.hir, this.normalizer);
 
   final Hir hir;
+  final TypeNormalizer normalizer;
   final _declarations = <MonoType, MonoTypeDeclaration?>{};
 
   Map<MonoType, MonoTypeDeclaration> get declarations => {
@@ -25,7 +27,11 @@ class TypeMonomorphizer {
     HirType type,
     Map<TypeParameterId, HirType> environment,
   ) {
-    final result = _convert(type.substitute(environment));
+    // Substituting makes `Self` and the trait's type arguments concrete, which
+    // is exactly what a projection needs to resolve.
+    final result = _convert(
+      normalizer.normalize(type.substitute(environment)),
+    );
     _declare(result);
     return result;
   }
@@ -43,7 +49,9 @@ class TypeMonomorphizer {
     // the trait, so no substitution replaces it — but its base type is the
     // impl's type, which the environment has already made concrete.
     HirType_Self(:final baseType) => _convert(baseType),
-    HirType_Parameter() || HirType_Variable() => throw StateError(
+    HirType_Parameter() ||
+    HirType_Variable() ||
+    HirType_Associated() => throw StateError(
       '`$type` should have been monomorphized away.',
     ),
     HirType_Error() => throw StateError('The HIR still contains errors.'),

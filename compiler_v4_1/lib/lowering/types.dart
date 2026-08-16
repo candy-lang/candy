@@ -12,14 +12,23 @@ import 'modules.dart';
 
 /// The type parameters and `Self` type visible at some point in the program.
 class TypeScope {
-  const TypeScope({this.typeParameters = const [], this.selfBaseType});
+  const TypeScope({
+    this.typeParameters = const [],
+    this.selfBaseType,
+    this.selfTrait,
+  });
 
   final List<HirTypeParameter> typeParameters;
   final HirType? selfBaseType;
 
+  /// The trait `Self` gets its associated types from: the enclosing trait, or
+  /// the trait an enclosing impl implements. `null` everywhere else.
+  final HirTrait? selfTrait;
+
   TypeScope extend(List<HirTypeParameter> more) => TypeScope(
     typeParameters: [...typeParameters, ...more],
     selfBaseType: selfBaseType,
+    selfTrait: selfTrait,
   );
 
   HirTypeParameter? find(String name) =>
@@ -57,7 +66,72 @@ class TypeLowerer {
 
       case AstType_Named(:final name, :final typeArguments):
         return _lowerNamedType(name, typeArguments, typeScope);
+
+      case AstType_Associated(:final baseType, :final name):
+        return _lowerAssociatedType(baseType, name, typeScope);
     }
+  }
+
+  /// `Self.Item` / `T.Item`. Which trait the associated type comes from is
+  /// read off the base's bound rather than searched for, so this doesn't
+  /// depend on any other declaration having been lowered yet.
+  HirType _lowerAssociatedType(
+    AstType baseAst,
+    Token name,
+    TypeScope typeScope,
+  ) {
+    final base = lowerType(baseAst, typeScope);
+    if (base is HirType_Error) return base;
+
+    final HirTrait? trait;
+    switch (base) {
+      case HirType_Self():
+        trait = typeScope.selfTrait;
+        if (trait == null) {
+          error(
+            name.span,
+            '`Self` has no associated types here, because this impl '
+            "doesn't implement a trait.",
+          );
+          return const HirType.error();
+        }
+      case HirType_Parameter(:final id):
+        final bound = typeScope.find(id.name)?.upperBound;
+        if (bound is! Some<HirTrait>) {
+          error(
+            name.span,
+            '`${id.name}` has no associated types, because it has no bound.',
+          );
+          return const HirType.error();
+        }
+        trait = bound.some;
+      case _:
+        error(
+          name.span,
+          'Associated types can only be read off `Self` or a bounded type '
+          'parameter.',
+        );
+        return const HirType.error();
+    }
+
+    final declaration = declarations.associatedTypeOf(
+      trait.declaration,
+      name.rawText,
+    );
+    if (declaration == null) {
+      error(
+        name.span,
+        'Trait `${trait.declaration.name}` has no associated type '
+        '`${name.rawText}`.',
+      );
+      return const HirType.error();
+    }
+
+    return HirType.associated(
+      trait: trait,
+      baseType: base,
+      declaration: declaration,
+    );
   }
 
   HirType _lowerNamedType(
@@ -120,6 +194,10 @@ class TypeLowerer {
 
       case AstType_Function():
         error(fallbackSpan, 'A function type is not a trait.');
+        return const None();
+
+      case AstType_Associated(:final name):
+        error(name.span, 'An associated type is not a trait.');
         return const None();
 
       case AstType_Named(:final name, :final typeArguments):
@@ -234,5 +312,15 @@ extension TypeParameterCount on CollectedDeclarations {
       _ => null,
     };
     return parameters?.parameters.length ?? 0;
+  }
+
+  /// The trait's associated type of that name, for the same reason.
+  DeclarationId? associatedTypeOf(DeclarationId trait, String name) {
+    final collected = declarations[trait];
+    if (collected is! CollectedTrait) return null;
+    return collected.associatedTypes
+        .where((it) => it.id.name == name)
+        .map((it) => it.id)
+        .firstOrNull;
   }
 }

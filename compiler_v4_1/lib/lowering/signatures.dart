@@ -7,6 +7,7 @@ import '../hir/hir/builtins.dart';
 import '../hir/hir/hir.dart';
 import '../hir/hir/ids.dart';
 import '../hir/traits/hir_bridge.dart';
+import '../hir/traits/projections.dart';
 import '../hir/traits/solver.dart';
 import '../hir/traits/solver_values.dart';
 import '../position.dart';
@@ -39,29 +40,41 @@ class LoweredFunction {
 }
 
 class LoweredTrait {
-  const LoweredTrait({
+  LoweredTrait({
     required this.id,
     required this.typeParameters,
     required this.solverGoal,
     required this.solverSubgoals,
+    required this.associatedTypes,
     required this.functionIds,
     required this.selfBaseType,
+    required this.selfTrait,
   });
 
   final DeclarationId id;
   final List<HirTypeParameter> typeParameters;
   final SolverGoal solverGoal;
   final List<SolverGoal> solverSubgoals;
-  final List<DeclarationId> functionIds;
+  final List<HirAssociatedType> associatedTypes;
+
+  /// Filled in once every impl's associated types are known.
+  List<DeclarationId> functionIds;
   final HirType selfBaseType;
+
+  /// `Self`'s own trait, i.e. this trait applied to its type parameters.
+  final HirTrait selfTrait;
+
+  HirAssociatedType? associatedType(DeclarationId id) =>
+      associatedTypes.where((it) => it.id == id).firstOrNull;
 }
 
 class LoweredImpl {
-  const LoweredImpl({
+  LoweredImpl({
     required this.id,
     required this.typeParameters,
     required this.type,
     required this.trait,
+    required this.associatedTypes,
     required this.functionsByTraitFunction,
     required this.inherentFunctionIds,
   });
@@ -72,12 +85,25 @@ class LoweredImpl {
 
   /// `null` for an inherent impl, which names no trait.
   final HirErrorOr<HirTrait>? trait;
-  final Map<DeclarationId, DeclarationId> functionsByTraitFunction;
 
-  /// The impl's own functions, empty unless this is an inherent impl.
-  final List<DeclarationId> inherentFunctionIds;
+  /// Keyed by the trait's associated type each one binds.
+  final Map<DeclarationId, HirType> associatedTypes;
+
+  /// Both are filled in once every impl's associated types are known.
+  Map<DeclarationId, DeclarationId> functionsByTraitFunction;
+  List<DeclarationId> inherentFunctionIds;
 
   bool get isInherent => trait == null;
+
+  ProjectionImpl get forProjection => ProjectionImpl(
+    typeParameters: typeParameters,
+    type: type,
+    trait: switch (trait) {
+      null || None() => null,
+      Some(:final some) => some,
+    },
+    associatedTypes: associatedTypes,
+  );
 }
 
 class LoweredAssignment {
@@ -117,6 +143,10 @@ class Signatures {
   final WellKnownTypes wellKnownTypes;
   final Map<DeclarationId, BuiltinFunction> builtinIds;
 
+  late final TypeNormalizer normalizer = TypeNormalizer([
+    for (final impl in impls) impl.forProjection,
+  ]);
+
   LoweredTrait? traitOwning(DeclarationId functionId) {
     final owner = functions[functionId]?.owner;
     return owner == null ? null : traits[owner];
@@ -137,6 +167,11 @@ class _SignatureLowerer {
   final _typeDeclarations = <DeclarationId, HirTypeDeclaration>{};
   final _traits = <DeclarationId, LoweredTrait>{};
   final _impls = <LoweredImpl>[];
+  final _implsById = <DeclarationId, LoweredImpl>{};
+
+  /// Each trait's and impl's type scope, so the later function-lowering phase
+  /// doesn't have to rebuild it.
+  final _scopes = <DeclarationId, TypeScope>{};
   final _functions = <DeclarationId, LoweredFunction>{};
   final _assignments = <DeclarationId, LoweredAssignment>{};
   final _builtinIds = <DeclarationId, BuiltinFunction>{};
@@ -152,19 +187,32 @@ class _SignatureLowerer {
     scope: declarations.scopeOf(module),
   );
 
+  /// Only valid once every impl head is lowered, which is why it's lazy.
+  late final TypeNormalizer _normalizer = TypeNormalizer([
+    for (final impl in _impls) impl.forProjection,
+  ]);
+
   Signatures _lower() {
     _addBuiltins();
 
     declarations.ofKind<CollectedStruct>().forEach(_lowerStruct);
     declarations.ofKind<CollectedEnum>().forEach(_lowerEnum);
-    declarations.ofKind<CollectedTrait>().forEach(_lowerTrait);
-    declarations.ofKind<CollectedImpl>().forEach(_lowerImpl);
+
+    // Heads first: a function signature anywhere may project an associated
+    // type off any impl, so no signature can be lowered until every impl has
+    // bound its associated types.
+    declarations.ofKind<CollectedTrait>().forEach(_lowerTraitHead);
+    declarations.ofKind<CollectedImpl>().forEach(_lowerImplHead);
+
+    declarations.ofKind<CollectedTrait>().forEach(_lowerTraitFunctions);
+    declarations.ofKind<CollectedImpl>().forEach(_lowerImplFunctions);
     declarations
         .ofKind<CollectedFunction>()
         .where((it) => it.id.parent == null)
         .forEach(_lowerTopLevelFunction);
     declarations.ofKind<CollectedAssignment>().forEach(_lowerAssignment);
 
+    declarations.ofKind<CollectedImpl>().forEach(_checkImpl);
     _checkOverloads();
 
     return Signatures(
@@ -274,7 +322,7 @@ class _SignatureLowerer {
     );
   }
 
-  void _lowerTrait(CollectedTrait trait) {
+  void _lowerTraitHead(CollectedTrait trait) {
     final lowerer = _lowererFor(trait.module);
     final typeParameters = lowerer.lowerTypeParameters(
       trait.id,
@@ -285,10 +333,16 @@ class _SignatureLowerer {
       declaration: trait.id,
       typeArguments: typeParameters.map((it) => it.type).toList(),
     );
+    final selfTrait = HirTrait(
+      declaration: trait.id,
+      typeArguments: typeParameters.map((it) => it.type).toList(),
+    );
     final typeScope = TypeScope(
       typeParameters: typeParameters,
       selfBaseType: selfBaseType,
+      selfTrait: selfTrait,
     );
+    _scopes[trait.id] = typeScope;
 
     // The Rust compiler drops the trait's own type parameters here, so a
     // generic trait's goal never has the same arity as the rule an impl
@@ -301,8 +355,28 @@ class _SignatureLowerer {
       ],
     );
 
-    for (final function in trait.functions) {
-      _lowerFunctionSignature(function, typeScope, owner: trait.id);
+    final associatedTypes = <HirAssociatedType>[];
+    for (final associatedType in trait.associatedTypes) {
+      if (associatedType.ast.value != null) {
+        _error(
+          associatedType.ast.displaySpan,
+          "A trait's associated type can't have a value; only an impl gives "
+          'it one.',
+        );
+      }
+      associatedTypes.add(
+        HirAssociatedType(
+          id: associatedType.id,
+          upperBound: switch (associatedType.ast.upperBound) {
+            null => null,
+            final bound => lowerer.lowerTrait(
+              bound.toNullable(),
+              associatedType.ast.displaySpan,
+              typeScope,
+            ),
+          },
+        ),
+      );
     }
 
     _traits[trait.id] = LoweredTrait(
@@ -310,12 +384,14 @@ class _SignatureLowerer {
       typeParameters: typeParameters,
       solverGoal: solverGoal,
       solverSubgoals: solverGoalsOfBounds(typeParameters),
-      functionIds: trait.functions.map((it) => it.id).toList(),
+      associatedTypes: associatedTypes,
+      functionIds: const [],
       selfBaseType: selfBaseType,
+      selfTrait: selfTrait,
     );
   }
 
-  void _lowerImpl(CollectedImpl impl) {
+  void _lowerImplHead(CollectedImpl impl) {
     final lowerer = _lowererFor(impl.module);
     final implSpan = impl.ast.implKeyword.span;
     final typeParameters = lowerer.lowerTypeParameters(
@@ -330,51 +406,186 @@ class _SignatureLowerer {
     final trait = astTrait == null
         ? null
         : lowerer.lowerTrait(astTrait.toNullable(), implSpan, outerScope);
+    final traitRef = switch (trait) {
+      null || None() => null,
+      Some(:final some) => some,
+    };
     final typeScope = TypeScope(
       typeParameters: typeParameters,
       selfBaseType: type,
+      selfTrait: traitRef,
     );
+    _scopes[impl.id] = typeScope;
 
-    for (final function in impl.functions) {
-      _lowerFunctionSignature(function, typeScope, owner: impl.id);
-    }
-
-    final functionsByTraitFunction = <DeclarationId, DeclarationId>{};
     if (trait == null) {
       // A blanket inherent impl would add its functions to every type, which
       // no bound could then constrain. Rust rules them out the same way.
       if (type is HirType_Parameter) {
         _error(implSpan, 'An impl without a trait needs a concrete type.');
       }
-    } else if (trait case Some(some: final traitRef)) {
+    } else if (traitRef != null) {
       final goal = solverGoalOf(traitRef, type);
       if (goal != null) {
         _solverEnvironment.addRule(
           SolverRule(goal: goal, subgoals: solverGoalsOfBounds(typeParameters)),
         );
       }
+    }
 
+    final lowered = LoweredImpl(
+      id: impl.id,
+      typeParameters: typeParameters,
+      type: type,
+      trait: trait,
+      associatedTypes: _lowerImplAssociatedTypes(
+        impl,
+        traitRef,
+        lowerer,
+        typeScope,
+      ),
+      functionsByTraitFunction: {},
+      inherentFunctionIds: const [],
+    );
+    _impls.add(lowered);
+    _implsById[impl.id] = lowered;
+  }
+
+  Map<DeclarationId, HirType> _lowerImplAssociatedTypes(
+    CollectedImpl impl,
+    HirTrait? traitRef,
+    TypeLowerer lowerer,
+    TypeScope typeScope,
+  ) {
+    final bindings = <DeclarationId, HirType>{};
+    for (final associatedType in impl.associatedTypes) {
+      final span = associatedType.ast.displaySpan;
+      if (associatedType.ast.upperBound != null) {
+        _error(
+          span,
+          "An impl's associated type can't have a bound; only the trait "
+          'declares one.',
+        );
+      }
+
+      if (traitRef == null) {
+        _error(
+          span,
+          "An impl without a trait can't bind associated types.",
+        );
+        continue;
+      }
+
+      final traitAssociatedType = declarations.associatedTypeOf(
+        traitRef.declaration,
+        associatedType.id.name,
+      );
+      if (traitAssociatedType == null) {
+        _error(
+          span,
+          '`${associatedType.id.name}` is not an associated type of trait '
+          '`${traitRef.declaration.name}`.',
+        );
+        continue;
+      }
+
+      final value = associatedType.ast.value;
+      if (value == null) {
+        _error(span, 'This associated type is missing a value.');
+        continue;
+      }
+      bindings[traitAssociatedType] = lowerer.lowerType(
+        value.toNullable(),
+        typeScope,
+      );
+    }
+    return bindings;
+  }
+
+  void _lowerTraitFunctions(CollectedTrait trait) {
+    final typeScope = _scopes[trait.id]!;
+    for (final function in trait.functions) {
+      _lowerFunctionSignature(function, typeScope, owner: trait.id);
+    }
+    _traits[trait.id]?.functionIds = trait.functions
+        .map((it) => it.id)
+        .toList();
+  }
+
+  void _lowerImplFunctions(CollectedImpl impl) {
+    final typeScope = _scopes[impl.id]!;
+    for (final function in impl.functions) {
+      _lowerFunctionSignature(function, typeScope, owner: impl.id);
+    }
+
+    final lowered = _implsById[impl.id];
+    if (lowered != null && lowered.isInherent) {
+      lowered.inherentFunctionIds = impl.functions.map((it) => it.id).toList();
+    }
+  }
+
+  void _checkImpl(CollectedImpl impl) {
+    final lowered = _implsById[impl.id];
+    if (lowered == null) return;
+    if (lowered.trait case Some(some: final traitRef)) {
       _matchImplFunctions(
         impl,
         traitRef,
-        type,
-        implSpan,
-        functionsByTraitFunction,
+        lowered.type,
+        impl.ast.implKeyword.span,
+        lowered.functionsByTraitFunction,
       );
+      _checkImplAssociatedTypes(lowered, traitRef, impl.ast.implKeyword.span);
     }
+  }
 
-    _impls.add(
-      LoweredImpl(
-        id: impl.id,
-        typeParameters: typeParameters,
-        type: type,
-        trait: trait,
-        functionsByTraitFunction: functionsByTraitFunction,
-        inherentFunctionIds: trait == null
-            ? impl.functions.map((it) => it.id).toList()
-            : const [],
-      ),
-    );
+  /// Reports associated types the impl left unbound, and bindings that don't
+  /// satisfy the bound the trait declares.
+  void _checkImplAssociatedTypes(
+    LoweredImpl impl,
+    HirTrait traitRef,
+    SourceSpan implSpan,
+  ) {
+    final trait = _traits[traitRef.declaration];
+    if (trait == null) return;
+
+    for (final associatedType in trait.associatedTypes) {
+      final binding = impl.associatedTypes[associatedType.id];
+      if (binding == null) {
+        _error(
+          implSpan,
+          'Missing binding for associated type `${associatedType.name}`.',
+        );
+        continue;
+      }
+      if (binding.containsError) continue;
+
+      if (associatedType.upperBound case Some(some: final bound)) {
+        final goal = solverGoalOf(
+          bound.substitute(
+            HirType.buildEnvironment(
+              trait.typeParameters,
+              traitRef.typeArguments,
+            ),
+          ),
+          binding,
+          normalizer: _normalizer,
+        );
+        if (goal == null) continue;
+
+        final solution = _solverEnvironment.solve(
+          goal,
+          solverGoalsOfBounds(impl.typeParameters, normalizer: _normalizer),
+          opaqueVariables: solverVariablesOf(impl.typeParameters),
+        );
+        if (!solution.isUnique) {
+          _error(
+            implSpan,
+            '`$binding` does not satisfy the bound `$bound` on associated '
+            'type `${associatedType.name}`.',
+          );
+        }
+      }
+    }
   }
 
   void _matchImplFunctions(
@@ -387,6 +598,9 @@ class _SignatureLowerer {
     final trait = _traits[traitRef.declaration];
     if (trait == null) return;
 
+    // The impl's associated types aren't in here: a projection resolves
+    // through the impl once `Self` is substituted, which is what normalizing
+    // both signatures below does.
     final substitutions = {
       ...HirType.buildEnvironment(trait.typeParameters, traitRef.typeArguments),
       TypeParameterId.self(trait.id): type,
@@ -468,13 +682,19 @@ class _SignatureLowerer {
       if (implParameter.upperBound != expectedBound) return false;
     }
 
+    // Normalized on both sides, so the trait's `Self.Item` and the `Int` the
+    // impl writes out are recognized as the same type.
     for (final (index, parameter) in trait.parameters.indexed) {
       final implParameter = impl.parameters[index];
       if (implParameter.name != parameter.name) return false;
-      if (implParameter.type != parameter.type.substitute(all)) return false;
+      if (_normalizer.normalize(implParameter.type) !=
+          _normalizer.normalize(parameter.type.substitute(all))) {
+        return false;
+      }
     }
 
-    return impl.returnType == trait.returnType.substitute(all);
+    return _normalizer.normalize(impl.returnType) ==
+        _normalizer.normalize(trait.returnType.substitute(all));
   }
 
   HirFunctionSignature _substituteSignature(
@@ -482,9 +702,15 @@ class _SignatureLowerer {
     Map<TypeParameterId, HirType> substitutions,
   ) => signature.copyWith(
     parameters: signature.parameters
-        .map((it) => it.copyWith(type: it.type.substitute(substitutions)))
+        .map(
+          (it) => it.copyWith(
+            type: _normalizer.normalize(it.type.substitute(substitutions)),
+          ),
+        )
         .toList(),
-    returnType: signature.returnType.substitute(substitutions),
+    returnType: _normalizer.normalize(
+      signature.returnType.substitute(substitutions),
+    ),
   );
 
   void _lowerTopLevelFunction(CollectedFunction function) =>

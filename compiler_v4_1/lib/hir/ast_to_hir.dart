@@ -251,6 +251,7 @@ class _Lowerer {
         typeParameters: trait.typeParameters,
         solverGoal: trait.solverGoal,
         solverSubgoals: trait.solverSubgoals,
+        associatedTypes: trait.associatedTypes,
         functions: {
           for (final id in trait.functionIds)
             if (_traitFunctions.containsKey(id)) id: _traitFunctions[id]!,
@@ -265,6 +266,7 @@ class _Lowerer {
         typeParameters: impl.typeParameters,
         type: impl.type,
         trait: impl.trait,
+        associatedTypes: impl.associatedTypes,
         functions: {
           for (final MapEntry(key: traitFunctionId, value: implFunctionId)
               in impl.functionsByTraitFunction.entries)

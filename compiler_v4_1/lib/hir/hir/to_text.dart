@@ -92,11 +92,14 @@ class _TextBuilder {
   void writeTrait(HirTraitDefinition trait) {
     final header =
         'trait ${trait.id.name}${typeParameters(trait.typeParameters)}';
-    if (trait.functions.isEmpty) {
+    if (trait.functions.isEmpty && trait.associatedTypes.isEmpty) {
       writeLine('$header {}');
       return;
     }
     writeBlock('$header {', () {
+      for (final associatedType in trait.associatedTypes) {
+        writeLine('type $associatedType');
+      }
       for (final id in trait.functions.keys.sorted()) {
         final function = trait.functions[id]!;
         final body = function.body;
@@ -117,11 +120,16 @@ class _TextBuilder {
     };
     final header =
         'impl${typeParameters(impl.typeParameters)} ${impl.type}$trait';
-    if (impl.functions.isEmpty && impl.inherentFunctions.isEmpty) {
+    if (impl.functions.isEmpty &&
+        impl.inherentFunctions.isEmpty &&
+        impl.associatedTypes.isEmpty) {
       writeLine('$header {}');
       return;
     }
     writeBlock('$header {', () {
+      for (final id in impl.associatedTypes.keys.sorted()) {
+        writeLine('type ${id.name} = ${impl.associatedTypes[id]}');
+      }
       for (final traitFunctionId in impl.functions.keys.sorted()) {
         final function = impl.functions[traitFunctionId]!;
         writeLine('# implements $traitFunctionId');

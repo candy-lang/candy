@@ -70,6 +70,7 @@ sealed class TokenKind with _$TokenKind {
   const factory TokenKind.enumKeyword() = TokenKind_EnumKeyword;
   const factory TokenKind.traitKeyword() = TokenKind_TraitKeyword;
   const factory TokenKind.implKeyword() = TokenKind_ImplKeyword;
+  const factory TokenKind.typeKeyword() = TokenKind_TypeKeyword;
   const factory TokenKind.whereKeyword() = TokenKind_WhereKeyword;
   const factory TokenKind.funKeyword() = TokenKind_FunKeyword;
   const factory TokenKind.letKeyword() = TokenKind_LetKeyword;

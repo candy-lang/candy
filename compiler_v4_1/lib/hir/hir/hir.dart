@@ -51,6 +51,18 @@ sealed class HirType with _$HirType {
     required HirType returnType,
   }) = HirType_Function;
 
+  /// A projection like `T.Item`, before an impl is known to resolve it.
+  ///
+  /// [trait] pins down the trait's own type arguments, so `Self.Output` is
+  /// unambiguous even for a generic trait. [declaration] is the associated
+  /// type; its parent is the trait. Resolving one needs the impls in scope, so
+  /// it happens in `TypeNormalizer` rather than in [substitute].
+  const factory HirType.associated({
+    required HirTrait trait,
+    required HirType baseType,
+    required DeclarationId declaration,
+  }) = HirType_Associated;
+
   /// An error was already reported, so anything involving this stays silent.
   const factory HirType.error() = HirType_Error;
 
@@ -68,6 +80,9 @@ sealed class HirType with _$HirType {
     HirType_Self(:final baseType) => baseType.containsError,
     HirType_Function(:final parameterTypes, :final returnType) =>
       parameterTypes.any((it) => it.containsError) || returnType.containsError,
+    HirType_Associated(:final trait, :final baseType) =>
+      trait.typeArguments.any((it) => it.containsError) ||
+          baseType.containsError,
     HirType_Error() => true,
     HirType_Variable() => false,
   };
@@ -92,6 +107,12 @@ sealed class HirType with _$HirType {
               .toList(),
           returnType: returnType.substitute(environment),
         ),
+        HirType_Associated(:final trait, :final baseType, :final declaration) =>
+          .associated(
+            trait: trait.substitute(environment),
+            baseType: baseType.substitute(environment),
+            declaration: declaration,
+          ),
         HirType_Error() || HirType_Variable() => this,
       };
 
@@ -99,8 +120,12 @@ sealed class HirType with _$HirType {
     HirType_Named(:final declaration) => declaration,
     HirType_Parameter(:final id) => id.owner,
     HirType_Self(:final baseType) => baseType.selfOwner,
-    HirType_Function() || HirType_Error() || HirType_Variable() =>
-      throw StateError('This type can never be the base type of `Self`.'),
+    HirType_Function() ||
+    HirType_Associated() ||
+    HirType_Error() ||
+    HirType_Variable() => throw StateError(
+      'This type can never be the base type of `Self`.',
+    ),
   };
 
   /// Extra parameters are left unsubstituted rather than throwing, since
@@ -123,6 +148,8 @@ sealed class HirType with _$HirType {
     HirType_Self(:final baseType) => 'Self<$baseType>',
     HirType_Function(:final parameterTypes, :final returnType) =>
       '(${parameterTypes.join(', ')}) $returnType',
+    HirType_Associated(:final baseType, :final declaration) =>
+      '$baseType.${declaration.name}',
     HirType_Error() => '<error>',
     HirType_Variable(:final id) => '$id',
   };
@@ -228,8 +255,29 @@ sealed class HirTraitDefinition with _$HirTraitDefinition {
     required List<HirTypeParameter> typeParameters,
     required SolverGoal solverGoal,
     required List<SolverGoal> solverSubgoals,
+    required List<HirAssociatedType> associatedTypes,
     required Map<DeclarationId, HirTraitFunction> functions,
   }) = _HirTraitDefinition;
+}
+
+@freezed
+sealed class HirAssociatedType with _$HirAssociatedType {
+  const factory HirAssociatedType({
+    required DeclarationId id,
+
+    /// `null` when there's no bound, [None] when it couldn't be lowered.
+    required HirErrorOr<HirTrait>? upperBound,
+  }) = _HirAssociatedType;
+  const HirAssociatedType._();
+
+  String get name => id.name;
+
+  @override
+  String toString() => switch (upperBound) {
+    null => name,
+    Some(:final some) => '$name: $some',
+    None() => '$name: <error>',
+  };
 }
 
 @freezed
@@ -251,6 +299,9 @@ sealed class HirImpl with _$HirImpl {
 
     /// `null` for an inherent impl, which names no trait.
     required HirErrorOr<HirTrait>? trait,
+
+    /// Keyed by the trait's associated type each one binds.
+    required Map<DeclarationId, HirType> associatedTypes,
 
     /// Keyed by the trait function each one implements.
     required Map<DeclarationId, HirFunction> functions,

@@ -5,6 +5,7 @@ import '../../hir/hir/hir.dart';
 import '../../hir/hir/ids.dart';
 import '../../hir/inference/inference.dart';
 import '../../hir/traits/hir_bridge.dart';
+import '../../hir/traits/projections.dart';
 
 /// The function a call actually runs, and the substitutions to lower it with.
 class ResolvedCall {
@@ -21,10 +22,11 @@ class ResolvedCall {
 
 /// Answers what a call to a trait function dispatches to once `Self` is known.
 class ImplResolver {
-  ImplResolver(this.hir)
+  ImplResolver(this.hir, this.normalizer)
     : _implsById = {for (final impl in hir.impls) impl.id: impl};
 
   final Hir hir;
+  final TypeNormalizer normalizer;
   final Map<DeclarationId, HirImpl> _implsById;
 
   /// The type parameters the function's signature and body can mention, in the
@@ -159,6 +161,7 @@ class ImplResolver {
     final unifier = Unifier(
       variables: scratch,
       wellKnownTypes: const WellKnownTypes(),
+      normalize: normalizer.normalize,
     );
 
     if (!unifier.unify(impl.type.substitute(substitutions), selfType)) {
@@ -177,9 +180,15 @@ class ImplResolver {
     };
     // Everything is concrete by now, so the bounds hold or they don't; there
     // are no conditions to assume.
-    for (final goal in solverGoalsOfBounds(impl.typeParameters)) {
+    for (final goal in solverGoalsOfBounds(
+      impl.typeParameters,
+      normalizer: normalizer,
+    )) {
       if (!hir.solverEnvironment
-          .solve(substituteGoal(goal, resolved), const [])
+          .solve(
+            substituteGoal(goal, resolved, normalizer: normalizer),
+            const [],
+          )
           .isUnique) {
         return null;
       }

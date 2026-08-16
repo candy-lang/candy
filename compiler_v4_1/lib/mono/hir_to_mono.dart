@@ -1,6 +1,7 @@
 import '../hir/hir/builtins.dart';
 import '../hir/hir/hir.dart';
 import '../hir/hir/ids.dart';
+import '../hir/traits/projections.dart';
 import 'mono/ids.dart';
 import 'mono/mono.dart';
 import 'monomorphizing/bodies.dart';
@@ -19,9 +20,19 @@ Mono? hirToMono(Hir hir) {
 }
 
 class Monomorphizer {
-  Monomorphizer(this.hir)
-    : types = TypeMonomorphizer(hir),
-      impls = ImplResolver(hir);
+  factory Monomorphizer(Hir hir) {
+    final normalizer = normalizerOf(hir);
+    return Monomorphizer._(
+      hir: hir,
+      types: TypeMonomorphizer(hir, normalizer),
+      impls: ImplResolver(hir, normalizer),
+    );
+  }
+  Monomorphizer._({
+    required this.hir,
+    required this.types,
+    required this.impls,
+  });
 
   final Hir hir;
   final TypeMonomorphizer types;

@@ -70,7 +70,7 @@ void main() {
   test('reports visibility on a trait function', () {
     final result = parse('trait T { public fun f(self: Self) }');
     expect(result.errors, [
-      "A function inside a trait or impl can't have a visibility modifier.",
+      "A member of a trait or impl can't have a visibility modifier.",
     ]);
   });
 }

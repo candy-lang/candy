@@ -2,6 +2,7 @@ import 'package:supernova/supernova.dart';
 
 import '../../lowering/modules.dart';
 import '../../lowering/signatures.dart';
+import '../../lowering/types.dart';
 import '../hir/hir.dart';
 import '../hir/ids.dart';
 import '../traits/hir_bridge.dart';
@@ -12,11 +13,19 @@ import 'inference.dart';
 /// The type parameters in scope where a call appears. Their bounds are what
 /// the solver may assume; they're opaque so nothing else can be proven of them.
 class SolverContext {
-  const SolverContext(this.inScopeTypeParameters);
+  const SolverContext(this.inScopeTypeParameters, {this.extraConditions});
 
   final List<HirTypeParameter> inScopeTypeParameters;
 
-  List<SolverGoal> get conditions => solverGoalsOfBounds(inScopeTypeParameters);
+  /// The bounds that in-scope associated types carry, which
+  /// [OverloadResolver.solverContextFor] works out — `ToText($Assoc$Item(?T))`
+  /// for `[T: Iterator]` and `trait Iterator { type Item: ToText }`.
+  final List<SolverGoal>? extraConditions;
+
+  List<SolverGoal> get conditions => [
+    ...solverGoalsOfBounds(inScopeTypeParameters),
+    ...?extraConditions,
+  ];
   Set<SolverVariable> get opaqueVariables =>
       solverVariablesOf(inScopeTypeParameters);
 }
@@ -107,19 +116,129 @@ class OverloadResolver {
 
   final Signatures signatures;
 
-  Unifier _unifier(TypeVariables variables) =>
-      Unifier(variables: variables, wellKnownTypes: signatures.wellKnownTypes);
+  Unifier _unifier(TypeVariables variables) => Unifier(
+    variables: variables,
+    wellKnownTypes: signatures.wellKnownTypes,
+    normalize: signatures.normalizer.normalize,
+  );
+
+  /// The solver context for a body written in [typeScope].
+  ///
+  /// Besides the bounds on the type parameters themselves, this assumes the
+  /// bounds a trait puts on its associated types, so `T.Item` is usable as a
+  /// `ToText` when `trait Iterator { type Item: ToText }`. Projections of
+  /// projections are followed a few levels deep; a trait whose associated type
+  /// is bounded by its own trait would otherwise never stop.
+  SolverContext solverContextFor(TypeScope typeScope) {
+    final conditions = <SolverGoal>[];
+    var frontier = <(HirType, HirTrait)>[
+      for (final parameter in typeScope.typeParameters)
+        if (parameter.upperBound case Some(some: final bound))
+          (parameter.type, bound),
+      if (typeScope.selfTrait case final selfTrait?)
+        if (typeScope.selfBaseType case final selfBaseType?)
+          (HirType.self(baseType: selfBaseType), selfTrait),
+    ];
+
+    for (var depth = 0; depth < _maxProjectionDepth; depth++) {
+      final next = <(HirType, HirTrait)>[];
+      for (final (baseType, traitRef) in frontier) {
+        final trait = signatures.traits[traitRef.declaration];
+        if (trait == null) continue;
+
+        final environment = {
+          ...HirType.buildEnvironment(
+            trait.typeParameters,
+            traitRef.typeArguments,
+          ),
+          TypeParameterId.self(trait.id): baseType,
+        };
+        for (final associatedType in trait.associatedTypes) {
+          if (associatedType.upperBound case Some(some: final bound)) {
+            final projection = HirType.associated(
+              trait: traitRef,
+              baseType: baseType,
+              declaration: associatedType.id,
+            );
+            final substituted = bound.substitute(environment);
+            final goal = solverGoalOf(
+              substituted,
+              projection,
+              normalizer: signatures.normalizer,
+            );
+            if (goal != null) conditions.add(goal);
+            next.add((projection, substituted));
+          }
+        }
+      }
+      if (next.isEmpty) break;
+      frontier = next;
+    }
+
+    return SolverContext(
+      typeScope.typeParameters,
+      extraConditions: conditions,
+    );
+  }
+
+  static const _maxProjectionDepth = 3;
+
+  /// The obligations an impl's own bounds impose, once its type parameters are
+  /// pinned down.
+  List<SolverGoal> _boundGoals(
+    List<HirTypeParameter> typeParameters,
+    Map<TypeParameterId, HirType> substitutions,
+  ) => solverGoalsOfBounds(typeParameters, normalizer: signatures.normalizer)
+      .map(
+        (it) =>
+            substituteGoal(it, substitutions, normalizer: signatures.normalizer),
+      )
+      .toList();
+
+  /// The associated type a rigid projection stands for, or `null` if it has no
+  /// declared bound and so offers no methods at all.
+  HirAssociatedType? _associatedTypeOf(HirType_Associated projection) =>
+      signatures.traits[projection.trait.declaration]?.associatedType(
+        projection.declaration,
+      );
 
   /// Candidates for `receiver.name(…)`.
   ///
   /// UFCS is deliberately absent: top-level functions are never candidates
   /// here, so a method call only ever finds trait and impl members.
   List<CandidateSource> memberCandidates(
-    HirType receiver,
+    HirType rawReceiver,
     String name,
     SolverContext solverContext,
   ) {
     final candidates = <CandidateSource>[];
+    final receiver = signatures.normalizer.normalize(rawReceiver);
+
+    // A projection that no impl resolves stands for one unknown type, so like
+    // a type parameter it only offers what its declared bound provides.
+    if (receiver is HirType_Associated) {
+      final associatedType = _associatedTypeOf(receiver);
+      if (associatedType?.upperBound case Some(some: final bound)) {
+        final trait = signatures.traits[receiver.trait.declaration];
+        _addTraitFunctions(
+          candidates,
+          trait == null
+              ? bound
+              : bound.substitute({
+                  ...HirType.buildEnvironment(
+                    trait.typeParameters,
+                    receiver.trait.typeArguments,
+                  ),
+                  TypeParameterId.self(trait.id): receiver.baseType,
+                }),
+          receiver,
+          name,
+          group: 0,
+          goals: const [],
+        );
+      }
+      return candidates;
+    }
 
     // A type parameter is only usable through the traits it's bounded by.
     if (receiver is HirType_Parameter) {
@@ -152,7 +271,11 @@ class OverloadResolver {
         final (implType, instantiatedTrait, goals, implSubstitutions) = match;
         final isBlanket = impl.type is HirType_Parameter;
         if (isBlanket) {
-          final goal = solverGoalOf(instantiatedTrait, implType);
+          final goal = solverGoalOf(
+            instantiatedTrait,
+            implType,
+            normalizer: signatures.normalizer,
+          );
           if (goal == null) continue;
           final solution = signatures.solverEnvironment.solve(
             goal,
@@ -202,9 +325,7 @@ class OverloadResolver {
           function: function,
           preset: implSubstitutions,
           group: _inherentGroup,
-          goals: solverGoalsOfBounds(
-            impl.typeParameters,
-          ).map((it) => substituteGoal(it, implSubstitutions)).toList(),
+          goals: _boundGoals(impl.typeParameters, implSubstitutions),
         ),
       );
     }
@@ -218,9 +339,7 @@ class OverloadResolver {
     return (
       impl.type.substitute(resolved),
       traitRef.substitute(resolved),
-      solverGoalsOfBounds(
-        impl.typeParameters,
-      ).map((it) => substituteGoal(it, resolved)).toList(),
+      _boundGoals(impl.typeParameters, resolved),
       resolved,
     );
   }
@@ -419,12 +538,19 @@ class OverloadResolver {
     );
     for (final goal in [
       ...candidate.source.goals,
-      ...solverGoalsOfBounds(original.typeParameters),
+      ...solverGoalsOfBounds(
+        original.typeParameters,
+        normalizer: signatures.normalizer,
+      ),
     ]) {
       if (hasUnknown) continue;
 
       final solution = signatures.solverEnvironment.solve(
-        substituteGoal(goal, resolvedSubstitutions),
+        substituteGoal(
+          goal,
+          resolvedSubstitutions,
+          normalizer: signatures.normalizer,
+        ),
         solverContext.conditions,
         opaqueVariables: solverContext.opaqueVariables,
       );

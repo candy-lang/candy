@@ -33,6 +33,9 @@ class Parser {
     TokenKind_ImplKeyword,
     TokenKind_FunKeyword,
     TokenKind_LetKeyword,
+    // Only starts a member of a trait or impl, but listing it here lets the
+    // member loop recover on it just like on `fun`.
+    TokenKind_TypeKeyword,
   });
   static const _typeFirstSet = SyntaxElementTypeSet.of({
     TokenKind_Identifier,
@@ -401,7 +404,7 @@ class Parser {
       recoverySet: _declarationFirstSet,
     );
 
-    final functions = parseFunctions();
+    final members = parseMembers();
 
     expect<TokenKind_ClosingBrace>(
       'This trait is missing a closing curly brace.',
@@ -412,7 +415,8 @@ class Parser {
       visibility: visibility,
       name: name,
       typeParameters: typeParameters,
-      functions: functions,
+      associatedTypes: members.associatedTypes,
+      functions: members.functions,
     );
   }
 
@@ -444,7 +448,7 @@ class Parser {
       recoverySet: _declarationFirstSet,
     );
 
-    final functions = parseFunctions();
+    final members = parseMembers();
 
     expect<TokenKind_ClosingBrace>(
       'This impl is missing a closing curly brace.',
@@ -456,32 +460,69 @@ class Parser {
       typeParameters: typeParameters,
       type: type,
       trait: trait,
-      functions: functions,
+      associatedTypes: members.associatedTypes,
+      functions: members.functions,
     );
   }
 
-  List<AstFunction> parseFunctions() {
+  ({List<AstAssociatedType> associatedTypes, List<AstFunction> functions})
+  parseMembers() {
+    final associatedTypes = <AstAssociatedType>[];
     final functions = <AstFunction>[];
     while (!at<TokenKind_ClosingBrace>() && !_isAtEnd) {
       final visibility = _parseVisibility();
       if (visibility != .private) {
         error(
-          "A function inside a trait or impl can't have a visibility modifier.",
+          "A member of a trait or impl can't have a visibility modifier.",
         );
       }
 
-      if (!at<TokenKind_FunKeyword>()) {
-        if (visibility == .private && atSet(_declarationFirstSet)) {
-          break;
-        }
-
-        errorAndAdvance('Expected a function.');
+      if (at<TokenKind_TypeKeyword>()) {
+        associatedTypes.add(parseAssociatedType());
+        continue;
+      }
+      if (at<TokenKind_FunKeyword>()) {
+        functions.add(parseFunction(.private));
         continue;
       }
 
-      functions.add(parseFunction(.private));
+      if (visibility == .private && atSet(_declarationFirstSet)) break;
+
+      errorAndAdvance('Expected a function or an associated type.');
     }
-    return functions;
+    return (associatedTypes: associatedTypes, functions: functions);
+  }
+
+  AstAssociatedType parseAssociatedType() {
+    final typeKeyword = advance(); // `type`
+
+    final name = expectIdentifier(
+      'This associated type is missing a name.',
+      recoverySet: _declarationNameRecoverySet,
+    );
+
+    AstErrorOr<AstType>? upperBound;
+    if (_advanceIfKind<TokenKind_Colon>() != null) {
+      upperBound = parseTypeOrError(
+        'This associated type is missing an upper bound after the colon.',
+        recoverySet: _typeRecoverySet,
+      );
+    }
+
+    AstErrorOr<AstType>? value;
+    if (_advanceIfKind<TokenKind_Equal>() != null) {
+      value = parseTypeOrError(
+        'This associated type is missing a type after the equals sign.',
+        recoverySet: _typeRecoverySet,
+      );
+    }
+
+    return AstAssociatedType(
+      displaySpan: name.toNullable()?.span ?? typeKeyword.span,
+      name: name,
+      upperBound: upperBound,
+      value: value,
+    );
   }
 
   AstAssignment parseAssignment(AstVisibility visibility) {
@@ -649,9 +690,26 @@ class Parser {
   }
 
   AstType? parseType() {
-    if (at<TokenKind_Identifier>()) return parseNamedType();
-    if (at<TokenKind_OpeningParenthesis>()) return parseFunctionType();
-    return null;
+    final AstType base;
+    if (at<TokenKind_Identifier>()) {
+      base = parseNamedType();
+    } else if (at<TokenKind_OpeningParenthesis>()) {
+      base = parseFunctionType();
+    } else {
+      return null;
+    }
+
+    var type = base;
+    while (_advanceIfKind<TokenKind_Dot>() != null) {
+      final name = expectIdentifier(
+        'This associated type is missing a name after the dot.',
+        recoverySet: _typeRecoverySet,
+      ).toNullable();
+      if (name == null) break;
+
+      type = AstType.associated(baseType: type, name: name);
+    }
+    return type;
   }
 
   AstType_Named parseNamedType() {

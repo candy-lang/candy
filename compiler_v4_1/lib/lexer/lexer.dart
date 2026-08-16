@@ -220,6 +220,7 @@ class Lexer {
       'enum' => const .enumKeyword(),
       'trait' => const .traitKeyword(),
       'impl' => const .implKeyword(),
+      'type' => const .typeKeyword(),
       'where' => const .whereKeyword(),
       'fun' => const .funKeyword(),
       'let' => const .letKeyword(),

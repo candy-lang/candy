@@ -37,11 +37,13 @@ class CollectedTrait extends CollectedDeclaration {
   const CollectedTrait({
     required this.id,
     required this.ast,
+    required this.associatedTypes,
     required this.functions,
   });
   @override
   final DeclarationId id;
   final AstTrait ast;
+  final List<CollectedAssociatedType> associatedTypes;
   final List<CollectedFunction> functions;
   @override
   AstVisibility get visibility => ast.visibility;
@@ -51,14 +53,27 @@ class CollectedImpl extends CollectedDeclaration {
   const CollectedImpl({
     required this.id,
     required this.ast,
+    required this.associatedTypes,
     required this.functions,
   });
   @override
   final DeclarationId id;
   final AstImpl ast;
+  final List<CollectedAssociatedType> associatedTypes;
   final List<CollectedFunction> functions;
 
   /// Impls are never named, so they are never imported.
+  @override
+  AstVisibility get visibility => .private;
+}
+
+class CollectedAssociatedType extends CollectedDeclaration {
+  const CollectedAssociatedType({required this.id, required this.ast});
+  @override
+  final DeclarationId id;
+  final AstAssociatedType ast;
+
+  /// Members of a trait or impl are never named from the outside.
   @override
   AstVisibility get visibility => .private;
 }
@@ -339,10 +354,16 @@ class _Collector {
         case AstDeclaration_Trait(:final trait):
           final id = declare(trait.name, NamedTrait.new);
           if (id != null) {
+            final members = _collectMembers(
+              id,
+              trait.associatedTypes,
+              trait.functions,
+            );
             _declarations[id] = CollectedTrait(
               id: id,
               ast: trait,
-              functions: _collectNestedFunctions(id, trait.functions),
+              associatedTypes: members.associatedTypes,
+              functions: members.functions,
             );
           }
 
@@ -352,10 +373,16 @@ class _Collector {
             name: DeclarationId.implName,
             disambiguator: implCount++,
           );
+          final members = _collectMembers(
+            id,
+            impl.associatedTypes,
+            impl.functions,
+          );
           _declarations[id] = CollectedImpl(
             id: id,
             ast: impl,
-            functions: _collectNestedFunctions(id, impl.functions),
+            associatedTypes: members.associatedTypes,
+            functions: members.functions,
           );
 
         case AstDeclaration_Assignment(:final assignment):
@@ -399,26 +426,61 @@ class _Collector {
     return names;
   }
 
-  List<CollectedFunction> _collectNestedFunctions(
+  ({
+    List<CollectedAssociatedType> associatedTypes,
+    List<CollectedFunction> functions,
+  })
+  _collectMembers(
     DeclarationId parent,
+    List<AstAssociatedType> associatedTypes,
     List<AstFunction> functions,
   ) {
+    final collectedAssociatedTypes = <CollectedAssociatedType>[];
+    final takenNames = <String>{};
+    for (final associatedType in associatedTypes) {
+      final token = associatedType.name.toNullable();
+      if (token == null) continue;
+
+      final name = token.rawText;
+      if (!takenNames.add(name)) {
+        _error(token.span, 'Duplicate associated type name: `$name`.');
+        continue;
+      }
+      final collected = CollectedAssociatedType(
+        id: parent.child(name),
+        ast: associatedType,
+      );
+      _declarations[collected.id] = collected;
+      collectedAssociatedTypes.add(collected);
+    }
+
     final counts = <String, int>{};
-    final collected = <CollectedFunction>[];
+    final collectedFunctions = <CollectedFunction>[];
     for (final function in functions) {
       final token = function.name.toNullable();
       if (token == null) continue;
 
       final name = token.rawText;
+      if (takenNames.contains(name)) {
+        _error(
+          token.span,
+          'An associated type named `$name` already exists.',
+        );
+        continue;
+      }
       final id = parent.child(
         name,
         disambiguator: counts.update(name, (it) => it + 1, ifAbsent: () => 0),
       );
       final collectedFunction = CollectedFunction(id: id, ast: function);
       _declarations[id] = collectedFunction;
-      collected.add(collectedFunction);
+      collectedFunctions.add(collectedFunction);
     }
-    return collected;
+
+    return (
+      associatedTypes: collectedAssociatedTypes,
+      functions: collectedFunctions,
+    );
   }
 
   /// Well-known types can live in any module until `use` exists, so this scans
