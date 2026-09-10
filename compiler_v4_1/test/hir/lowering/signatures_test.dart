@@ -174,6 +174,18 @@ void main() {
       );
     });
 
+    test('accepts an impl function that writes `Self`', () {
+      final harness = _lower('''
+        trait ToText { fun toText(self: Self) Text }
+        impl Int: ToText { fun toText(self: Self) Text { "int" } }
+      ''');
+      harness.expectNoErrors();
+      expect(
+        harness.signatures.impls.single.functionsByTraitFunction,
+        hasLength(1),
+      );
+    });
+
     test('reports a missing implementation', () {
       final harness = _lower('''
         trait ToText { fun toText(self: Self) Text }

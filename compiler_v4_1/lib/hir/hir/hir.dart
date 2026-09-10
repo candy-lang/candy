@@ -128,6 +128,14 @@ sealed class HirType with _$HirType {
     ),
   };
 
+  /// A trait's own `Self`, which stands for an unknown type. An impl's `Self`
+  /// is only another spelling of the type the impl is for.
+  bool get isTraitSelf => switch (this) {
+    HirType_Self(baseType: HirType_Parameter(id: TypeParameterId_Self())) =>
+      true,
+    _ => false,
+  };
+
   /// `Self` stands for its base type wherever the concrete type matters.
   HirType get unwrapSelf => switch (this) {
     HirType_Self(:final baseType) => baseType.unwrapSelf,
@@ -152,9 +160,7 @@ sealed class HirType with _$HirType {
           : '${declaration.name}[${typeArguments.join(', ')}]',
     HirType_Parameter(:final id) => id.name,
     HirType_Self(:final baseType) =>
-      baseType is HirType_Parameter && baseType.id is TypeParameterId_Self
-          ? 'Self'
-          : 'Self<$baseType>',
+      isTraitSelf ? 'Self' : 'Self<$baseType>',
     HirType_Function(:final parameterTypes, :final returnType) =>
       '(${parameterTypes.join(', ')}) $returnType',
     HirType_Associated(:final baseType, :final declaration) =>

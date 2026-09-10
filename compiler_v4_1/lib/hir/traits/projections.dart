@@ -75,9 +75,10 @@ class TypeNormalizer {
           .toList(),
       returnType: _normalize(returnType, depth),
     ),
-    HirType_Self(:final baseType) => .self(
-      baseType: _normalize(baseType, depth),
-    ),
+    // Only a trait's `Self` stands for an unknown type; an impl's is just
+    // another spelling of the type the impl is for.
+    HirType_Self() when type.isTraitSelf => type,
+    HirType_Self(:final baseType) => _normalize(baseType, depth),
     HirType_Associated(:final trait, :final baseType, :final declaration) =>
       _resolve(
         HirTrait(
