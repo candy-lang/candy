@@ -1,172 +1,129 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-import * as child_process from "child_process";
-import linebyline from "linebyline";
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
+import {
+  LanguageClient,
+  LanguageClientOptions,
+  ServerOptions,
+  TransportKind,
+} from "vscode-languageclient/node";
 
-let diagnosticCollection: vscode.DiagnosticCollection;
+let client: LanguageClient | undefined;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function activate(context: vscode.ExtensionContext) {
-  console.info("Activated the 🍭 Candy extension!");
+export async function activate(context: vscode.ExtensionContext) {
+  console.info("Activated the 🍭 Candy extension!");
 
-  diagnosticCollection = vscode.languages.createDiagnosticCollection("candy");
-  context.subscriptions.push(diagnosticCollection);
+  const serverOptions = resolveServerOptions();
+  if (serverOptions === undefined) return;
 
-  vscode.window.onDidChangeVisibleTextEditors(() => onlyRunOneAtATime(update));
-  vscode.workspace.onDidChangeTextDocument(() => onlyRunOneAtATime(update));
-}
-
-// Updates can be triggered very frequently (on every keystroke), but they can
-// take long to process. Thus, here we make sure that only one update runs at a
-// time.
-let generation = 0;
-let currentRun = Promise.resolve(null);
-async function onlyRunOneAtATime(callback: () => Promise<void>) {
-  console.log("Scheduling update");
-  const myGeneration = ++generation;
-  await currentRun;
-  if (generation != myGeneration) return; // a newer update exists and will run
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises, no-async-promise-executor
-  currentRun = new Promise(async (resolve) => {
-    await callback();
-    resolve(null);
-  });
-}
-
-async function update() {
-  console.log("Updating");
-  const promises = [];
-  for (const editor of vscode.window.visibleTextEditors) {
-    const uri = editor.document.uri.toString();
-    if (!uri.endsWith(".candy")) continue;
-
-    const analysis = analyze(uri);
-    promises.push(analysis);
-    analysis
-      .then((diagnostics) => {
-        diagnosticCollection.clear();
-        const diagnosticMap = new Map<string, vscode.Diagnostic[]>();
-        for (const diagnostic of diagnostics) {
-          console.info(`Error: ${JSON.stringify(diagnostic)}`);
-          if (diagnostic.source.file != uri) continue;
-          const range = new vscode.Range(
-            new vscode.Position(
-              diagnostic.source.start.line,
-              diagnostic.source.start.character,
-            ),
-            new vscode.Position(
-              diagnostic.source.end.line,
-              diagnostic.source.end.character,
-            ),
-          );
-          const diagnostics = diagnosticMap.get(diagnostic.source.file) ?? [];
-          diagnostics.push(
-            new vscode.Diagnostic(
-              range,
-              diagnostic.message,
-              vscode.DiagnosticSeverity.Error,
-            ),
-          );
-          diagnosticMap.set(diagnostic.source.file, diagnostics);
-        }
-        diagnosticMap.forEach((diags, file) => {
-          diagnosticCollection.set(vscode.Uri.parse(file), diags);
-        });
-      })
-      .catch((error) => {
-        console.error(`Analyzing failed: ${error}`);
-      });
-  }
-  await Promise.all(promises);
-}
-
-/// Communication with the Candy language server works using the following
-/// schema.
-
-type AnalyzeMessage = ReadFileMessage | DiagnosticsMessage; // candy tooling-analyze ...
-interface ReadFileMessage {
-  type: "read_file";
-  path: string;
-}
-interface DiagnosticsMessage {
-  type: "diagnostics";
-  diagnostics: Diagnostic[];
-}
-interface Diagnostic {
-  message: string;
-  source: {
-    file: string;
-    start: { line: number; character: number };
-    end: { line: number; character: number };
+  const clientOptions: LanguageClientOptions = {
+    documentSelector: [{ scheme: "file", language: "candy" }],
+    outputChannelName: "🍭 Candy Language Server",
+    synchronize: {
+      fileEvents: vscode.workspace.createFileSystemWatcher("**/*.candy"),
+    },
   };
+
+  client = new LanguageClient(
+    "candy",
+    "🍭 Candy Language Server",
+    serverOptions,
+    clientOptions,
+  );
+  context.subscriptions.push(client);
+
+  try {
+    await client.start();
+  } catch (error) {
+    client = undefined;
+    await showConfigurationError(
+      `Couldn't start the 🍭 Candy language server: ${String(error)}`,
+    );
+  }
 }
 
-async function analyze(path: string): Promise<Diagnostic[]> {
-  console.log(`Analyzing ${path}`);
-  const candy = child_process.spawn(
-    vscode.workspace
-      .getConfiguration("candy")
-      .get<string>("compilerExecutablePath") ?? "candy",
-    ["tooling-analyze", path],
-    { env: { ...process.env, RUST_BACKTRACE: "1" } },
-  );
-  candy.on("error", (error) => {
-    console.error(`Failed to spawn: ${error.name}: ${error.message}`);
-  });
-  linebyline(candy.stderr).on("line", (line: string) => {
-    console.log(line);
-  });
-
-  let diagnostics: Diagnostic[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-  linebyline(candy.stdout).on("line", async function (line: string) {
-    console.info("Line: " + line);
-    const message = JSON.parse(line) as AnalyzeMessage;
-    switch (message.type) {
-      case "read_file":
-        candy.stdin.write(await handleReadFileMessage(message));
-        break;
-      case "diagnostics":
-        diagnostics = message.diagnostics;
-        break;
-    }
-  });
-
-  const exitCode: number | null = await new Promise((resolve) =>
-    candy.on("close", (exitCode) => {
-      resolve(exitCode);
-    }),
-  );
-  console.info(`\`candy tooling-analyze\` exited with exit code ${exitCode}.`);
-
-  return diagnostics;
+export function deactivate(): Thenable<void> | undefined {
+  return client?.stop();
 }
 
-async function handleReadFileMessage(
-  message: ReadFileMessage,
-): Promise<string> {
-  const uri = vscode.Uri.parse(message.path);
-  const content = await readFile(uri);
-  const response = content
-    ? { type: "read_file", success: true, content: content }
-    : { type: "read_file", success: false };
-  return `${JSON.stringify(response)}\n`;
+function resolveServerOptions(): ServerOptions | undefined {
+  const configured = vscode.workspace
+    .getConfiguration("candy")
+    .get<string>("compilerExecutablePath");
+  const hasConfigured = configured !== undefined && configured.length > 0;
+
+  const executablePath = hasConfigured
+    ? resolveExecutablePath(configured)
+    : undefined;
+  if (hasConfigured && executablePath === undefined) {
+    void showConfigurationError(
+      `Couldn't find the 🍭 Candy compiler at \`${configured}\`.`,
+    );
+    return undefined;
+  }
+
+  // A source checkout of the compiler is a Dart script rather than a binary.
+  let command: string;
+  let args: string[];
+  if (executablePath === undefined) {
+    command = "candy";
+    args = ["lsp"];
+  } else if (executablePath.endsWith(".dart")) {
+    command = "dart";
+    args = ["run", executablePath, "lsp"];
+  } else {
+    command = executablePath;
+    args = ["lsp"];
+  }
+
+  // Spawning a command that doesn't exist tears down the client with a pile of
+  // unhandled `EPIPE` rejections, so we'd rather explain what's wrong.
+  if (findOnPath(command) === undefined) {
+    void showConfigurationError(
+      `Couldn't run \`${command}\`: it isn't on the \`PATH\`. Set \`candy.compilerExecutablePath\` to the 🍭 Candy compiler, or to \`bin/candy.dart\` in a compiler checkout.`,
+    );
+    return undefined;
+  }
+
+  return { command, args, transport: TransportKind.stdio };
 }
 
 /**
- * Returns the source code of the given URI. Prefers the content of open text
- * documents, even if they're not saved yet. If none exists, asks the file
- * system.
+ * A relative path is resolved against the workspace folders, so a checkout can
+ * commit one instead of a machine-specific absolute path.
  */
-async function readFile(uri: vscode.Uri): Promise<string | null> {
-  for (const doc of vscode.workspace.textDocuments) {
-    if (doc.uri.toString() == uri.toString()) return doc.getText();
+function resolveExecutablePath(configured: string): string | undefined {
+  if (path.isAbsolute(configured)) {
+    return fs.existsSync(configured) ? configured : undefined;
   }
 
-  try {
-    const bytes = await vscode.workspace.fs.readFile(uri);
-    return new TextDecoder("utf8").decode(bytes);
-  } catch (e) {
-    return null;
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    const candidate = path.join(folder.uri.fsPath, configured);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+function findOnPath(command: string): string | undefined {
+  if (command.includes(path.sep)) {
+    return fs.existsSync(command) ? command : undefined;
+  }
+
+  for (const directory of (process.env.PATH ?? "").split(path.delimiter)) {
+    if (directory.length === 0) continue;
+    const candidate = path.join(directory, command);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+async function showConfigurationError(message: string) {
+  const openSettings = "Open settings";
+  const result = await vscode.window.showErrorMessage(message, openSettings);
+  if (result === openSettings) {
+    await vscode.commands.executeCommand(
+      "workbench.action.openSettings",
+      "candy.compilerExecutablePath",
+    );
   }
 }

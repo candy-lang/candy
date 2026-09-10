@@ -6,17 +6,14 @@ import 'dart:convert';
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:compiler_v4_1/context.dart';
-import 'package:compiler_v4_1/file.dart';
 import 'package:compiler_v4_1/hir/ast_to_hir.dart';
-import 'package:compiler_v4_1/hir/hir/ids.dart';
 import 'package:compiler_v4_1/hir/hir/to_text.dart';
-import 'package:compiler_v4_1/lexer/lexer.dart';
-import 'package:compiler_v4_1/lexer/token.dart';
+import 'package:compiler_v4_1/language_server/language_server.dart';
+import 'package:compiler_v4_1/loading.dart';
 import 'package:compiler_v4_1/lowering/modules.dart';
 import 'package:compiler_v4_1/mono/backend/mono_to_c.dart';
 import 'package:compiler_v4_1/mono/hir_to_mono.dart';
 import 'package:compiler_v4_1/mono/mono/to_text.dart';
-import 'package:compiler_v4_1/parser/parser.dart';
 import 'package:supernova/supernova.dart';
 import 'package:supernova/supernova_io.dart';
 
@@ -24,6 +21,7 @@ Future<void> main(List<String> arguments) async {
   final runner = CommandRunner<void>('candy', 'The 🍭 Candy CLI.')
     ..addCommand(CheckCommand())
     ..addCommand(CompileCommand())
+    ..addCommand(LspCommand())
     ..addCommand(DebugCommand());
 
   try {
@@ -50,86 +48,22 @@ class Exit implements Exception {
 
 // Loading packages & modules
 
-/// A Candy package is marked by a `_package.candy` file, which is the root
-/// folder for resolving imports. Falls back to the file's own directory if
-/// no package is found, so single-file invocations still work.
-Directory findPackageRoot(File file) {
-  for (var directory = file.absolute.parent; ;) {
-    if ((directory ~/ '_package.candy').existsSync()) return directory;
-
-    final parent = directory.parent;
-    if (parent.path == directory.path) return file.absolute.parent;
-
-    directory = parent;
-  }
-}
-
-class LoadedPackage {
-  const LoadedPackage(this.context, this.modules);
-
-  final Context context;
-  final List<Module> modules;
-}
-
 /// Loads the file's own package plus every package reachable through `use`
-/// lines. Loading only what is reachable keeps an unrelated broken package in
-/// the same directory from breaking the build.
+/// lines.
 LoadedPackage loadPackageForFile(File file) {
   if (!file.existsSync()) {
     stderr.writeln('The given file does not exist.');
     throw const Exit(Exit.fileNotFound);
   }
 
-  return _loadPackageFromRoot(findPackageRoot(file));
+  return loadPackage(findPackageRoot(file));
 }
 
 /// Like [loadPackageForFile], but also accepts a package directory (one
 /// containing `_package.candy` directly), so a whole package can be checked
 /// without naming one of its files.
 LoadedPackage loadPackageForPath(String path) =>
-    _loadPackageFromRoot(resolvePackageRoot(path));
-
-LoadedPackage _loadPackageFromRoot(Directory root) {
-  final entry = Package(name: root.name, rootDirectory: root);
-
-  // A file inside a package sits alongside its siblings; a loose file's own
-  // directory is itself the packages directory, so sibling packages — Core
-  // above all — stay reachable either way.
-  final isInPackage = (root ~/ '_package.candy').existsSync();
-  final workspace = Workspace({
-    entry.name: entry,
-    ...Workspace.discover(isInPackage ? root.parent : root).packages,
-  });
-
-  final context = Context();
-  final modules = <Module>[];
-  final loaded = <String>{};
-
-  // Core is always loaded, not just when imported: its public declarations are
-  // ambient in every module.
-  final pending = <String>[entry.name, ModuleId.corePackageName];
-
-  while (pending.isNotEmpty) {
-    final name = pending.removeLast();
-    if (!loaded.add(name)) continue;
-
-    final package = workspace[name] ?? (name == entry.name ? entry : null);
-    if (package == null) continue;
-
-    for (final packageFile in package.discoverFiles()) {
-      final module = parseModule(context, package, packageFile);
-      modules.add(module);
-      for (final use in module.ast.uses) {
-        final rootSegment = use.path.firstOrNull;
-        if (rootSegment == null) continue;
-        if (rootSegment.kind is TokenKind_PackageKeyword) continue;
-        pending.add(rootSegment.rawText);
-      }
-    }
-  }
-
-  return LoadedPackage(context, modules);
-}
+    loadPackage(resolvePackageRoot(path));
 
 /// The package root for [path], which may be a file or a package directory.
 Directory resolvePackageRoot(String path) {
@@ -151,17 +85,6 @@ Directory resolvePackageRoot(String path) {
     throw const Exit(Exit.fileNotFound);
   }
   return findPackageRoot(file);
-}
-
-Module parseModule(Context context, Package package, File file) {
-  final source = file.readAsStringSync();
-  final sourceFile = SourceFile(file, source);
-  final tokens = Lexer.lex(context, sourceFile, source);
-  return Module(
-    id: package.moduleIdFor(file),
-    file: sourceFile,
-    ast: Parser.parse(context, sourceFile, tokens),
-  );
 }
 
 void printErrors(Context context) {
@@ -328,6 +251,29 @@ class CompileCommand extends Command<void> {
       if (exitOnError) rethrow;
     }
   }
+}
+
+// `lsp`
+
+class LspCommand extends Command<void> {
+  LspCommand() {
+    argParser.addFlag(
+      'stdio',
+      negatable: false,
+      help:
+          'Communicate over stdin/stdout. This is the only transport; the '
+          'flag exists because LSP clients pass it.',
+    );
+  }
+
+  @override
+  final name = 'lsp';
+  @override
+  final description =
+      'Run the language server, communicating over stdin/stdout.';
+
+  @override
+  Future<void> run() => runLanguageServer();
 }
 
 String _requirePath(ArgResults results) {
