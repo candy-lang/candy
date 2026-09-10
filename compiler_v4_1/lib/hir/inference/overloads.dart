@@ -597,8 +597,12 @@ class OverloadResolver {
       switch (solution) {
         case SolverSolution_Unique():
           continue;
-        case SolverSolution_Ambiguous():
-          return 'the bound `$goal` is reachable via multiple impls';
+        case SolverSolution_Ambiguous(:final cause):
+          final lines = cause.describe();
+          return [
+            'the bound `$goal` ${lines.first}',
+            ...lines.skip(1),
+          ].join('\n');
         case SolverSolution_Impossible():
           return 'the bound `$goal` is not satisfied';
       }

@@ -336,10 +336,9 @@ class _SignatureLowerer {
       trait.ast.typeParameters,
       const TypeScope(),
     );
-    final selfBaseType = HirType.named(
-      declaration: trait.id,
-      typeArguments: typeParameters.map((it) => it.type).toList(),
-    );
+    // A trait's `Self` is an opaque type parameter of the trait, unlike an
+    // impl's, which stands for the concrete type being implemented.
+    final selfBaseType = HirType.parameter(TypeParameterId.self(trait.id));
     final selfTrait = HirTrait(
       declaration: trait.id,
       typeArguments: typeParameters.map((it) => it.type).toList(),
@@ -434,7 +433,11 @@ class _SignatureLowerer {
       final goal = solverGoalOf(traitRef, type);
       if (goal != null) {
         _solverEnvironment.addRule(
-          SolverRule(goal: goal, subgoals: solverGoalsOfBounds(typeParameters)),
+          SolverRule(
+            goal: goal,
+            subgoals: solverGoalsOfBounds(typeParameters),
+            origin: impl.id,
+          ),
         );
       }
     }

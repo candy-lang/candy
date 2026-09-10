@@ -35,7 +35,7 @@ void main() {
             .single
             .signature
             .toString(),
-        'next(self: Self<Iterator>) Self<Iterator>.Item',
+        'next(self: Self) Self.Item',
       );
     });
 

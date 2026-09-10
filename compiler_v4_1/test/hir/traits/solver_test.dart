@@ -188,7 +188,15 @@ void main() {
       );
       expect(
         environment.solve(_goal('Equal', [_type('Ordering')]), const []),
-        const SolverSolution.ambiguous(),
+        isA<SolverSolution_Ambiguous>().having(
+          (it) => it.cause,
+          'cause',
+          isA<SolverAmbiguity_MultipleImpls>().having(
+            (it) => it.candidates,
+            'candidates',
+            hasLength(2),
+          ),
+        ),
       );
     });
   });

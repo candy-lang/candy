@@ -22,9 +22,7 @@ SolverType? _solverTypeOf(HirType type) => switch (type) {
     typeArguments,
   ),
   HirType_Parameter(:final id) => SolverVariable.parameter(id).type,
-  HirType_Self(:final baseType) => SolverVariable.parameter(
-    TypeParameterId.self(baseType.selfOwner),
-  ).type,
+  HirType_Self(:final baseType) => _solverTypeOf(baseType),
   HirType_Associated(:final trait, :final baseType, :final declaration) =>
     _value(SolverTypeName.synthetic('\$Assoc\$$declaration'), [
       baseType,

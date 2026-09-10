@@ -151,7 +151,10 @@ sealed class HirType with _$HirType {
           ? declaration.name
           : '${declaration.name}[${typeArguments.join(', ')}]',
     HirType_Parameter(:final id) => id.name,
-    HirType_Self(:final baseType) => 'Self<$baseType>',
+    HirType_Self(:final baseType) =>
+      baseType is HirType_Parameter && baseType.id is TypeParameterId_Self
+          ? 'Self'
+          : 'Self<$baseType>',
     HirType_Function(:final parameterTypes, :final returnType) =>
       '(${parameterTypes.join(', ')}) $returnType',
     HirType_Associated(:final baseType, :final declaration) =>

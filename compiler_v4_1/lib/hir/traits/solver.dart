@@ -52,12 +52,67 @@ sealed class SolverRule with _$SolverRule {
   const factory SolverRule({
     required SolverGoal goal,
     required List<SolverGoal> subgoals,
+
+    /// The impl this rule was read off, so a diagnostic can point at it.
+    /// `null` for a rule standing for an in-scope bound.
+    DeclarationId? origin,
   }) = _SolverRule;
   const SolverRule._();
+
+  /// How the rule reads in a diagnostic, e.g.
+  /// ``impl `Equal(?T)` if `Compare(?T)` in Core.Operators.Compare``.
+  String describe() {
+    final origin = this.origin;
+    if (origin == null) return 'a bound on a type parameter in scope';
+    return [
+      'impl `$goal`',
+      if (subgoals.isNotEmpty) 'if ${subgoals.map((it) => '`$it`').join(', ')}',
+      'in ${origin.module}',
+    ].join(' ');
+  }
 
   @override
   String toString() =>
       '$goal <- ${subgoals.isEmpty ? '<nothing>' : subgoals.join(', ')}';
+}
+
+/// Why the solver couldn't pin a goal down to a single impl.
+@freezed
+sealed class SolverAmbiguity with _$SolverAmbiguity {
+  /// Every rule in [candidates] proves [goal], so which impl applies depends on
+  /// a type that isn't known yet.
+  const factory SolverAmbiguity.multipleImpls({
+    required SolverGoal goal,
+    required List<SolverRule> candidates,
+  }) = SolverAmbiguity_MultipleImpls;
+
+  /// [goal] can only be proven by way of itself.
+  const factory SolverAmbiguity.cycle({required SolverGoal goal}) =
+      SolverAmbiguity_Cycle;
+
+  /// One rule proves [goal], but it leaves the goal's own types open.
+  const factory SolverAmbiguity.underdetermined({
+    required SolverGoal goal,
+    required SolverRule rule,
+  }) = SolverAmbiguity_Underdetermined;
+
+  const SolverAmbiguity._();
+
+  /// A diagnostic explaining the ambiguity, as lines that read on from the
+  /// goal they're about. Only the first line is unindented.
+  List<String> describe() => switch (this) {
+    SolverAmbiguity_MultipleImpls(:final candidates) => [
+      'matches several impls:',
+      ...candidates.map((it) => '  • ${it.describe()}'),
+    ],
+    SolverAmbiguity_Cycle() => ['can only be proven by way of itself'],
+    SolverAmbiguity_Underdetermined(:final rule) => [
+      'only matches ${rule.describe()}, which leaves its type open',
+    ],
+  };
+
+  @override
+  String toString() => describe().join(' ');
 }
 
 class SolverEnvironment {
@@ -126,7 +181,8 @@ sealed class SolverSolution with _$SolverSolution {
   }) = SolverSolution_Unique;
 
   /// There may be multiple types that fulfill the goal.
-  const factory SolverSolution.ambiguous() = SolverSolution_Ambiguous;
+  const factory SolverSolution.ambiguous(SolverAmbiguity cause) =
+      SolverSolution_Ambiguous;
 
   /// It's impossible to fulfill the goal.
   const factory SolverSolution.impossible() = SolverSolution_Impossible;
@@ -139,7 +195,7 @@ sealed class SolverSolution with _$SolverSolution {
   String toString() => switch (this) {
     SolverSolution_Unique(:final refinedGoal, :final usedRule) =>
       'Unique(refined goal: $refinedGoal, used rule: $usedRule)',
-    SolverSolution_Ambiguous() => 'Ambiguous',
+    SolverSolution_Ambiguous(:final cause) => 'Ambiguous($cause)',
     SolverSolution_Impossible() => 'Impossible',
   };
 }
@@ -160,8 +216,11 @@ class _Solver {
 
     if (!_beingSolved.add(canonical)) {
       // Cycle: break it by treating the goal as ambiguous.
-      _solved[canonical] = const SolverSolution.ambiguous();
-      return const SolverSolution.ambiguous();
+      final solution = SolverSolution.ambiguous(
+        SolverAmbiguity.cycle(goal: canonical),
+      );
+      _solved[canonical] = solution;
+      return solution;
     }
 
     final solution = _solveTree(canonical);
@@ -195,16 +254,24 @@ class _Solver {
       solved.add((strand, solution));
     }
 
-    if (solved.length > 1) return const SolverSolution.ambiguous();
+    if (solved.length > 1) {
+      return SolverSolution.ambiguous(
+        SolverAmbiguity.multipleImpls(
+          goal: goal,
+          candidates: solved.map((it) => it.$1.usedRule).toList(),
+        ),
+      );
+    }
     if (solved.isEmpty) return const SolverSolution.impossible();
 
     final (strand, solution) = solved.single;
-    if (solution is! SolverSolution_Unique) {
-      return const SolverSolution.ambiguous();
-    }
+    SolverSolution underdetermined() => SolverSolution.ambiguous(
+      SolverAmbiguity.underdetermined(goal: goal, rule: strand.usedRule),
+    );
+    if (solution is! SolverSolution_Unique) return underdetermined();
 
     final substitutions = strand.goal.unify(solution.refinedGoal);
-    if (substitutions == null) return const SolverSolution.ambiguous();
+    if (substitutions == null) return underdetermined();
     return SolverSolution.unique(
       refinedGoal: goal.substituteAll(substitutions),
       usedRule: solution.usedRule,

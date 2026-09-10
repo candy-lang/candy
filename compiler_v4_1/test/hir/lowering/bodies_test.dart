@@ -349,6 +349,38 @@ void main() {
       expect(harness.errorMessages.single, contains('No function `compareTo`'));
     });
 
+    test('satisfies a bound through `Self` in an inherent impl', () {
+      final harness = _lower('''
+        $_traitsSource
+        fun isEqual[T: Equal](left: T, right: T) Bool { left.equals(right) }
+        impl Ordering {
+          fun isLess(self: Self) Bool { isEqual(self, Ordering.less()) }
+        }
+        fun main() Int { 0 }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('names the impls a bound could be satisfied by', () {
+      final harness = _lower('''
+        $_traitsSource
+        impl[T] T: Compare {
+          fun compareTo(self: T, other: T) Ordering { Ordering.less() }
+        }
+        fun isBigger[T: Compare](left: T, right: T) Bool { Bool.true_() }
+        fun main() Int {
+          isBigger(Ordering.less(), Ordering.greater())
+          0
+        }
+      ''');
+      expect(harness.errorMessages.single, contains('matches several impls'));
+      expect(
+        harness.errorMessages.single,
+        contains('impl `Compare(Ordering)`'),
+      );
+      expect(harness.errorMessages.single, contains('impl `Compare(?T)`'));
+    });
+
     test('does not find top-level functions in method position', () {
       // UFCS is gone: `builtinIntToText` is a function, not a member of `Int`.
       final harness = _lower(
