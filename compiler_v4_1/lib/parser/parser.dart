@@ -404,7 +404,7 @@ class Parser {
       recoverySet: _declarationFirstSet,
     );
 
-    final members = parseMembers();
+    final members = parseMembers(allowFunctionVisibility: false);
 
     expect<TokenKind_ClosingBrace>(
       'This trait is missing a closing curly brace.',
@@ -448,7 +448,7 @@ class Parser {
       recoverySet: _declarationFirstSet,
     );
 
-    final members = parseMembers();
+    final members = parseMembers(allowFunctionVisibility: trait == null);
 
     expect<TokenKind_ClosingBrace>(
       'This impl is missing a closing curly brace.',
@@ -466,23 +466,29 @@ class Parser {
   }
 
   ({List<AstAssociatedType> associatedTypes, List<AstFunction> functions})
-  parseMembers() {
+  parseMembers({required bool allowFunctionVisibility}) {
     final associatedTypes = <AstAssociatedType>[];
     final functions = <AstFunction>[];
     while (!at<TokenKind_ClosingBrace>() && !_isAtEnd) {
       final visibility = _parseVisibility();
-      if (visibility != .private) {
-        error(
-          "A member of a trait or impl can't have a visibility modifier.",
-        );
-      }
 
       if (at<TokenKind_TypeKeyword>()) {
+        if (visibility != .private) {
+          error("An associated type can't have a visibility modifier.");
+        }
         associatedTypes.add(parseAssociatedType());
         continue;
       }
       if (at<TokenKind_FunKeyword>()) {
-        functions.add(parseFunction(.private));
+        if (!allowFunctionVisibility && visibility != .private) {
+          error(
+            "A function in a trait or a trait impl can't have a visibility "
+            'modifier.',
+          );
+        }
+        functions.add(
+          parseFunction(allowFunctionVisibility ? visibility : .private),
+        );
         continue;
       }
 

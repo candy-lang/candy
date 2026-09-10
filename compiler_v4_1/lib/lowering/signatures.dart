@@ -143,13 +143,20 @@ class Signatures {
   final WellKnownTypes wellKnownTypes;
   final Map<DeclarationId, BuiltinFunction> builtinIds;
 
-  late final TypeNormalizer normalizer = TypeNormalizer([
-    for (final impl in impls) impl.forProjection,
-  ]);
+  late final normalizer = TypeNormalizer(
+    impls.map((it) => it.forProjection).toList(),
+  );
+
+  late final implsById = impls.associateBy((it) => it.id);
 
   LoweredTrait? traitOwning(DeclarationId functionId) {
     final owner = functions[functionId]?.owner;
     return owner == null ? null : traits[owner];
+  }
+
+  LoweredImpl? implOwning(DeclarationId functionId) {
+    final owner = functions[functionId]?.owner;
+    return owner == null ? null : implsById[owner];
   }
 }
 
@@ -468,10 +475,7 @@ class _SignatureLowerer {
       }
 
       if (traitRef == null) {
-        _error(
-          span,
-          "An impl without a trait can't bind associated types.",
-        );
+        _error(span, "An impl without a trait can't bind associated types.");
         continue;
       }
 

@@ -70,7 +70,41 @@ void main() {
   test('reports visibility on a trait function', () {
     final result = parse('trait T { public fun f(self: Self) }');
     expect(result.errors, [
-      "A member of a trait or impl can't have a visibility modifier.",
+      "A function in a trait or a trait impl can't have a visibility modifier.",
+    ]);
+  });
+
+  test('reports visibility on a trait impl function', () {
+    final result = parse(
+      'trait T {}\nstruct S {}\nimpl S: T { public fun f(self: Self) {} }',
+    );
+    expect(result.errors, [
+      "A function in a trait or a trait impl can't have a visibility modifier.",
+    ]);
+  });
+
+  test('parses visibility on an inherent impl function', () {
+    final result = parse('''
+      struct S {}
+      impl S {
+        public fun f(self: Self) {}
+        package fun g(self: Self) {}
+        fun h(self: Self) {}
+      }
+    ''');
+    expect(result.errors, isEmpty);
+    final impl = (result.ast.declarations.last as AstDeclaration_Impl).impl;
+    expect(impl.functions.map((it) => it.visibility), [
+      AstVisibility.public,
+      AstVisibility.package,
+      AstVisibility.private,
+    ]);
+  });
+
+  test('reports visibility on an associated type', () {
+    final result = parse('trait T { public type A }');
+    expect(result.errors, [
+      "An associated type can't have a visibility modifier.",
     ]);
   });
 }

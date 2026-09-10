@@ -894,6 +894,12 @@ class _Builder {
 
       switch (resolution) {
         case OverloadResolved(:final candidate):
+          final invisible = _methodVisibilityMessage(candidate.id, name);
+          if (invisible != null) {
+            _error(nameSpan, invisible);
+            return;
+          }
+
           entry.pendingCall = _PendingCall(
             candidate,
             arguments.map((it) => it.$1).toList(),
@@ -917,6 +923,26 @@ class _Builder {
 
     attempt();
     return _Value(entryId, resultType);
+  }
+
+  /// Inherent methods carry their own visibility; trait members never do and
+  /// are always callable wherever their receiver is.
+  String? _methodVisibilityMessage(DeclarationId id, String name) {
+    final impl = lowerer.signatures.implOwning(id);
+    if (impl == null || !impl.isInherent) return null;
+
+    final visibility =
+        lowerer.signatures.functions[id]?.ast?.visibility ?? .private;
+    final isVisible = switch (visibility) {
+      .private => id.module == lowerer.module,
+      .package => id.module.packageName == lowerer.module.packageName,
+      .public => true,
+    };
+    if (isVisible) return null;
+
+    return visibility == .private
+        ? 'The function `$name` is private.'
+        : 'The function `$name` is not visible here.';
   }
 
   String _callSignature(String name, List<(HirId, HirType)> arguments) =>
