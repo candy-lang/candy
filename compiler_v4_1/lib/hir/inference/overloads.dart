@@ -331,6 +331,46 @@ class OverloadResolver {
     }
   }
 
+  /// Candidates for `Type.name(…)`, i.e. the functions of every inherent impl
+  /// on that type. Unlike [memberCandidates] no receiver is prepended, so
+  /// `Int.divideTruncating(a, b)` and `a.divideTruncating(b)` both work.
+  ///
+  /// The impl's type parameters become variables in [variables] rather than
+  /// being pinned down by a receiver, so `Maybe.none()` infers its element
+  /// type from the call site.
+  List<CandidateSource> staticCandidates(
+    DeclarationId declaration,
+    String name,
+    TypeVariables variables,
+  ) {
+    final candidates = <CandidateSource>[];
+    for (final impl in signatures.impls) {
+      if (!impl.isInherent) continue;
+      final type = impl.type;
+      if (type is! HirType_Named || type.declaration != declaration) continue;
+
+      final substitutions = {
+        for (final parameter in impl.typeParameters)
+          parameter.id: variables.fresh(),
+      };
+      for (final id in impl.inherentFunctionIds) {
+        final function = signatures.functions[id];
+        if (function == null) continue;
+        if (function.signature.name != name) continue;
+
+        candidates.add(
+          CandidateSource(
+            function: function,
+            preset: substitutions,
+            group: _inherentGroup,
+            goals: _boundGoals(impl.typeParameters, substitutions),
+          ),
+        );
+      }
+    }
+    return candidates;
+  }
+
   (HirType, HirTrait, List<SolverGoal>, Map<TypeParameterId, HirType>)?
   _matchImpl(LoweredImpl impl, HirType receiver, HirTrait traitRef) {
     final resolved = _matchImplType(impl, receiver);

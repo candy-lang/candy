@@ -452,13 +452,16 @@ class _Builder {
       case _Value(:final id, :final type):
         return _lowerFieldAccess(id, type, key);
       case _TypeReference(:final declaration):
-        final kind = lowerer.signatures.typeDeclarations[declaration]?.kind;
-        if (kind is HirTypeDeclarationKind_Enum &&
-            kind.variants.any((it) => it.name == key.rawText)) {
+        if (_isVariant(declaration, key.rawText)) {
           _error(
             key.span,
             'Enum variant `${declaration.name}.${key.rawText}` must be called '
             'to create a value.',
+          );
+        } else if (_staticCandidates(declaration, key.rawText).isNotEmpty) {
+          _error(
+            key.span,
+            'Referencing a function as a value is not supported yet.',
           );
         } else {
           _error(
@@ -470,6 +473,17 @@ class _Builder {
       case _LoweringError():
         return const _LoweringError();
     }
+  }
+
+  List<CandidateSource> _staticCandidates(
+    DeclarationId declaration,
+    String name,
+  ) => lowerer.resolver.staticCandidates(declaration, name, variables);
+
+  bool _isVariant(DeclarationId declaration, String name) {
+    final kind = lowerer.signatures.typeDeclarations[declaration]?.kind;
+    return kind is HirTypeDeclarationKind_Enum &&
+        kind.variants.any((it) => it.name == name);
   }
 
   _Lowered _lowerFieldAccess(HirId receiverId, HirType receiver, Token key) {
@@ -747,12 +761,26 @@ class _Builder {
               isMember: true,
             );
           case _TypeReference(:final declaration):
-            return _lowerEnumCreation(
-              declaration,
-              key,
-              call,
-              typeArguments,
-              argumentSpan,
+            if (_isVariant(declaration, key.rawText) ||
+                _staticCandidates(declaration, key.rawText).isEmpty) {
+              return _lowerEnumCreation(
+                declaration,
+                key,
+                call,
+                typeArguments,
+                argumentSpan,
+              );
+            }
+
+            final arguments = _lowerArguments(call.arguments);
+            return _resolveCall(
+              name: key.rawText,
+              nameSpan: key.span,
+              candidates: () => _staticCandidates(declaration, key.rawText),
+              driver: null,
+              arguments: arguments,
+              typeArguments: typeArguments,
+              isMember: false,
             );
           case _LoweringError():
             return const _LoweringError();
