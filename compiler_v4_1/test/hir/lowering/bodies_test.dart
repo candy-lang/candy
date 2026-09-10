@@ -72,6 +72,29 @@ void main() {
       expect(harness.errorMessages, ['Switch is missing variant: `greater`.']);
     });
 
+    test('accesses a struct field through `Self`', () {
+      final harness = _lower('''
+        struct Box { value: Int }
+        impl Box {
+          fun get(self: Self) Int { self.value }
+        }
+        fun main() Int { Box(1).get() }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('switches over a value of type `Self`', () {
+      final harness = _lower('''
+        impl Ordering {
+          fun toInt(self: Self) Int {
+            switch self { less => 0, equal => 1, greater => 2 }
+          }
+        }
+        fun main() Int { Ordering.less().toInt() }
+      ''');
+      harness.expectNoErrors();
+    });
+
     test('binds a switch case payload', () {
       final harness = _lower('''
         fun main() Int {

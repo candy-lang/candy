@@ -108,7 +108,7 @@ class TypeNormalizer {
 
     // `Self` stands for the impl's type, which is what an impl is matched
     // against — the same unwrapping `Unifier` does.
-    final concrete = _unwrapSelf(baseType);
+    final concrete = baseType.unwrapSelf;
     if (concrete is HirType_Parameter ||
         concrete is HirType_Associated ||
         concrete is HirType_Variable ||
@@ -183,7 +183,4 @@ class TypeNormalizer {
         key: scratch.finalize(value),
     };
   }
-
-  static HirType _unwrapSelf(HirType type) =>
-      type is HirType_Self ? _unwrapSelf(type.baseType) : type;
 }

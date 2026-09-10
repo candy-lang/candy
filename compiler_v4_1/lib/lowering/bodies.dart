@@ -475,7 +475,8 @@ class _Builder {
   _Lowered _lowerFieldAccess(HirId receiverId, HirType receiver, Token key) {
     final resolved = variables.resolve(receiver);
     if (resolved is HirType_Error) return const _LoweringError();
-    if (resolved is! HirType_Named) {
+    final unwrapped = resolved.unwrapSelf;
+    if (unwrapped is! HirType_Named) {
       _error(
         key.span,
         variables.isUnresolved(resolved)
@@ -486,14 +487,14 @@ class _Builder {
     }
 
     final declaration =
-        lowerer.signatures.typeDeclarations[resolved.declaration];
+        lowerer.signatures.typeDeclarations[unwrapped.declaration];
     final kind = declaration?.kind;
     if (kind is HirTypeDeclarationKind_Struct) {
       final field = kind.fields
           .where((it) => it.name == key.rawText)
           .firstOrNull;
       if (field != null) {
-        if (!_isFieldVisible(field, resolved.declaration)) {
+        if (!_isFieldVisible(field, unwrapped.declaration)) {
           _error(key.span, _fieldVisibilityMessage(field, key.rawText));
           return const _LoweringError();
         }
@@ -501,7 +502,7 @@ class _Builder {
         final type = field.type.substitute(
           HirType.buildEnvironment(
             declaration!.typeParameters,
-            resolved.typeArguments,
+            unwrapped.typeArguments,
           ),
         );
         return _Value(
@@ -604,8 +605,9 @@ class _Builder {
 
     if (resolved is HirType_Error) return const _LoweringError();
 
-    final declaration = resolved is HirType_Named
-        ? lowerer.signatures.typeDeclarations[resolved.declaration]
+    final unwrapped = resolved.unwrapSelf;
+    final declaration = unwrapped is HirType_Named
+        ? lowerer.signatures.typeDeclarations[unwrapped.declaration]
         : null;
     final kind = declaration?.kind;
     if (kind is! HirTypeDeclarationKind_Enum) {
@@ -620,7 +622,7 @@ class _Builder {
 
     final environment = HirType.buildEnvironment(
       declaration!.typeParameters,
-      (resolved as HirType_Named).typeArguments,
+      (unwrapped as HirType_Named).typeArguments,
     );
 
     var returnType = expectedType;

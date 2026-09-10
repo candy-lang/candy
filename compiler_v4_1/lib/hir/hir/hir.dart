@@ -128,6 +128,12 @@ sealed class HirType with _$HirType {
     ),
   };
 
+  /// `Self` stands for its base type wherever the concrete type matters.
+  HirType get unwrapSelf => switch (this) {
+    HirType_Self(:final baseType) => baseType.unwrapSelf,
+    _ => this,
+  };
+
   /// Extra parameters are left unsubstituted rather than throwing, since
   /// lowering produces mismatched arities after reporting an error.
   static Map<TypeParameterId, HirType> buildEnvironment(
