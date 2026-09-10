@@ -1,6 +1,3 @@
-import 'package:deranged/deranged.dart';
-import 'package:supernova/supernova.dart';
-
 import '../ast.dart';
 import '../context.dart';
 import '../error.dart';
@@ -286,22 +283,7 @@ class _Lowerer {
               !it.isBuiltin && it.owner == null && it.signature.name == 'main',
         )
         .toList();
-
-    if (candidates.isEmpty) {
-      final anyFile = modules.firstOrNull;
-      if (anyFile != null) {
-        context.addError(
-          CompilerError(
-            span: SourceSpan(
-              anyFile.file,
-              const Offset(0).rangeTo(const Offset(0)),
-            ),
-            message: 'The program is missing a `main` function.',
-          ),
-        );
-      }
-      return null;
-    }
+    if (candidates.isEmpty) return null;
 
     final main = candidates.first;
     final span = main.ast!.displaySpan;

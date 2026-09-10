@@ -383,11 +383,10 @@ void main() {
       expect('${harness.hir.mainFunction}', 'Core.test:main');
     });
 
-    test('reports a missing main function', () {
+    test('does not report a missing main function', () {
       final harness = _lower('fun other() Int { 0 }');
-      expect(harness.errorMessages, [
-        'The program is missing a `main` function.',
-      ]);
+      harness.expectNoErrors();
+      expect(harness.hir.mainFunction, isNull);
     });
 
     test('reports a main function with parameters', () {

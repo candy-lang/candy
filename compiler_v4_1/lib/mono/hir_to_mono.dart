@@ -12,7 +12,7 @@ import 'monomorphizing/types.dart';
 ///
 /// [hir] must be free of errors; anything left over from a failed lowering
 /// throws a [StateError] rather than being reported. Returns `null` when there
-/// is no `main` function, which HIR lowering already reported.
+/// is no `main` function; only the caller knows whether that is a problem.
 Mono? hirToMono(Hir hir) {
   final mainFunction = hir.mainFunction;
   if (mainFunction == null) return null;
