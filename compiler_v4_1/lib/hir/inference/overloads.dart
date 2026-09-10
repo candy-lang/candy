@@ -13,7 +13,12 @@ import 'inference.dart';
 /// The type parameters in scope where a call appears. Their bounds are what
 /// the solver may assume; they're opaque so nothing else can be proven of them.
 class SolverContext {
-  const SolverContext(this.inScopeTypeParameters, {this.extraConditions});
+  const SolverContext(
+    this.inScopeTypeParameters, {
+    this.extraConditions,
+    this.selfTrait,
+    this.selfType,
+  });
 
   final List<HirTypeParameter> inScopeTypeParameters;
 
@@ -22,12 +27,34 @@ class SolverContext {
   /// for `[T: Iterator]` and `trait Iterator { type Item: ToText }`.
   final List<SolverGoal>? extraConditions;
 
+  /// Inside a trait declaration, that trait and the `Self` it bounds. Both
+  /// `null` anywhere else, including in an impl.
+  final HirTrait? selfTrait;
+  final HirType? selfType;
+
   List<SolverGoal> get conditions => [
     ...solverGoalsOfBounds(inScopeTypeParameters),
+    ?_selfGoal,
     ...?extraConditions,
   ];
-  Set<SolverVariable> get opaqueVariables =>
-      solverVariablesOf(inScopeTypeParameters);
+  Set<SolverVariable> get opaqueVariables => {
+    ...solverVariablesOf(inScopeTypeParameters),
+    ?_selfVariable,
+  };
+
+  SolverGoal? get _selfGoal {
+    if (selfTrait case final trait?) {
+      if (selfType case final type?) return solverGoalOf(trait, type);
+    }
+    return null;
+  }
+
+  SolverVariable? get _selfVariable {
+    if (selfTrait case final trait?) {
+      return SolverVariable.parameter(TypeParameterId.self(trait.declaration));
+    }
+    return null;
+  }
 }
 
 /// A function that could be called, before its type parameters are given
@@ -130,14 +157,20 @@ class OverloadResolver {
   /// projections are followed a few levels deep; a trait whose associated type
   /// is bounded by its own trait would otherwise never stop.
   SolverContext solverContextFor(TypeScope typeScope) {
+    final selfType = typeScope.selfBaseType == null
+        ? null
+        : HirType.self(baseType: typeScope.selfBaseType!);
+    // Only a trait's own `Self` is opaque and bounded by the trait; an impl's
+    // is the concrete type it implements, which its own rule already covers.
+    final isTraitSelf = selfType?.isTraitSelf ?? false;
+
     final conditions = <SolverGoal>[];
     var frontier = <(HirType, HirTrait)>[
       for (final parameter in typeScope.typeParameters)
         if (parameter.upperBound case Some(some: final bound))
           (parameter.type, bound),
-      if (typeScope.selfTrait case final selfTrait?)
-        if (typeScope.selfBaseType case final selfBaseType?)
-          (HirType.self(baseType: selfBaseType), selfTrait),
+      if (typeScope.selfTrait case final traitOfSelf?)
+        if (selfType case final type?) (type, traitOfSelf),
     ];
 
     for (var depth = 0; depth < _maxProjectionDepth; depth++) {
@@ -178,6 +211,8 @@ class OverloadResolver {
     return SolverContext(
       typeScope.typeParameters,
       extraConditions: conditions,
+      selfTrait: isTraitSelf ? typeScope.selfTrait : null,
+      selfType: isTraitSelf ? selfType : null,
     );
   }
 
@@ -231,6 +266,22 @@ class OverloadResolver {
                   ),
                   TypeParameterId.self(trait.id): receiver.baseType,
                 }),
+          receiver,
+          name,
+          group: 0,
+          goals: const [],
+        );
+      }
+      return candidates;
+    }
+
+    // Inside the trait itself, `Self` is as opaque as a type parameter bounded
+    // by that trait, so the trait's own functions are all it offers.
+    if (receiver.isTraitSelf) {
+      if (solverContext.selfTrait case final trait?) {
+        _addTraitFunctions(
+          candidates,
+          trait,
           receiver,
           name,
           group: 0,

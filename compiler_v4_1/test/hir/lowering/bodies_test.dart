@@ -361,6 +361,37 @@ void main() {
       harness.expectNoErrors();
     });
 
+    test("calls the trait's own function on `Self` in a default body", () {
+      final harness = _lower('''
+        $_traitsSource
+        trait Ordered {
+          fun compare(self: Self, other: Self) Ordering
+          fun isSame(self: Self, other: Self) Bool {
+            switch self.compare(other) {
+              less => Bool.false_(),
+              equal => Bool.true_(),
+              greater => Bool.false_(),
+            }
+          }
+        }
+        fun main() Int { 0 }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('satisfies a bound through `Self` in a trait default body', () {
+      final harness = _lower('''
+        $_traitsSource
+        fun isBigger[T: Sized](left: T, right: T) Bool { Bool.true_() }
+        trait Sized {
+          fun size(self: Self) Int
+          fun exceeds(self: Self, other: Self) Bool { isBigger(self, other) }
+        }
+        fun main() Int { 0 }
+      ''');
+      harness.expectNoErrors();
+    });
+
     test('names the impls a bound could be satisfied by', () {
       final harness = _lower('''
         $_traitsSource
