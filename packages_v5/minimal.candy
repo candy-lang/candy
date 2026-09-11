@@ -1,9 +1,0 @@
-struct Nothing {}
-enum Never {}
-struct Int = builtin
-struct Text = builtin
-
-fun main() Int {
-  builtinPrint(builtinIntToText(42))
-  0
-}

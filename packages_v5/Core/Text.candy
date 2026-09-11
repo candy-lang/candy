@@ -1,0 +1,111 @@
+use Builtins
+use Core
+use Core.Bool
+use Core.Collections.HasLength
+use Core.Collections.List
+use Core.Int
+use Core.Maybe
+use Core.Operators.Compare
+use Core.ToText
+
+public struct Text = builtin
+impl Text{
+  public fun concat(self: Self, other: Text) Text {
+    builtinTextConcat(self, other)
+  }
+  # TODO: Support ranges when we have them.
+  public fun get(self: Self, index: Int) Maybe[Text] {
+    switch index.isInRange(0, self.length()) {
+      false => none(),
+      true => some(self.getRange(index, index.add(1))),
+    }
+  }
+  public fun getRange(self: Self, startInclusive: Int, endExclusive: Int) Text {
+    builtinTextGetRange(self, startInclusive, endExclusive)
+  }
+  public fun characters(self: Text) List[Text] {
+    List.generate(self.length(), (i: Int) { self.get(i).unwrap() })
+  }
+
+  public fun startsWith(self: Self, prefix: Text) Bool {
+    switch self.length().isAtLeast(prefix.length()) {
+      false => false,
+      true => self.getRange(0, prefix.length()).equals(prefix),
+    }
+  }
+  public fun endsWith(self: Self, suffix: Text) Bool {
+    switch self.length().isAtLeast(suffix.length()) {
+      false => false,
+      true => self.getRange(self.length().subtract(suffix.length()), self.length()).equals(suffix),
+    }
+  }
+  public fun removePrefix(self: Self, prefix: Text) Text {
+    switch self.startsWith(prefix) {
+      false => self,
+      true => self.getRange(prefix.length(), self.length()),
+    }
+  }
+  public fun removeSuffix(self: Self, suffix: Text) Text {
+    switch self.endsWith(suffix) {
+      false => self,
+      true => self.getRange(self.length().subtract(suffix.length()), self.length()),
+    }
+  }
+
+  public fun split(self: Self, character: Text) List[Text] {
+    self.splitIf((char: Text) { char.equals(character) })
+  }
+  public fun splitIf(self: Self, predicate: (Text) Bool) List[Text] {
+    self.splitIfHelper(predicate, 0, 0, List.of())
+  }
+  fun splitIfHelper(self: Self, predicate: (Text) Bool, currentStartOffset: Int, offset: Int, result: List[Text]) List[Text] {
+    switch self.get(offset) {
+      none => result.append(self.getRange(currentStartOffset, offset)),
+      some(char) => switch predicate(char) {
+        true => {
+          let nextOffset = offset.add(1)
+          let nextResult = result.append(self.getRange(currentStartOffset, offset))
+          self.splitIfHelper(predicate, nextOffset, nextOffset, nextResult)
+        },
+        false => self.splitIfHelper(predicate, currentStartOffset, offset.add(1), result),
+      },
+    }
+  }
+  public fun lines(self: Text) List[Text] {
+    self.split("\n")
+  }
+
+  public fun indexOf(self: Self, other: Text) Maybe[Int] {
+    builtinTextIndexOf(self, other)
+  }
+  public fun allIndexesOfOverlapping(self: Self, other: Text) List[Int] {
+    self.allIndexesOfOverlappingHelper(other, 0, List.of())
+  }
+  fun allIndexesOfOverlappingHelper(self: Self, other: Text, offset: Int, result: List[Int]) List[Int] {
+    switch self.getRange(offset, self.length()).indexOf(other) {
+      none => result,
+      some(index) => {
+        let index = offset.add(index)
+        self.allIndexesOfOverlappingHelper(other, index.add(1), result.append(index))
+      },
+    }
+  }
+  public fun contains(self: Self, other: Text) Bool {
+    self.indexOf(other).isSome()
+}
+  }
+impl Text: ToText {
+  fun toText(self: Text) Text {
+    self
+  }
+}
+impl Text: HasLength {
+  fun length(self: Text) Int {
+    builtinTextLength(self)
+  }
+}
+impl Text: Compare {
+  fun compareTo(self: Self, other: Self) Ordering {
+    builtinTextCompareTo(self, other)
+  }
+}

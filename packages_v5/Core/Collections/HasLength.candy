@@ -1,0 +1,10 @@
+use Core.Bool
+use Core.Int
+
+public trait HasLength {
+  fun length(self: Self) Int
+
+  fun isEmpty(self: Self) Bool {
+    self.length().equals(0)
+  }
+}

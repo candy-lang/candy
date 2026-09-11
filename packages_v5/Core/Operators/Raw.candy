@@ -1,0 +1,4 @@
+public trait OperatorPlus[T] {
+  # TODO: add associated type for return type
+  fun plus(self: Self, other: T) Self
+}

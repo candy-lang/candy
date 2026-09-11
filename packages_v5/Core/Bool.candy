@@ -1,0 +1,63 @@
+use Core
+use Core.Int
+use Core.Operators.Compare
+use Core.Text
+use Core.ToText
+
+public enum Bool { true, false }
+public let true: Bool = Bool.true()
+public let false: Bool = Bool.false()
+impl Bool {
+  public fun not(self: Bool) Bool {
+    switch self {
+      true => false,
+      false => true,
+    }
+  }
+  public fun and(self: Bool, other: Bool) Bool {
+    switch self {
+      true => other,
+      false => false,
+    }
+  }
+  public fun or(self: Bool, other: Bool) Bool {
+    switch self {
+      true => true,
+      false => other,
+    }
+  }
+  public fun xor(self: Bool, other: Bool) Bool {
+    self.equals(other).not()
+  }
+  public fun implies(self: Bool, other: Bool) Bool {
+    self.not().or(other)
+  }
+  public fun toInt(self: Bool) Int {
+    switch self {
+      false => 0,
+      true => 1,
+    }
+  }
+}
+impl Bool: Compare {
+  fun compareTo(self: Bool, other: Bool) Ordering {
+    switch self {
+      false => switch other {
+        false => Ordering.equal(),
+        true => Ordering.less(),
+      },
+      true => switch other {
+        false => Ordering.greater(),
+        true => Ordering.equal(),
+      },
+    }
+  }
+}
+impl Bool: ToText {
+  fun toText(self: Bool) Text {
+    switch self {
+      true => "true",
+      false => "false",
+    }
+  }
+}

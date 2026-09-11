@@ -1,0 +1,136 @@
+use Builtins
+use Core
+use Core.Bool
+use Core.Operators.Arithmetic
+use Core.Operators.Compare
+use Core.Operators.Equal
+use Core.Panic
+use Core.Result
+use Core.Text
+use Core.ToText
+
+public struct Int = builtin
+impl Int {
+  public fun parse(text: Text) Result[Int, Text] {
+    builtinIntParse(text)
+  }
+
+  public fun isPositive(self: Self) Bool {
+    self.isGreaterThan(0)
+  }
+  public fun isNonPositive(self: Self) Bool {
+    self.isAtMost(0)
+  }
+  public fun isNegative(self: Self) Bool {
+    self.isLessThan(0)
+  }
+  public fun isNonNegative(self: Self) Bool {
+    self.isAtLeast(0)
+  }
+  public fun absolute(self: Self) Int {
+    switch self.isNegative() {
+      true => self.negate(),
+      false => self,
+    }
+  }
+  public fun negate(self: Self) Int {
+    0.subtract(self)
+  }
+  public fun multiply(self: Self, other: Int) Int {
+    builtinIntMultiply(self, other)
+  }
+  public fun square(self: Self) Int {
+    self.multiply(self)
+  }
+  public fun divideTruncating(dividend: Int, divisor: Int) Int {
+    needs(divisor.equals(0).not())
+
+    builtinIntDivideTruncating(dividend, divisor)
+  }
+  public fun remainder(dividend: Int, divisor: Int) Int {
+    # Returns the remainder you get when dividing the `dividend` by the `divisor`.
+    #
+    # The result has the same sign as the `dividend`.
+    #
+    # | `dividend` | `divisor` | `dividend.remainder(divisor)` |
+    # |-----------:|----------:|---------------------------:|
+    # |          6 |         3 |                          0 |
+    # |          5 |         3 |                          2 |
+    # |         -5 |         3 |                         -2 |
+    # |          5 |        -3 |                          2 |
+    # |         -5 |        -3 |                         -2 |
+    needs(divisor.equals(0).not())
+
+    builtinIntRemainder(dividend, divisor)
+  }
+  public fun modulo(dividend: Int, divisor: Int) Int {
+    # Returns `dividend` % `divisor`.
+    #
+    # The result of a modulo operation is the smallest non-negative number $x$
+    # such that there exists a $y$ with $dividend = y * divisor + x$.
+    #
+    # | `dividend` | `divisor` | `dividend.modulo(divisor)` |
+    # |-----------:|----------:|---------------------------:|
+    # |          6 |         3 |                          0 |
+    # |          5 |         3 |                          2 |
+    # |          5 |        -3 |                          2 |
+    # |         -5 |         3 |                          1 |
+    # |         -5 |        -3 |                          1 |
+    needs(divisor.equals(0).not())
+
+    let remainder = dividend.remainder(divisor)
+    switch remainder.isNegative() {
+      true => switch divisor.isNegative() {
+        true => remainder.subtract(divisor),
+        false => remainder.add(divisor),
+      },
+      false => remainder,
+    }
+  }
+  public fun shiftLeft(value: Int, amount: Int) Int {
+    builtinIntShiftLeft(value, amount)
+  }
+  public fun shiftRight(value: Int, amount: Int) Int {
+    builtinIntShiftRight(value, amount)
+  }
+  public fun bitwiseAnd(self: Self, other: Int) Int {
+    builtinIntBitwiseAnd(self, other)
+  }
+  public fun bitwiseOr(self: Self, other: Int) Int {
+    builtinIntBitwiseOr(self, other)
+  }
+  public fun bitwiseXor(self: Self, other: Int) Int {
+    builtinIntBitwiseXor(self, other)
+  }
+  public fun isEven(self: Self) Bool {
+    self.remainder(2).equals(0)
+  }
+  public fun isOdd(self: Self) Bool {
+    self.remainder(2).equals(1)
+  }
+  public fun lowestBits(self: Self, bitCount: Int) Int {
+    needs(bitCount.isNonNegative())
+    let mask = 1.shiftLeft(bitCount).subtract(1)
+    self.bitwiseAnd(mask)
+  }
+}
+impl Int: Add {
+  fun add(self: Int, other: Int) Int {
+    builtinIntAdd(self, other)
+  }
+}
+impl Int: Subtract {
+  fun subtract(self: Int, other: Int) Int {
+    builtinIntSubtract(self, other)
+  }
+}
+impl Int: ToText {
+  fun toText(self: Int) Text {
+    builtinIntToText(self)
+  }
+}
+impl Int: Compare {
+  fun compareTo(self: Int, other: Int) Ordering {
+    builtinIntCompareTo(self, other)
+  }
+}

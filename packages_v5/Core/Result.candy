@@ -1,0 +1,55 @@
+use Core
+use Core.Bool
+use Core.Panic
+use Core.Text
+use Core.ToText
+
+public enum Result[T, E] {
+  ok: T,
+  error: E,
+}
+public fun ok[T, E](value: T) Result[T, E] {
+  Result.ok[T, E](value)
+}
+public fun error[T, E](value: E) Result[T, E] {
+  Result.error[T, E](value)
+}
+impl[T, E] Result[T, E] {
+  public fun unwrap(self: Self) T {
+    # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+    # self.unwrapOrElse((error: E) { panic("`unwrap()` called on `error()`") })
+    switch self {
+      ok(value) => value,
+      error(error) => panic("`unwrap()` called on `error()`"),
+    }
+  }
+  public fun unwrapOr(self: Self, defaultValue: T) T {
+    self.unwrapOrElse((error: E) { defaultValue })
+  }
+  public fun unwrapOrElse(self: Self, getDefaultValue: (E) T) T {
+    switch self {
+      ok(value) => value,
+      error(error) => getDefaultValue(error),
+    }
+  }
+  public fun isOk(self: Self) Bool {
+    switch self {
+      ok(value) => true,
+      error(value) => false,
+    }
+  }
+  public fun isError(self: Self) Bool {
+    switch self {
+      ok(value) => false,
+      error(value) => true,
+    }
+  }
+}
+impl[T: ToText, E: ToText] Result[T, E]: ToText {
+  fun toText(self: Result[T, E]) Text {
+    switch self {
+      ok(value) => "ok({value.toText()})",
+      error(error) => "error({error.toText()})",
+    }
+  }
+}

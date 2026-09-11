@@ -1,0 +1,6 @@
+use Core
+use Core.Text
+
+public trait ToText {
+  fun toText(self: Self) Text
+}

@@ -1,0 +1,23 @@
+use Builtins
+use Core
+use Core.Bool
+use Core.Primitives
+use Core.Text
+
+public fun panic(message: Text) Never {
+  builtinPanic(message)
+}
+
+# TODO: build this into the language; fuzzing
+public fun needs(condition: Bool) {
+  switch condition {
+    true => Nothing(),
+    false => panic("Needs not fulfilled"),
+  }
+}
+public fun needs(condition: Bool, message: Text) {
+  switch condition {
+    true => Nothing(),
+    false => panic("Needs not fulfilled: {message}"),
+  }
+}

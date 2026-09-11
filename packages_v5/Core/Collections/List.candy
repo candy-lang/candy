@@ -1,0 +1,248 @@
+use Builtins
+use Core
+use Core.Bool
+use Core.Collections.HasLength
+use Core.Int
+use Core.Maybe
+use Core.Operators.Compare
+use Core.Panic
+use Core.Text
+use Core.ToText
+use Core.Tuples
+
+public struct List[T] = builtin
+impl[T] List[T] {
+  public fun filled(length: Int, item: T) Self {
+    builtinListFilled(length, item)
+  }
+  public fun generate(length: Int, generator: (Int) T) Self {
+    builtinListGenerate(length, generator)
+  }
+  public fun of() Self {
+    builtinListOf()
+  }
+  public fun of(item0: T) Self {
+    builtinListOf(item0)
+  }
+  public fun of(item0: T, item1: T) Self {
+    builtinListOf(item0, item1)
+  }
+  public fun of(item0: T, item1: T, item2: T) Self {
+    builtinListOf(item0, item1, item2)
+  }
+  public fun of(item0: T, item1: T, item2: T, item3: T) Self {
+    builtinListOf(item0, item1, item2, item3)
+  }
+  public fun of(item0: T, item1: T, item2: T, item3: T, item4: T) Self {
+    builtinListOf(item0, item1, item2, item3, item4)
+  }
+
+  public fun lastIndex(list: Self) Maybe[Int] {
+    switch list.isEmpty() {
+      true => none(),
+      false => some(list.length().subtract(1)),
+    }
+  }
+  public fun get(list: Self, index: Int) Maybe[T] {
+    builtinListGet(list, index)
+  }
+  public fun single(list: Self) Maybe[T] {
+    switch list.length().equals(1) {
+      true => list.get(0),
+      false => none(),
+    }
+  }
+  public fun first(list: Self) Maybe[T] {
+    list.get(0)
+  }
+  public fun last(list: Self) Maybe[T] {
+    list.get(list.length().subtract(1))
+  }
+  public fun insert(list: Self, index: Int, item: T) Self {
+    builtinListInsert(list, index, item)
+  }
+  public fun prepend(list: Self, item: T) Self {
+    list.insert(0, item)
+  }
+  public fun append(list: Self, item: T) Self {
+    list.insert(list.length(), item)
+  }
+  public fun replace(list: Self, index: Int, item: T) Self {
+    builtinListReplace(list, index, item)
+  }
+  # TODO: list.update(…)
+  public fun removeAt(list: Self, index: Int) Self {
+    builtinListRemoveAt(list, index)
+  }
+  public fun concat(list0: Self, list1: Self) Self {
+    Self.generate(list0.length().add(list1.length()), (i: Int) {
+      switch i.isLessThan(list0.length()) {
+        true => list0.get(i).unwrap(),
+        false => list1.get(i.subtract(list0.length())).unwrap(),
+      }
+    })
+  }
+  public fun getRange(list: Self, startInclusive: Int, endExclusive: Int) Self {
+    switch startInclusive.isNonNegative()
+      .and(endExclusive.isNonNegative())
+      .and(startInclusive.isAtMost(endExclusive))
+      .and(endExclusive.isAtMost(list.length())) {
+      false => panic("Invalid range"),
+      true => Self.generate(
+        endExclusive.subtract(startInclusive),
+        (i: Int) { list.get(startInclusive.add(i)).unwrap() },
+      ),
+    }
+  }
+  public fun skip(list: Self, count: Int) Self {
+    needs(count.isNonNegative())
+    list.getRange(count, list.length())
+  }
+  public fun skipLast(list: Self, count: Int) Self {
+    needs(count.isNonNegative())
+    list.getRange(0, list.length().subtract(count))
+  }
+  public fun indexes(list: Self) List[Int] {
+    range(list.length())
+  }
+
+  public fun toPair(list: Self) Maybe[Pair[T, T]] {
+    switch list.length().equals(2) {
+      true => some(Pair[T, T](list.get(0).unwrap(), list.get(1).unwrap())),
+      false => none(),
+    }
+  }
+
+  # TODO: .firstIndexWhere(…), .firstWhere(…), .firstIndexOf(…), .lastIndexWhere(…), .lastWhere(…), .lastIndexOf(…)
+  public fun fold[R](self: Self, initial: R, combine: (R, T) R) R {
+    self.foldIndexed(initial, (state: R, index: Int, item: T) { combine(state, item) })
+  }
+  public fun foldIndexed[R](self: Self, initial: R, combine: (R, Int, T) R) R {
+    self.foldIndexedHelper(0, initial, combine)
+  }
+  public fun foldIndexedHelper[R](self: Self, index: Int, state: R, combine: (R, Int, T) R) R {
+    switch index.isLessThan(self.length()) {
+      true => self.foldIndexedHelper(index.add(1), combine(state, index, self.get(index).unwrap()), combine),
+      false => state,
+    }
+  }
+  public fun reduce(self: Self, combine: (T, T) T) Maybe[T] {
+    switch self.get(0) {
+      none => none(),
+      some(first) => some(self.reduceHelper(1, first, combine)),
+    }
+  }
+  public fun reduceHelper(self: Self, index: Int, current: T, combine: (T, T) T) T {
+    switch index.isLessThan(self.length()) {
+      true => self.reduceHelper(index.add(1), combine(current, self.get(index).unwrap()), combine),
+      false => current,
+    }
+  }
+
+  public fun all(self: Self, predicate: (T) Bool) Bool {
+    self.allHelper(predicate, 0)
+  }
+  public fun allHelper(self: Self, predicate: (T) Bool, index: Int) Bool {
+    switch self.get(index) {
+      some(item) => switch predicate(item) {
+        true => self.allHelper(predicate, index.add(1)),
+        false => false,
+      },
+      none => true,
+    }
+  }
+  public fun any(self: Self, predicate: (T) Bool) Bool {
+    self.all((it: T) { predicate(it).not() }).not()
+  }
+
+  public fun isSortedBy(self: Self, checkPair: (T, T) Bool) Bool {
+    self.pairs().all((pair: Pair[T, T]) { checkPair(pair.first, pair.second) })
+  }
+
+  public fun map[R](self: Self, transform: (T) R) List[R] {
+    self.mapIndexed((index: Int, item: T) { transform(item) })
+  }
+  public fun mapIndexed[R](self: Self, transform: (Int, T) R) List[R] {
+    self.fold(List.of(), (result: List[R], item: T) {
+      result.append(transform(result.length(), item))
+    })
+  }
+  public fun flatMap[R](self: Self, transform: (T) List[R]) List[R] {
+    self.fold(List.of(), (result: List[R], item: T) {
+      result.concat(transform(item))
+    })
+  }
+  public fun filter(self: Self, predicate: (T) Bool) List[T] {
+    self.fold(List.of(), (result: List[T], item: T) {
+      switch predicate(item) {
+        true => result.append(item),
+        false => result,
+      }
+    })
+  }
+  public fun windows(self: Self, windowLength: Int) List[List[T]] {
+    # Returns a list over all contiguous windows of length `windowLength`.
+    #
+    # The windows overlap. If the `list` is shorter than `windowLength`, the
+    # resulting list is empty.
+    needs(windowLength.isPositive())
+
+    self.windowsHelper(windowLength, List.of())
+  }
+  public fun windowsHelper(self: Self, windowLength: Int, resultSoFar: List[List[T]]) List[List[T]] {
+    let index = resultSoFar.length()
+    switch index.isAtMost(self.length().subtract(windowLength)) {
+      true => self.windowsHelper(windowLength,
+        resultSoFar.append(self.getRange(index, index.add(windowLength))),),
+      false => resultSoFar,
+    }
+  }
+  public fun pairs(self: Self) List[Pair[T, T]] {
+    # Returns a list over all contiguous pairs of items.
+    #
+    # The pairs overlap. If the `list` is shorter than two, the resulting list is
+    # empty.
+    self.windows(2).map((window: List[T]) { window.toPair().unwrap() })
+  }
+}
+
+impl[T] List[T]: HasLength {
+  fun length(self: Self) Int {
+    builtinListLength(self)
+  }
+}
+impl[T: ToText] List[T]: ToText {
+  fun toText(self: List[T]) Text {
+    "[{self.join(", ")}]"
+  }
+}
+impl[T: ToText] List[T] {
+  public fun join(self: Self, separator: Text) Text {
+    self.map((item: T) { item.toText() }).reduce((result: Text, item: Text) { "{result}{separator}{item}" }).unwrapOr("")
+  }
+}
+
+impl[T: Compare] List[T] {
+  public fun isStrictlyAscending(self: Self) Bool {
+    self.isSortedBy((a: T, b: T) { a.compareTo(b).equals(Ordering.less()) })
+  }
+  public fun isStrictlyDescending(self: Self) Bool {
+    self.isSortedBy((a: T, b: T) { a.compareTo(b).equals(Ordering.greater()) })
+  }
+}
+impl List[Int] {
+  public fun sum(self: Self) Int {
+    self.fold(0, (sum: Int, item: Int) { sum.add(item) })
+  }
+}
+
+public fun range(length: Int) List[Int] {
+  needs(length.isNonNegative())
+
+  List.generate(length, (i: Int) { i })
+}
+public fun range(startInclusive: Int, endExclusive: Int) List[Int] {
+  needs(startInclusive.isAtMost(endExclusive))
+
+  List.generate(endExclusive.subtract(startInclusive), (i: Int) { startInclusive.add(i) })
+}

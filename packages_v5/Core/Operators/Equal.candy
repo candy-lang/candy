@@ -1,0 +1,5 @@
+use Core.Bool
+
+public trait Equal {
+  fun equals(self: Self, other: Self) Bool
+}

@@ -1,0 +1,38 @@
+fun main() Int {
+  identity(1)
+  identity("foo")
+#  # (x: Int) { x }
+#
+#  let helloWorld = "Hello, World!"
+#  printHello("World")
+#
+#  # let theAnswer = 40.add(2)
+#  let theAnswer = 42
+#  let theAnswerText = "42"
+#  print("The answer is {theAnswerText}!")
+#
+#  theAnswer
+  print("fibonacci(20) = {fibonacci(20).toText()}")
+  print(Ordering.less())
+  print(true)
+  print(false)
+  print("1.equals(2): {1.equals(2).toText()}")
+
+  let list = removeAt(replace(insert(listOf(0, 1), 1, 2), 0, 3), 2)
+  print("Length: {list.length().toText()}")
+  print("[{get(list, 0).toText()}, {get(list, 1).toText()}, {get(list, 2).toText()}]")
+
+  print(isEmpty(endsWith("orld!", "World!").toText()))
+
+  let foo = 123
+  let addCaptured = (x: Int) { x.add(foo) }
+  print("addCaptured(1) = {addCaptured(1).toText()}")
+
+  repeat(3, () { print("Hello, World!") })
+
+  print(map(listOf(1, 2, 3), (x: Int) { multiply(x, 2) }))
+
+  day6Part1("1")
+
+  0
+}

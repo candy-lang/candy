@@ -1,0 +1,63 @@
+use Core
+use Core.Collections.List
+use Core.Int
+use Core.Maybe
+use Core.Panic
+use Core.Tuples
+
+public struct List2D[T] {
+  public width: Int,
+  public height: Int,
+  public items: List[T],
+}
+impl[T] List2D[T] {
+  public fun new(width: Int, height: Int, items: List[T]) List2D[T] {
+    needs(width.isNonNegative())
+    needs(height.isNonNegative())
+    needs(width.multiply(height).equals(items.length()))
+
+    List2D(width, height, items)
+  }
+  public fun filled(width: Int, height: Int, item: T) List2D[T] {
+    needs(width.isNonNegative())
+    needs(height.isNonNegative())
+
+    Self.new(width, height, List.filled(width.multiply(height), item))
+  }
+  public fun get(self: Self, position: Pair[Int, Int]) Maybe[T] {
+    self.get(position.first, position.second)
+  }
+  public fun get(self: Self, x: Int, y: Int) Maybe[T] {
+    switch x.isInRange(0, self.width).and(y.isInRange(0, self.height)) {
+      false => none(),
+        true => some(self.items.get(self.rawIndex(x, y)).unwrap()),
+    }
+  }
+  public fun replace(self: Self, x: Int, y: Int, value: T) List2D[T] {
+    needs(x.isInRange(0, self.width))
+    needs(y.isInRange(0, self.height))
+
+    let newItems = self.items.replace(self.rawIndex(x, y), value)
+    Self.new(self.width, self.height, newItems)
+  }
+  public fun indexesRowWise(self: Self) List[Pair[Int, Int]] {
+    range(self.height).flatMap((y: Int) {
+      range(self.width).map((x: Int) { Pair(x, y) })
+    })
+  }
+  public fun rows(self: Self) List[List[T]] {
+    range(self.height).map((y: Int) { self.row(y).unwrap() })
+  }
+  public fun row(self: Self, y: Int) Maybe[List[T]] {
+    switch y.isInRange(0, self.height) {
+      false => none(),
+      true => some(self.items.getRange(self.rawIndex(0, y), self.rawIndex(0, y.add(1)))),
+    }
+  }
+  fun rawIndex(self: Self, x: Int, y: Int) Int {
+    needs(x.isInRange(0, self.width))
+    needs(y.isInRange(0, self.height))
+
+    y.multiply(self.width).add(x)
+  }
+}

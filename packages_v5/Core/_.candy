@@ -1,0 +1,6 @@
+use Builtins
+use Core.ToText
+
+public fun print[T: ToText](t: T) {
+  builtinPrint(t.toText())
+}

@@ -1,0 +1,6 @@
+public struct Nothing {}
+public enum Never {}
+
+public fun identity[T](t: T) T {
+  t
+}

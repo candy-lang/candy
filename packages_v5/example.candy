@@ -1,0 +1,57 @@
+use AdventOfCode2024.Day2
+use AdventOfCode2024.Day4
+use AdventOfCode2024.Day6
+
+fun main() Int {
+  identity(1)
+  identity("foo")
+#  # (x: Int) { x }
+#
+#  let helloWorld = "Hello, World!"
+#  printHello("World")
+#
+#  # let theAnswer = 40.add(2)
+#  let theAnswer = 42
+#  let theAnswerText = "42"
+#  print("The answer is {theAnswerText}!")
+#
+#  theAnswer
+  print("fibonacci(20) = {fibonacci(20).toText()}")
+  print(Ordering.less())
+  print(true)
+  print(false)
+  print("1.equals(2): {1.equals(2).toText()}")
+
+  let list = List.of(0, 1).insert(1, 2).replace(0, 3).removeAt(2)
+  print("Length: {list.length().toText()}")
+  print("[{list.get(0).toText()}, {list.get(1).toText()}, {list.get(2).toText()}]")
+
+  print("orld!".endsWith("World!").toText().isEmpty())
+
+  let foo = 123
+  let addCaptured = (x: Int) { x.add(foo) }
+  print("addCaptured(1) = {addCaptured(1).toText()}")
+
+  repeat(3, () { print("Hello, World!") })
+
+  print(List.of(1, 2, 3).map((x: Int) { x.multiply(2) }))
+
+  print("Day 2 Part 1: {day2Part1(day2Input).toText()}")
+  print("Day 2 Part 2: {day2Part2(day2Input).toText()}")
+  print("Day 4 Part 1: {day4Part1(day4Input).toText()}")
+  print("Day 4 Part 2: {day4Part2(day4Input).toText()}")
+  print("Day 6 Part 1: {day6Part1(day6Input).toText()}")
+
+  0
+}
+
+public fun fibonacci(n: Int) Int {
+  switch n.isLessThan(2) {
+    true => n,
+    false => fibonacci(n.subtract(1)).add(fibonacci(n.subtract(2))),
+  }
+}
+
+# calculator
+# 2048
+# sudoku

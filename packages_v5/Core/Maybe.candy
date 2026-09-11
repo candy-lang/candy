@@ -1,0 +1,55 @@
+use Core
+use Core.Bool
+use Core.Panic
+use Core.Text
+use Core.ToText
+
+public enum Maybe[T] {
+  some: T,
+  none,
+}
+public fun some[T](value: T) Maybe[T] {
+  Maybe.some(value)
+}
+public fun none[T]() Maybe[T] {
+  Maybe.none()
+}
+impl[T] Maybe[T] {
+  public fun unwrap(self: Self) T {
+    # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
+    # self.unwrapOrElse(() { panic("`unwrap()` called on `none()`") })
+    switch self {
+      some(value) => value,
+      none => panic("`unwrap()` called on `none()`"),
+    }
+  }
+  public fun unwrapOr(self: Self, defaultValue: T) T {
+    self.unwrapOrElse(() { defaultValue })
+  }
+  public fun unwrapOrElse(self: Self, getDefaultValue: () T) T {
+    switch self {
+      some(value) => value,
+      none => getDefaultValue(),
+    }
+  }
+  public fun isSome(self: Self) Bool {
+    switch self {
+      some(value) => true,
+      none => false,
+    }
+  }
+  public fun isNone(self: Self) Bool {
+    switch self {
+      some(value) => false,
+      none => true,
+    }
+  }
+}
+impl[T: ToText] Maybe[T]: ToText {
+  fun toText(self: Maybe[T]) Text {
+    switch self {
+      some(value) => "some({value.toText()})",
+      none => "none()",
+    }
+  }
+}

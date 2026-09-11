@@ -1,0 +1,12 @@
+use Core.Bool
+use Core.Operators.Equal
+
+public struct Pair[T0, T1] {
+  public first: T0,
+  public second: T1,
+}
+impl[T0: Equal, T1: Equal] Pair[T0, T1]: Equal {
+  fun equals(self: Pair[T0, T1], other: Pair[T0, T1]) Bool {
+    self.first.equals(other.first).and(self.second.equals(other.second))
+  }
+}

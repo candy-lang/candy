@@ -1,0 +1,9 @@
+public trait Add {
+  fun add(self: Self, other: Self) Self
+}
+
+public trait Subtract {
+  fun subtract(self: Self, other: Self) Self
+}
+
+# TODO: `impl[T: Add] T: OperatorPlus[T] {}`, etc.
