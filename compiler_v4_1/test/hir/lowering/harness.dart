@@ -167,6 +167,22 @@ class LoweringHarness {
       .map(_describeTarget)
       .toList();
 
+  /// Every place pointing at whatever is at the [occurrence]-th occurrence of
+  /// [needle] in [path]'s source, each as `text@line`.
+  List<String> referencesAt(
+    String needle, {
+    int occurrence = 1,
+    String path = 'test',
+    bool includeDeclaration = false,
+  }) => context.references
+      .referencesAt(
+        files[path]!.file,
+        _offsetOf(needle, occurrence, path),
+        includeDeclaration: includeDeclaration,
+      )
+      .map(_describeTarget)
+      .toList();
+
   /// The same `text@line` shape [definitionsAt] returns, for spelling out
   /// where a definition is expected to be without hard-coding line numbers.
   String location(String needle, {int occurrence = 1, String path = 'test'}) {

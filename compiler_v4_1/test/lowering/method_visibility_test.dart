@@ -90,10 +90,7 @@ void main() {
         ''',
       },
     });
-    expect(
-      harness.errorMessages.where((it) => it.contains('`f`')),
-      isEmpty,
-    );
+    expect(harness.errorMessages.where((it) => it.contains('`f`')), isEmpty);
   });
 
   test('allows calling a trait method from another module', () {

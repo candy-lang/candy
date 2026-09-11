@@ -153,6 +153,8 @@ class BodyLowerer {
   void _reference(SourceSpan span, Iterable<SourceSpan?> targets) =>
       context.addReference(span, targets);
 
+  void _declare(SourceSpan span) => context.addDeclaration(span);
+
   /// Lowers one function or assignment body.
   HirBody lower(
     AstBody? ast, {
@@ -229,6 +231,8 @@ class _Builder {
   void _reference(SourceSpan span, Iterable<SourceSpan?> targets) =>
       lowerer._reference(span, targets);
 
+  void _declare(SourceSpan span) => lowerer._declare(span);
+
   CollectedDeclarations get declarations => lowerer.declarations;
 
   HirBody finish() => HirBody([
@@ -265,6 +269,7 @@ class _Builder {
   }) {
     final id = lowerer.ids.generate();
     if (name != null) {
+      if (nameSpan != null) _declare(nameSpan);
       lowerer._locals.add(
         _Local(name: name, id: id, type: type, span: nameSpan),
       );
@@ -631,6 +636,7 @@ class _Builder {
         type = variables.fresh();
         lowerer.checkInferred(name.rawText, name.span, () => type);
       }
+      _declare(name.span);
       parameters.add(
         HirParameter(
           id: lowerer.ids.generate(),
@@ -738,6 +744,7 @@ class _Builder {
       final body = buildNested((builder) {
         if (variant.type != null && valueName != null) {
           bindingId = lowerer.ids.generate();
+          _declare(valueName.span);
           lowerer._locals.add(
             _Local(
               name: valueName.rawText,

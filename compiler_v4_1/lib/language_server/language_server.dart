@@ -12,8 +12,8 @@ import '../position.dart';
 
 /// Serves the Language Server Protocol over stdin/stdout.
 ///
-/// Only document sync, diagnostics, and go-to-definition are implemented so
-/// far.
+/// Only document sync, diagnostics, go-to-definition, and find-references are
+/// implemented so far.
 Future<void> runLanguageServer() =>
     LanguageServer(Connection(stdin, stdout)).run();
 
@@ -45,6 +45,7 @@ class LanguageServer {
       ..onDidSaveTextDocument(_didSave)
       ..onDidCloseTextDocument(_didClose)
       ..onDefinition(_definition)
+      ..onReferences(_references)
       ..onShutdown(() async => _pendingAnalysis?.cancel())
       ..onExit(() async => exit(0));
 
@@ -64,6 +65,7 @@ class LanguageServer {
             ),
           ),
           definitionProvider: const Either2.t1(true),
+          referencesProvider: const Either2.t1(true),
         ),
         serverInfo: InitializeResultServerInfo(name: 'Candy Language Server'),
       );
@@ -169,6 +171,36 @@ class LanguageServer {
   Future<Either3<Location, List<Location>, List<LocationLink>>?> _definition(
     TextDocumentPositionParams params,
   ) async {
+    final targets = _lookUp(
+      params.textDocument.uri,
+      params.position,
+      (context, file, offset) => context.references.targetsAt(file, offset),
+    );
+    if (targets.isEmpty) return null;
+
+    return Either3.t2(targets.map(_locationOf).toList());
+  }
+
+  Future<List<Location>> _references(ReferenceParams params) async {
+    final found = _lookUp(
+      params.textDocument.uri,
+      params.position,
+      (context, file, offset) => context.references.referencesAt(
+        file,
+        offset,
+        includeDeclaration: params.context.includeDeclaration,
+      ),
+    );
+    return found.map(_locationOf).toList();
+  }
+
+  /// Resolves a document position against an up-to-date analysis, then hands
+  /// both to [query]. Empty when the file isn't open or analysis failed.
+  List<SourceSpan> _lookUp(
+    Uri uri,
+    Position position,
+    List<SourceSpan> Function(Context context, File file, Offset offset) query,
+  ) {
     // Answering out of the debounce window would use an index that predates
     // the edits already sitting in the overlay.
     if (_pendingAnalysis?.isActive ?? false) {
@@ -176,23 +208,20 @@ class LanguageServer {
       _analyze();
     }
 
-    final file = _fileOf(params.textDocument.uri);
+    final file = _fileOf(uri);
     final content = _overlay[file];
-    if (content == null) return null;
+    if (content == null) return const [];
 
     // The very first request can arrive before any analysis has run.
     final root = findPackageRoot(file);
     final context = _analyses[root.absolute.path] ?? _analyzePackage(root);
-    if (context == null) return null;
+    if (context == null) return const [];
 
-    final offset = SourceFile(file, content).offsetOf(
-      line: params.position.line + 1,
-      column: params.position.character + 1,
-    );
-    final targets = context.references.targetsAt(file, offset);
-    if (targets.isEmpty) return null;
-
-    return Either3.t2(targets.map(_locationOf).toList());
+    final offset = SourceFile(
+      file,
+      content,
+    ).offsetOf(line: position.line + 1, column: position.character + 1);
+    return query(context, file, offset);
   }
 
   Location _locationOf(SourceSpan span) => Location(

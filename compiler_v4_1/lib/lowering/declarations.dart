@@ -151,6 +151,7 @@ class _Collector {
       _resolveImports(module, byId, knownPackages);
     }
     _fillPrelude(modules);
+    _recordDeclarations();
 
     return CollectedDeclarations(
       modules: modules,
@@ -158,6 +159,59 @@ class _Collector {
       declarations: _declarations,
       wellKnownTypes: _findWellKnownTypes(),
     );
+  }
+
+  /// Every name the source declares, so that find-references can start from one
+  /// even when nothing uses it. What a name resolves *to* is recorded during
+  /// lowering instead, where the resolution actually happens.
+  void _recordDeclarations() {
+    for (final collected in _declarations.values) {
+      switch (collected) {
+        case CollectedStruct(:final ast):
+          _declare(ast.name);
+          _declareTypeParameters(ast.typeParameters);
+          if (ast.kind case AstStructKind_UserDefined(:final fields)) {
+            for (final field in fields) {
+              _declare(field.name);
+            }
+          }
+        case CollectedEnum(:final ast):
+          _declare(ast.name);
+          _declareTypeParameters(ast.typeParameters);
+          for (final variant in ast.variants) {
+            _declare(variant.name);
+          }
+        case CollectedTrait(:final ast):
+          _declare(ast.name);
+          _declareTypeParameters(ast.typeParameters);
+        case CollectedImpl(:final ast):
+          _declareTypeParameters(ast.typeParameters);
+        case CollectedAssociatedType(:final ast):
+          _declare(ast.name);
+        case CollectedFunction(:final ast):
+          _declare(ast.name);
+          _declareTypeParameters(ast.typeParameters);
+          for (final parameter
+              in ast.valueParameters.toNullable()?.valueParameters ??
+                  const <AstValueParameter>[]) {
+            _declare(parameter.name);
+          }
+        case CollectedAssignment(:final ast):
+          _declare(ast.name);
+      }
+    }
+  }
+
+  void _declareTypeParameters(AstTypeParameters? parameters) {
+    for (final parameter
+        in parameters?.parameters ?? const <AstTypeParameter>[]) {
+      _declare(parameter.name);
+    }
+  }
+
+  void _declare(AstErrorOr<Token> name) {
+    final token = name.toNullable();
+    if (token != null) context.addDeclaration(token.span);
   }
 
   void _resolveImports(
