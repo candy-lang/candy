@@ -95,6 +95,62 @@ void main() {
       harness.expectNoErrors();
     });
 
+    test('calls a static function through `Self`', () {
+      final harness = _lower('''
+        struct Box { value: Int }
+        impl Box {
+          fun of(value: Int) Self { Box(value) }
+          fun twin(self: Self) Self { Self.of(self.value) }
+        }
+        fun main() Int { Box(1).twin().value }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('calls a static function through `Self` in a generic impl', () {
+      final harness = _lower('''
+        struct Box[T] { value: T }
+        impl[T] Box[T] {
+          fun of(value: T) Self { Box[T](value) }
+          fun twin(self: Self) Self { Self.of(self.value) }
+        }
+        fun main() Int { Box[Int](1).twin().value }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('creates a struct through `Self`', () {
+      final harness = _lower('''
+        struct Box { value: Int }
+        impl Box {
+          fun twin(self: Self) Self { Self(self.value) }
+        }
+        fun main() Int { Box(1).twin().value }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('reports `Self` used as a value outside a trait or impl', () {
+      final harness = _lower('''
+        struct Box { value: Int }
+        fun main() Int { Self(1).value }
+      ''');
+      expect(harness.errorMessages, [
+        '`Self` can only be used in traits and impls.',
+      ]);
+    });
+
+    test('reports a static call on `Self` in a trait', () {
+      final harness = _lower('''
+        trait Boxy {
+          fun value(self: Self) Int
+          fun zero(self: Self) Int { Self.value(self) }
+        }
+        fun main() Int { 0 }
+      ''');
+      expect(harness.errorMessages, ['`Self` is not a named type here.']);
+    });
+
     test('binds a switch case payload', () {
       final harness = _lower('''
         fun main() Int {

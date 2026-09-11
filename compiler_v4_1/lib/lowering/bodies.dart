@@ -466,6 +466,13 @@ class _Builder {
       }
     }
 
+    if (name == 'Self') {
+      final declaration = _selfDeclaration(identifier.span);
+      return declaration == null
+          ? const _LoweringError()
+          : _TypeReference(declaration);
+    }
+
     switch (lowerer.scope.lookup(name)) {
       case NamedAssignment(:final id):
         _reference(identifier.span, [declarations.spanOf(id)]);
@@ -494,6 +501,21 @@ class _Builder {
         _error(identifier.span, 'Unknown reference: `$name`.');
         return const _LoweringError();
     }
+  }
+
+  DeclarationId? _selfDeclaration(SourceSpan span) {
+    final baseType = lowerer.typeScope.selfBaseType;
+    if (baseType == null) {
+      _error(span, '`Self` can only be used in traits and impls.');
+      return null;
+    }
+    if (baseType is! HirType_Named) {
+      _error(span, '`Self` is not a named type here.');
+      return null;
+    }
+
+    _reference(span, [declarations.spanOf(baseType.declaration)]);
+    return baseType.declaration;
   }
 
   _Lowered _lowerNavigation(AstNavigation navigation) {
@@ -858,6 +880,18 @@ class _Builder {
           if (local.name != name) continue;
           _reference(identifier.span, [local.span]);
           return _lowerLambdaCall(local.id, local.type, call, identifier.span);
+        }
+
+        if (name == 'Self') {
+          final declaration = _selfDeclaration(identifier.span);
+          if (declaration == null) return const _LoweringError();
+          return _lowerStructCreation(
+            declaration,
+            call,
+            typeArguments,
+            identifier.span,
+            argumentSpan,
+          );
         }
 
         final found = lowerer.scope.lookup(name);
