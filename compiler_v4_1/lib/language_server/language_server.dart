@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:lsp_server/lsp_server.dart';
 
+import '../context.dart';
 import '../error.dart';
 import '../file.dart';
 import '../hir/ast_to_hir.dart';
@@ -11,7 +12,8 @@ import '../position.dart';
 
 /// Serves the Language Server Protocol over stdin/stdout.
 ///
-/// Only document sync and diagnostics are implemented so far.
+/// Only document sync, diagnostics, and go-to-definition are implemented so
+/// far.
 Future<void> runLanguageServer() =>
     LanguageServer(Connection(stdin, stdout)).run();
 
@@ -29,6 +31,10 @@ class LanguageServer {
   /// became error-free instead of leaving stale squiggles behind.
   final _publishedUris = <Uri>{};
 
+  /// The last analysis of each open package, keyed by its root's path. Kept
+  /// around because go-to-definition reads the references it recorded.
+  final _analyses = <String, Context>{};
+
   Timer? _pendingAnalysis;
 
   Future<void> run() async {
@@ -38,6 +44,7 @@ class LanguageServer {
       ..onDidChangeTextDocument(_didChange)
       ..onDidSaveTextDocument(_didSave)
       ..onDidCloseTextDocument(_didClose)
+      ..onDefinition(_definition)
       ..onShutdown(() async => _pendingAnalysis?.cancel())
       ..onExit(() async => exit(0));
 
@@ -56,6 +63,7 @@ class LanguageServer {
               save: const Either2.t1(true),
             ),
           ),
+          definitionProvider: const Either2.t1(true),
         ),
         serverInfo: InitializeResultServerInfo(name: 'Candy Language Server'),
       );
@@ -157,6 +165,43 @@ class LanguageServer {
     }
     return roots.values.toList();
   }
+
+  Future<Either3<Location, List<Location>, List<LocationLink>>?> _definition(
+    TextDocumentPositionParams params,
+  ) async {
+    // Answering out of the debounce window would use an index that predates
+    // the edits already sitting in the overlay.
+    if (_pendingAnalysis?.isActive ?? false) {
+      _pendingAnalysis!.cancel();
+      _analyze();
+    }
+
+    final file = _fileOf(params.textDocument.uri);
+    final content = _overlay[file];
+    if (content == null) return null;
+
+    // The very first request can arrive before any analysis has run.
+    final root = findPackageRoot(file);
+    final context = _analyses[root.absolute.path] ?? _analyzePackage(root);
+    if (context == null) return null;
+
+    final offset = SourceFile(file, content).offsetOf(
+      line: params.position.line + 1,
+      column: params.position.character + 1,
+    );
+    final targets = context.references.targetsAt(file, offset);
+    if (targets.isEmpty) return null;
+
+    return Either3.t2(targets.map(_locationOf).toList());
+  }
+
+  Location _locationOf(SourceSpan span) => Location(
+    uri: span.file.file.absolute.uri,
+    range: Range(
+      start: _positionOf(span.file, span.span.start),
+      end: _positionOf(span.file, span.span.end),
+    ),
+  );
 
   Diagnostic _diagnosticOf(CompilerError error) => Diagnostic(
     range: Range(

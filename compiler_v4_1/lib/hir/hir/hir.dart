@@ -159,8 +159,7 @@ sealed class HirType with _$HirType {
           ? declaration.name
           : '${declaration.name}[${typeArguments.join(', ')}]',
     HirType_Parameter(:final id) => id.name,
-    HirType_Self(:final baseType) =>
-      isTraitSelf ? 'Self' : 'Self<$baseType>',
+    HirType_Self(:final baseType) => isTraitSelf ? 'Self' : 'Self<$baseType>',
     HirType_Function(:final parameterTypes, :final returnType) =>
       '(${parameterTypes.join(', ')}) $returnType',
     HirType_Associated(:final baseType, :final declaration) =>
@@ -365,6 +364,9 @@ sealed class HirParameter with _$HirParameter {
     required HirId id,
     required String name,
     required HirType type,
+
+    /// Where the parameter is declared, or `null` for builtins.
+    SourceSpan? span,
   }) = _HirParameter;
 }
 

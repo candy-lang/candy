@@ -754,6 +754,7 @@ class _SignatureLowerer {
           id: _ids.generate(),
           name: name.rawText,
           type: lowerer.lowerType(parameter.type?.toNullable(), typeScope),
+          span: name.span,
         ),
       );
     }

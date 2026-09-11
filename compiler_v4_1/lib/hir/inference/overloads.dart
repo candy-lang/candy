@@ -225,8 +225,11 @@ class OverloadResolver {
     Map<TypeParameterId, HirType> substitutions,
   ) => solverGoalsOfBounds(typeParameters, normalizer: signatures.normalizer)
       .map(
-        (it) =>
-            substituteGoal(it, substitutions, normalizer: signatures.normalizer),
+        (it) => substituteGoal(
+          it,
+          substitutions,
+          normalizer: signatures.normalizer,
+        ),
       )
       .toList();
 

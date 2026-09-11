@@ -1,6 +1,9 @@
+import 'package:deranged/deranged.dart';
+
 import '../ast.dart';
 import '../context.dart';
 import '../error.dart';
+import '../file.dart';
 import '../hir/hir/builtins.dart';
 import '../hir/hir/ids.dart';
 import '../lexer/token.dart';
@@ -206,9 +209,22 @@ class _Collector {
         continue;
       }
 
+      context.addReference(_pathSpan(use, module.file), [
+        SourceSpan(
+          byId[target]!.file,
+          const Offset(0).rangeTo(const Offset(0)),
+        ),
+      ]);
       _importFrom(imports, target, module.id.packageName);
     }
   }
+
+  /// The whole `Core.Compare` part of a `use` line, so clicking any segment
+  /// opens the module.
+  SourceSpan _pathSpan(AstUse use, SourceFile file) => SourceSpan(
+    file,
+    use.path.first.span.span.start.rangeTo(use.path.last.span.span.end),
+  );
 
   /// Core's public declarations are ambient everywhere except inside Core,
   /// which would otherwise merge its own overload sets into themselves.
@@ -462,10 +478,7 @@ class _Collector {
 
       final name = token.rawText;
       if (takenNames.contains(name)) {
-        _error(
-          token.span,
-          'An associated type named `$name` already exists.',
-        );
+        _error(token.span, 'An associated type named `$name` already exists.');
         continue;
       }
       final id = parent.child(
@@ -511,4 +524,62 @@ class _Collector {
       boolId: found['Bool'],
     );
   }
+}
+
+extension DeclarationSpans on CollectedDeclarations {
+  /// Where a declaration's name is written, which is where "go to definition"
+  /// jumps. `null` for builtins and for names that failed to parse.
+  SourceSpan? spanOf(DeclarationId declaration) =>
+      switch (declarations[declaration]) {
+        CollectedStruct(:final ast) => ast.name.toNullable()?.span,
+        CollectedEnum(:final ast) => ast.name.toNullable()?.span,
+        CollectedTrait(:final ast) => ast.name.toNullable()?.span,
+        CollectedImpl(:final ast) => ast.implKeyword.span,
+        CollectedAssociatedType(:final ast) => ast.name.toNullable()?.span,
+        CollectedFunction(:final ast) => ast.name.toNullable()?.span,
+        CollectedAssignment(:final ast) => ast.name.toNullable()?.span,
+        null => null,
+      };
+
+  SourceSpan? fieldSpanOf(DeclarationId struct, String name) {
+    final collected = declarations[struct];
+    if (collected is! CollectedStruct) return null;
+
+    final kind = collected.ast.kind;
+    if (kind is! AstStructKind_UserDefined) return null;
+    return _named(kind.fields.map((it) => it.name), name);
+  }
+
+  SourceSpan? variantSpanOf(DeclarationId enum_, String name) {
+    final collected = declarations[enum_];
+    if (collected is! CollectedEnum) return null;
+    return _named(collected.ast.variants.map((it) => it.name), name);
+  }
+
+  /// Looked up by name rather than by index, because
+  /// duplicate or unparsable parameters make the two disagree.
+  SourceSpan? typeParameterSpanOf(TypeParameterId id) => switch (id) {
+    TypeParameterId_Declared(:final owner, :final name) => _named(
+      _typeParametersOf(owner)?.parameters.map((it) => it.name) ?? const [],
+      name,
+    ),
+    TypeParameterId_Self(:final owner) => spanOf(owner),
+  };
+
+  AstTypeParameters? _typeParametersOf(DeclarationId declaration) =>
+      switch (declarations[declaration]) {
+        CollectedStruct(:final ast) => ast.typeParameters,
+        CollectedEnum(:final ast) => ast.typeParameters,
+        CollectedTrait(:final ast) => ast.typeParameters,
+        CollectedImpl(:final ast) => ast.typeParameters,
+        CollectedFunction(:final ast) => ast.typeParameters,
+        _ => null,
+      };
+
+  SourceSpan? _named(Iterable<AstErrorOr<Token>> names, String name) => names
+      .map((it) => it.toNullable())
+      .nonNulls
+      .where((it) => it.rawText == name)
+      .firstOrNull
+      ?.span;
 }

@@ -39,6 +39,30 @@ class _LoweringError extends _Lowered {
   const _LoweringError();
 }
 
+/// A parameter or binding visible to the code being lowered.
+class _Local {
+  const _Local({
+    required this.name,
+    required this.id,
+    required this.type,
+    required this.span,
+  });
+
+  factory _Local.ofParameter(HirParameter parameter) => _Local(
+    name: parameter.name,
+    id: parameter.id,
+    type: parameter.type,
+    span: parameter.span,
+  );
+
+  final String name;
+  final HirId id;
+  final HirType type;
+
+  /// Where the name is declared, or `null` for a builtin's parameter.
+  final SourceSpan? span;
+}
+
 /// An expression whose callee isn't decided yet.
 class _PendingCall {
   _PendingCall(this.candidate, this.arguments);
@@ -112,7 +136,7 @@ class BodyLowerer {
   late TypeScope typeScope;
   late SolverContext solverContext;
 
-  final _locals = <(String, HirId, HirType)>[];
+  final _locals = <_Local>[];
   final _retries = <void Function()>[];
   final _inferredTypeChecks = <(String, SourceSpan, HirType Function())>[];
 
@@ -125,6 +149,9 @@ class BodyLowerer {
 
   void _error(SourceSpan span, String message) =>
       context.addError(CompilerError(span: span, message: message));
+
+  void _reference(SourceSpan span, Iterable<SourceSpan?> targets) =>
+      context.addReference(span, targets);
 
   /// Lowers one function or assignment body.
   HirBody lower(
@@ -139,7 +166,7 @@ class BodyLowerer {
     solverContext = resolver.solverContextFor(typeScope);
     _locals
       ..clear()
-      ..addAll(parameters.map((it) => (it.name, it.id, it.type)));
+      ..addAll(parameters.map(_Local.ofParameter));
 
     final builder = _Builder(this);
     if (expression != null) {
@@ -199,6 +226,11 @@ class _Builder {
 
   void _error(SourceSpan span, String message) => lowerer._error(span, message);
 
+  void _reference(SourceSpan span, Iterable<SourceSpan?> targets) =>
+      lowerer._reference(span, targets);
+
+  CollectedDeclarations get declarations => lowerer.declarations;
+
   HirBody finish() => HirBody([
     for (final entry in _entries)
       HirBodyEntry(
@@ -225,9 +257,18 @@ class _Builder {
     );
   }
 
-  HirId push(HirExpressionKind kind, HirType type, {String? name}) {
+  HirId push(
+    HirExpressionKind kind,
+    HirType type, {
+    String? name,
+    SourceSpan? nameSpan,
+  }) {
     final id = lowerer.ids.generate();
-    if (name != null) lowerer._locals.add((name, id, type));
+    if (name != null) {
+      lowerer._locals.add(
+        _Local(name: name, id: id, type: type, span: nameSpan),
+      );
+    }
     _entries.add(_Entry(id: id, name: name, type: type, kind: kind));
     return id;
   }
@@ -290,6 +331,7 @@ class _Builder {
               HirExpressionKind.reference(id),
               bindingType,
               name: name.rawText,
+              nameSpan: name.span,
             );
             if (declared == null) {
               lowerer.checkInferred(name.rawText, name.span, () => bindingType);
@@ -409,17 +451,23 @@ class _Builder {
   _Lowered _lowerIdentifier(Token identifier) {
     final name = identifier.rawText;
 
-    for (final (localName, id, type) in lowerer._locals.reversed) {
-      if (localName == name) {
-        return _Value(push(HirExpressionKind.reference(id), type), type);
+    for (final local in lowerer._locals.reversed) {
+      if (local.name == name) {
+        _reference(identifier.span, [local.span]);
+        return _Value(
+          push(HirExpressionKind.reference(local.id), local.type),
+          local.type,
+        );
       }
     }
 
     switch (lowerer.scope.lookup(name)) {
       case NamedAssignment(:final id):
+        _reference(identifier.span, [declarations.spanOf(id)]);
         final type = lowerer.globalTypes[id] ?? const HirType.error();
         return _Value(push(HirExpressionKind.globalReference(id), type), type);
       case NamedType(:final id) || NamedTrait(:final id):
+        _reference(identifier.span, [declarations.spanOf(id)]);
         return _TypeReference(id);
       case NamedFunctions():
         _error(
@@ -508,6 +556,9 @@ class _Builder {
           .where((it) => it.name == key.rawText)
           .firstOrNull;
       if (field != null) {
+        _reference(key.span, [
+          declarations.fieldSpanOf(unwrapped.declaration, key.rawText),
+        ]);
         if (!_isFieldVisible(field, unwrapped.declaration)) {
           _error(key.span, _fieldVisibilityMessage(field, key.rawText));
           return const _LoweringError();
@@ -585,13 +636,14 @@ class _Builder {
           id: lowerer.ids.generate(),
           name: name.rawText,
           type: type,
+          span: name.span,
         ),
       );
     }
 
     var returnType = expectedFunction?.returnType ?? variables.fresh();
     final body = buildNested((builder) {
-      lowerer._locals.addAll(parameters.map((it) => (it.name, it.id, it.type)));
+      lowerer._locals.addAll(parameters.map(_Local.ofParameter));
       final (_, type) = builder.lowerStatements(
         lambda.body.statements,
         expectedFunction?.returnType,
@@ -655,6 +707,9 @@ class _Builder {
         _error(variantToken.span, 'Unknown variant in switch: `$variantName`.');
         continue;
       }
+      _reference(variantToken.span, [
+        declarations.variantSpanOf(declaration.id, variantName),
+      ]);
       if (!seen.add(variantName)) {
         _error(
           variantToken.span,
@@ -683,11 +738,14 @@ class _Builder {
       final body = buildNested((builder) {
         if (variant.type != null && valueName != null) {
           bindingId = lowerer.ids.generate();
-          lowerer._locals.add((
-            valueName.rawText,
-            bindingId!,
-            variant.type!.substitute(environment),
-          ));
+          lowerer._locals.add(
+            _Local(
+              name: valueName.rawText,
+              id: bindingId!,
+              type: variant.type!.substitute(environment),
+              span: valueName.span,
+            ),
+          );
         }
         final expression = case_.expression.toNullable();
         if (expression == null) {
@@ -789,9 +847,10 @@ class _Builder {
       case AstExpression_Identifier(:final identifier):
         final name = identifier.rawText;
 
-        for (final (localName, id, type) in lowerer._locals.reversed) {
-          if (localName != name) continue;
-          return _lowerLambdaCall(id, type, call, identifier.span);
+        for (final local in lowerer._locals.reversed) {
+          if (local.name != name) continue;
+          _reference(identifier.span, [local.span]);
+          return _lowerLambdaCall(local.id, local.type, call, identifier.span);
         }
 
         final found = lowerer.scope.lookup(name);
@@ -803,6 +862,9 @@ class _Builder {
           return const _LoweringError();
         }
         if (found is NamedType || found is NamedTrait) {
+          _reference(identifier.span, [
+            declarations.spanOf((found as dynamic).id as DeclarationId),
+          ]);
           return _lowerStructCreation(
             (found as dynamic).id as DeclarationId,
             call,
@@ -906,6 +968,7 @@ class _Builder {
           lowerer._retries.add(attempt);
           return;
         }
+        _referenceCandidates(nameSpan, candidates());
         _error(
           nameSpan,
           'The type of the receiver is not known here. Add a type annotation.',
@@ -924,6 +987,7 @@ class _Builder {
 
       switch (resolution) {
         case OverloadResolved(:final candidate):
+          _reference(nameSpan, [declarations.spanOf(candidate.id)]);
           final invisible = _methodVisibilityMessage(candidate.id, name);
           if (invisible != null) {
             _error(nameSpan, invisible);
@@ -938,9 +1002,11 @@ class _Builder {
           unifier.unify(resultType, candidate.signature.returnType);
 
         case OverloadNotFound(:final rejections):
+          _referenceCandidates(nameSpan, sources);
           _error(nameSpan, _notFoundMessage(name, arguments, rejections));
 
         case OverloadAmbiguous(:final candidates):
+          _referenceCandidates(nameSpan, candidates);
           _error(
             nameSpan,
             'Multiple functions match this call:\n'
@@ -954,6 +1020,14 @@ class _Builder {
     attempt();
     return _Value(entryId, resultType);
   }
+
+  /// A call that inference couldn't narrow down still points somewhere useful:
+  /// every function that was in the running.
+  void _referenceCandidates(SourceSpan span, List<CandidateSource> sources) =>
+      _reference(
+        span,
+        sources.map((it) => declarations.spanOf(it.signature.id)),
+      );
 
   /// Inherent methods carry their own visibility; trait members never do and
   /// are always callable wherever their receiver is.
@@ -1109,6 +1183,9 @@ class _Builder {
       );
       return const _LoweringError();
     }
+    _reference(variantToken.span, [
+      declarations.variantSpanOf(declaration, variant.name),
+    ]);
 
     final substitutions = _instantiate(
       type!.typeParameters,

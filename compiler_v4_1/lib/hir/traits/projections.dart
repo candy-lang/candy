@@ -56,8 +56,7 @@ class TypeNormalizer {
   /// unfolding.
   static const _maxDepth = 16;
 
-  HirType normalize(HirType type) =>
-      _cache[type] ??= _normalize(type, 0);
+  HirType normalize(HirType type) => _cache[type] ??= _normalize(type, 0);
 
   HirTrait normalizeTrait(HirTrait trait) => HirTrait(
     declaration: trait.declaration,

@@ -51,6 +51,9 @@ class TypeLowerer {
   void error(SourceSpan span, String message) =>
       context.addError(CompilerError(span: span, message: message));
 
+  void _reference(SourceSpan span, SourceSpan? target) =>
+      context.addReference(span, [target]);
+
   HirType lowerType(AstType? type, TypeScope typeScope) {
     switch (type) {
       case null:
@@ -127,6 +130,7 @@ class TypeLowerer {
       return const HirType.error();
     }
 
+    _reference(name.span, declarations.spanOf(declaration));
     return HirType.associated(
       trait: trait,
       baseType: base,
@@ -147,6 +151,9 @@ class TypeLowerer {
         error(name.span, '`Self` can only be used in traits and impls.');
         return const HirType.error();
       }
+      if (selfBaseType is HirType_Named) {
+        _reference(name.span, declarations.spanOf(selfBaseType.declaration));
+      }
       return HirType.self(baseType: selfBaseType);
     }
 
@@ -155,6 +162,7 @@ class TypeLowerer {
       if (typeArguments != null) {
         error(name.span, "Type parameters can't have type arguments.");
       }
+      _reference(name.span, declarations.typeParameterSpanOf(typeParameter.id));
       return typeParameter.type;
     }
 
@@ -164,6 +172,7 @@ class TypeLowerer {
 
     switch (scope.lookup(text)) {
       case NamedType(:final id):
+        _reference(name.span, declarations.spanOf(id));
         return HirType.named(
           declaration: id,
           typeArguments: _checkArity(id, arguments, name.span),
@@ -172,10 +181,7 @@ class TypeLowerer {
         error(name.span, "Traits can't be used as types.");
         return const HirType.error();
       case NamedAmbiguous(:final originsText):
-        error(
-          name.span,
-          'Ambiguous name `$text`, imported from $originsText.',
-        );
+        error(name.span, 'Ambiguous name `$text`, imported from $originsText.');
         return const HirType.error();
       case _:
         error(name.span, 'Unknown type: `$text`.');
@@ -217,6 +223,7 @@ class TypeLowerer {
 
         switch (scope.lookup(text)) {
           case NamedTrait(:final id):
+            _reference(name.span, declarations.spanOf(id));
             return Some(
               HirTrait(
                 declaration: id,

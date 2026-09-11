@@ -29,9 +29,7 @@ class TypeMonomorphizer {
   ) {
     // Substituting makes `Self` and the trait's type arguments concrete, which
     // is exactly what a projection needs to resolve.
-    final result = _convert(
-      normalizer.normalize(type.substitute(environment)),
-    );
+    final result = _convert(normalizer.normalize(type.substitute(environment)));
     _declare(result);
     return result;
   }
@@ -49,11 +47,8 @@ class TypeMonomorphizer {
     // the trait, so no substitution replaces it — but its base type is the
     // impl's type, which the environment has already made concrete.
     HirType_Self(:final baseType) => _convert(baseType),
-    HirType_Parameter() ||
-    HirType_Variable() ||
-    HirType_Associated() => throw StateError(
-      '`$type` should have been monomorphized away.',
-    ),
+    HirType_Parameter() || HirType_Variable() || HirType_Associated() =>
+      throw StateError('`$type` should have been monomorphized away.'),
     HirType_Error() => throw StateError('The HIR still contains errors.'),
   };
 

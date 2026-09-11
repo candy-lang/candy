@@ -12,6 +12,7 @@ import 'package:compiler_v4_1/lowering/declarations.dart';
 import 'package:compiler_v4_1/lowering/modules.dart';
 import 'package:compiler_v4_1/lowering/signatures.dart';
 import 'package:compiler_v4_1/parser/parser.dart';
+import 'package:compiler_v4_1/position.dart';
 import 'package:test/test.dart';
 
 // ignore: avoid-top-level-members-in-tests
@@ -111,6 +112,10 @@ class LoweringHarness {
   final String source;
   final Context context;
 
+  /// Every module's source, keyed by its path, so tests can look up offsets in
+  /// the file a name actually lives in.
+  final files = <String, SourceFile>{};
+
   late final CollectedDeclarations declarations;
   late final Signatures signatures;
   late final Hir hir;
@@ -121,6 +126,7 @@ class LoweringHarness {
     String packageName = ModuleId.corePackageName,
   }) {
     final file = SourceFile(File('$path.candy'), source);
+    files[path] = file;
     final ast = Parser.parse(context, file, Lexer.lex(context, file, source));
     expect(
       context.errors,
@@ -136,6 +142,7 @@ class LoweringHarness {
 
   Module _parse() {
     final file = SourceFile(File('test.candy'), source);
+    files['test'] = file;
     final ast = Parser.parse(context, file, Lexer.lex(context, file, source));
     expect(
       context.errors,
@@ -148,6 +155,44 @@ class LoweringHarness {
       ast: ast,
     );
   }
+
+  /// Where go-to-definition lands from the [occurrence]-th occurrence of
+  /// [needle] in [path]'s source, each as `text@line`.
+  List<String> definitionsAt(
+    String needle, {
+    int occurrence = 1,
+    String path = 'test',
+  }) => context.references
+      .targetsAt(files[path]!.file, _offsetOf(needle, occurrence, path))
+      .map(_describeTarget)
+      .toList();
+
+  /// The same `text@line` shape [definitionsAt] returns, for spelling out
+  /// where a definition is expected to be without hard-coding line numbers.
+  String location(String needle, {int occurrence = 1, String path = 'test'}) {
+    final offset = _offsetOf(needle, occurrence, path);
+    return '$needle@${_lineOf(files[path]!.content, offset.value)}';
+  }
+
+  Offset _offsetOf(String needle, int occurrence, String path) {
+    final content = files[path]!.content;
+    var offset = -1;
+    for (var i = 0; i < occurrence; i++) {
+      offset = content.indexOf(needle, offset + 1);
+      expect(offset, isNot(-1), reason: 'No `$needle` #$occurrence in $path.');
+    }
+    return Offset(offset);
+  }
+
+  String _describeTarget(SourceSpan span) {
+    final content = span.file.content;
+    final start = span.span.start.value;
+    final text = content.substring(start, span.span.end.value);
+    return '$text@${_lineOf(content, start)}';
+  }
+
+  int _lineOf(String content, int offset) =>
+      '\n'.allMatches(content.substring(0, offset)).length + 1;
 
   List<String> get errorMessages =>
       context.errors.map((it) => it.message).toList();

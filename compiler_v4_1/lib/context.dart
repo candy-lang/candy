@@ -6,7 +6,14 @@ class Context {
   final _errors = <CompilerError>{};
   List<CompilerError> get errors => _errors.toList()..sort();
 
+  final references = ReferenceIndex();
+
   void addError(CompilerError error) {
     _errors.add(error);
   }
+
+  /// [targets] may be empty, which records nothing: a name that didn't resolve
+  /// simply has nowhere to jump to.
+  void addReference(SourceSpan span, Iterable<SourceSpan?> targets) =>
+      references.add(span, targets.nonNulls);
 }
