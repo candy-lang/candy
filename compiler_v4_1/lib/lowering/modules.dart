@@ -76,8 +76,13 @@ class Workspace {
 
   factory Workspace.discover(Directory packagesDirectory) {
     final packages = <String, Package>{};
-    for (final directory
-        in packagesDirectory.listSync().whereType<Directory>()) {
+    // Sorted, so the order packages are loaded in — and with it the order
+    // errors come out in — doesn't depend on the file system's listing order.
+    final directories = packagesDirectory
+        .listSync()
+        .whereType<Directory>()
+        .sortedBy((it) => it.path);
+    for (final directory in directories) {
       if (!(directory ~/ '_package.candy').existsSync()) continue;
 
       final name = _directoryName(directory);

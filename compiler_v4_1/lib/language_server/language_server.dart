@@ -97,12 +97,17 @@ class LanguageServer {
   }
 
   void _analyze() {
+    final roots = _packageRootsOfOpenFiles();
+    _analyses.removeWhere(
+      (path, _) => roots.every((it) => it.absolute.path != path),
+    );
+
+    final errors = mergeErrors([for (final root in roots) _errorsIn(root)]);
+
     final diagnostics = <Uri, List<Diagnostic>>{};
-    for (final root in _packageRootsOfOpenFiles()) {
-      for (final error in _errorsIn(root)) {
-        final uri = error.span.file.file.absolute.uri;
-        diagnostics.putIfAbsent(uri, () => []).add(_diagnosticOf(error));
-      }
+    for (final error in errors) {
+      final uri = error.span.file.file.absolute.uri;
+      diagnostics.putIfAbsent(uri, () => []).add(_diagnosticOf(error));
     }
 
     for (final uri in _publishedUris) {
@@ -120,18 +125,25 @@ class LanguageServer {
     }
   }
 
+  List<CompilerError> _errorsIn(Directory root) =>
+      _analyzePackage(root)?.errors ?? const [];
+
   /// A crash in the compiler must not take the server down with it: the editor
-  /// would lose all diagnostics and never get them back.
-  List<CompilerError> _errorsIn(Directory root) {
+  /// would lose all diagnostics and never get them back. The previous
+  /// analysis is dropped in that case, so nothing answers requests from a
+  /// state we no longer understand.
+  Context? _analyzePackage(Directory root) {
+    final key = root.absolute.path;
     try {
       final loaded = loadPackage(root, overlay: _overlay);
       astToHir(loaded.context, loaded.modules);
-      return loaded.context.errors;
+      return _analyses[key] = loaded.context;
     } catch (error, stackTrace) {
+      _analyses.remove(key);
       _connection.console.error(
         'Analyzing ${root.path} failed: $error\n$stackTrace',
       );
-      return const [];
+      return null;
     }
   }
 

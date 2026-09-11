@@ -117,10 +117,10 @@ void main() {
       expect(harness.errorMessages, [
         "A trait's associated type can't have a value; only an impl gives it "
             'one.',
+        'Missing binding for associated type `Item`.',
         "An impl's associated type can't have a bound; only the trait declares "
             'one.',
         'This associated type is missing a value.',
-        'Missing binding for associated type `Item`.',
       ]);
     });
 
