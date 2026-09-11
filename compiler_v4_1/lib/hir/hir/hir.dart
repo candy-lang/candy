@@ -195,8 +195,9 @@ sealed class HirTypeParameter with _$HirTypeParameter {
   const factory HirTypeParameter({
     required TypeParameterId id,
 
-    /// `null` when there's no bound, [None] when it couldn't be lowered.
-    required HirErrorOr<HirTrait>? upperBound,
+    /// Bounds that couldn't be lowered are dropped, so this is empty for both
+    /// `[T]` and `[T: Unknown]`.
+    @Default(<HirTrait>[]) List<HirTrait> upperBounds,
   }) = _HirTypeParameter;
   const HirTypeParameter._();
 
@@ -204,11 +205,8 @@ sealed class HirTypeParameter with _$HirTypeParameter {
   HirType get type => HirType.parameter(id);
 
   @override
-  String toString() => switch (upperBound) {
-    null => name,
-    Some(:final some) => '$name: $some',
-    None() => '$name: <error>',
-  };
+  String toString() =>
+      upperBounds.isEmpty ? name : '$name: ${upperBounds.join(' + ')}';
 }
 
 // Type declarations
@@ -279,19 +277,17 @@ sealed class HirAssociatedType with _$HirAssociatedType {
   const factory HirAssociatedType({
     required DeclarationId id,
 
-    /// `null` when there's no bound, [None] when it couldn't be lowered.
-    required HirErrorOr<HirTrait>? upperBound,
+    /// Bounds that couldn't be lowered are dropped, so this is empty for both
+    /// `type Item` and `type Item: Unknown`.
+    @Default(<HirTrait>[]) List<HirTrait> upperBounds,
   }) = _HirAssociatedType;
   const HirAssociatedType._();
 
   String get name => id.name;
 
   @override
-  String toString() => switch (upperBound) {
-    null => name,
-    Some(:final some) => '$name: $some',
-    None() => '$name: <error>',
-  };
+  String toString() =>
+      upperBounds.isEmpty ? name : '$name: ${upperBounds.join(' + ')}';
 }
 
 @freezed

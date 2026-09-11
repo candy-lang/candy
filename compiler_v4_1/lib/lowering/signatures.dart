@@ -373,14 +373,11 @@ class _SignatureLowerer {
       associatedTypes.add(
         HirAssociatedType(
           id: associatedType.id,
-          upperBound: switch (associatedType.ast.upperBound) {
-            null => null,
-            final bound => lowerer.lowerTrait(
-              bound.toNullable(),
-              associatedType.ast.displaySpan,
-              typeScope,
-            ),
-          },
+          upperBounds: lowerer.lowerBounds(
+            associatedType.ast.upperBounds,
+            associatedType.ast.displaySpan,
+            typeScope,
+          ),
         ),
       );
     }
@@ -469,7 +466,7 @@ class _SignatureLowerer {
     final bindings = <DeclarationId, HirType>{};
     for (final associatedType in impl.associatedTypes) {
       final span = associatedType.ast.displaySpan;
-      if (associatedType.ast.upperBound != null) {
+      if (associatedType.ast.upperBounds.isNotEmpty) {
         _error(
           span,
           "An impl's associated type can't have a bound; only the trait "
@@ -566,7 +563,7 @@ class _SignatureLowerer {
       }
       if (binding.containsError) continue;
 
-      if (associatedType.upperBound case Some(some: final bound)) {
+      for (final bound in associatedType.upperBounds) {
         final goal = solverGoalOf(
           bound.substitute(
             HirType.buildEnvironment(
@@ -681,12 +678,15 @@ class _SignatureLowerer {
     for (final (index, parameter) in trait.typeParameters.indexed) {
       final implParameter = impl.typeParameters[index];
       if (implParameter.name != parameter.name) return false;
-      final expectedBound = switch (parameter.upperBound) {
-        null => null,
-        Some(:final some) => Some(some.substitute(all)),
-        None() => const None<HirTrait>(),
-      };
-      if (implParameter.upperBound != expectedBound) return false;
+      final expectedBounds = parameter.upperBounds
+          .map((it) => it.substitute(all))
+          .toList();
+      if (!const ListEquality<HirTrait>().equals(
+        implParameter.upperBounds,
+        expectedBounds,
+      )) {
+        return false;
+      }
     }
 
     // Normalized on both sides, so the trait's `Self.Item` and the `Int` the

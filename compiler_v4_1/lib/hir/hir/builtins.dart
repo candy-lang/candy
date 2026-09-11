@@ -160,7 +160,7 @@ enum BuiltinFunction {
       id: id,
       name: candyName,
       typeParameters: isGeneric
-          ? [HirTypeParameter(id: _itemTypeParameter, upperBound: null)]
+          ? [HirTypeParameter(id: _itemTypeParameter)]
           : const [],
       parameters: [
         for (final (name, type) in parameters)

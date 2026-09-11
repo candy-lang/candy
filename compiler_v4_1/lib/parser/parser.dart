@@ -54,6 +54,7 @@ class Parser {
         TokenKind_Comma,
         TokenKind_Colon,
         TokenKind_Equal,
+        TokenKind_Plus,
         TokenKind_ClosingParenthesis,
         TokenKind_ClosingBracket,
       }) +
@@ -507,13 +508,9 @@ class Parser {
       recoverySet: _declarationNameRecoverySet,
     );
 
-    AstErrorOr<AstType>? upperBound;
-    if (_advanceIfKind<TokenKind_Colon>() != null) {
-      upperBound = parseTypeOrError(
-        'This associated type is missing an upper bound after the colon.',
-        recoverySet: _typeRecoverySet,
-      );
-    }
+    final upperBounds = parseUpperBounds(
+      'This associated type is missing an upper bound after the colon.',
+    );
 
     AstErrorOr<AstType>? value;
     if (_advanceIfKind<TokenKind_Equal>() != null) {
@@ -526,7 +523,7 @@ class Parser {
     return AstAssociatedType(
       displaySpan: name.toNullable()?.span ?? typeKeyword.span,
       name: name,
-      upperBound: upperBound,
+      upperBounds: upperBounds,
       value: value,
     );
   }
@@ -671,15 +668,30 @@ class Parser {
 
     final name = expectIdentifier('This type parameter is missing a name.');
 
-    AstErrorOr<AstType>? upperBound;
-    if (_advanceIfKind<TokenKind_Colon>() != null) {
-      upperBound = parseTypeOrError(
-        'This type parameter is missing an upper bound after the colon.',
-        recoverySet: _typeRecoverySet,
+    final upperBounds = parseUpperBounds(
+      'This type parameter is missing an upper bound after the colon.',
+    );
+
+    return AstTypeParameter(name: name, upperBounds: upperBounds);
+  }
+
+  /// The `: Equal + Hash` of a type parameter or associated type, empty when
+  /// there's no colon.
+  List<AstErrorOr<AstType>> parseUpperBounds(String missingFirstBoundMessage) {
+    if (_advanceIfKind<TokenKind_Colon>() == null) return const [];
+
+    final bounds = [
+      parseTypeOrError(missingFirstBoundMessage, recoverySet: _typeRecoverySet),
+    ];
+    while (_advanceIfKind<TokenKind_Plus>() != null) {
+      bounds.add(
+        parseTypeOrError(
+          'This bound is missing a trait after the plus sign.',
+          recoverySet: _typeRecoverySet,
+        ),
       );
     }
-
-    return AstTypeParameter(name: name, upperBound: upperBound);
+    return bounds;
   }
 
   // Types

@@ -67,6 +67,8 @@ class Lexer {
         _add(const .arrow());
       case '=':
         _add(const .equal());
+      case '+':
+        _add(const .plus());
       case '#':
         while (true) {
           final next = _peek();

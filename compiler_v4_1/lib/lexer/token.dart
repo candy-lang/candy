@@ -51,6 +51,7 @@ sealed class TokenKind with _$TokenKind {
   const factory TokenKind.dot() = TokenKind_Dot;
   const factory TokenKind.equal() = TokenKind_Equal;
   const factory TokenKind.arrow() = TokenKind_Arrow;
+  const factory TokenKind.plus() = TokenKind_Plus;
 
   const factory TokenKind.identifier() = TokenKind_Identifier;
 

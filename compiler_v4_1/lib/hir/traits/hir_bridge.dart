@@ -1,5 +1,3 @@
-import 'package:supernova/supernova.dart';
-
 import '../hir/hir.dart';
 import '../hir/ids.dart';
 import 'projections.dart';
@@ -63,17 +61,6 @@ SolverGoal? solverGoalOf(
   );
 }
 
-/// The goal a type parameter's upper bound imposes, e.g. `Compare(?T)` for
-/// `[T: Compare]`. `null` when the parameter is unbounded.
-SolverGoal? solverGoalOfBound(
-  HirTypeParameter parameter, {
-  TypeNormalizer? normalizer,
-}) {
-  final bound = parameter.upperBound;
-  if (bound is! Some<HirTrait>) return null;
-  return solverGoalOf(bound.some, parameter.type, normalizer: normalizer);
-}
-
 /// Replaces the goal's type-parameter variables with what [substitutions] maps
 /// them to. Anything the solver can't represent is left as-is.
 SolverGoal substituteGoal(
@@ -92,13 +79,16 @@ SolverGoal substituteGoal(
   }).toList(),
 );
 
+/// The goals the type parameters' upper bounds impose, e.g. `Compare(?T)` for
+/// `[T: Compare]`.
 List<SolverGoal> solverGoalsOfBounds(
   List<HirTypeParameter> parameters, {
   TypeNormalizer? normalizer,
-}) => parameters
-    .map((it) => solverGoalOfBound(it, normalizer: normalizer))
-    .nonNulls
-    .toList();
+}) => [
+  for (final parameter in parameters)
+    for (final bound in parameter.upperBounds)
+      ?solverGoalOf(bound, parameter.type, normalizer: normalizer),
+];
 
 Set<SolverVariable> solverVariablesOf(List<HirTypeParameter> parameters) =>
     parameters.map((it) => SolverVariable.parameter(it.id)).toSet();

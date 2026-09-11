@@ -154,7 +154,7 @@ sealed class AstAssociatedType with _$AstAssociatedType {
   const factory AstAssociatedType({
     required SourceSpan displaySpan,
     @_TokenOptionConverter() required AstErrorOr<Token> name,
-    @_AstTypeOptionConverter() required AstErrorOr<AstType>? upperBound,
+    @_AstTypeOptionConverter() required List<AstErrorOr<AstType>> upperBounds,
     @_AstTypeOptionConverter() required AstErrorOr<AstType>? value,
   }) = _AstAssociatedType;
 
@@ -236,7 +236,7 @@ sealed class AstTypeParameters with _$AstTypeParameters {
 sealed class AstTypeParameter with _$AstTypeParameter {
   const factory AstTypeParameter({
     @_TokenOptionConverter() required AstErrorOr<Token> name,
-    @_AstTypeOptionConverter() required AstErrorOr<AstType>? upperBound,
+    @_AstTypeOptionConverter() required List<AstErrorOr<AstType>> upperBounds,
   }) = _AstTypeParameter;
 
   factory AstTypeParameter.fromJson(Map<String, dynamic> json) =>

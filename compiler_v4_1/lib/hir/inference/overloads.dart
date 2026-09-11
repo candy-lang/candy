@@ -167,8 +167,7 @@ class OverloadResolver {
     final conditions = <SolverGoal>[];
     var frontier = <(HirType, HirTrait)>[
       for (final parameter in typeScope.typeParameters)
-        if (parameter.upperBound case Some(some: final bound))
-          (parameter.type, bound),
+        for (final bound in parameter.upperBounds) (parameter.type, bound),
       if (typeScope.selfTrait case final traitOfSelf?)
         if (selfType case final type?) (type, traitOfSelf),
     ];
@@ -187,7 +186,7 @@ class OverloadResolver {
           TypeParameterId.self(trait.id): baseType,
         };
         for (final associatedType in trait.associatedTypes) {
-          if (associatedType.upperBound case Some(some: final bound)) {
+          for (final bound in associatedType.upperBounds) {
             final projection = HirType.associated(
               trait: traitRef,
               baseType: baseType,
@@ -256,8 +255,8 @@ class OverloadResolver {
     // a type parameter it only offers what its declared bound provides.
     if (receiver is HirType_Associated) {
       final associatedType = _associatedTypeOf(receiver);
-      if (associatedType?.upperBound case Some(some: final bound)) {
-        final trait = signatures.traits[receiver.trait.declaration];
+      final trait = signatures.traits[receiver.trait.declaration];
+      for (final bound in associatedType?.upperBounds ?? const <HirTrait>[]) {
         _addTraitFunctions(
           candidates,
           trait == null
@@ -299,7 +298,7 @@ class OverloadResolver {
       final parameter = solverContext.inScopeTypeParameters
           .where((it) => it.id == receiver.id)
           .firstOrNull;
-      if (parameter?.upperBound case Some(some: final bound)) {
+      for (final bound in parameter?.upperBounds ?? const <HirTrait>[]) {
         _addTraitFunctions(
           candidates,
           bound,

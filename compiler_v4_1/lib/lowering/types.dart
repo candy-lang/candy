@@ -86,11 +86,11 @@ class TypeLowerer {
     final base = lowerType(baseAst, typeScope);
     if (base is HirType_Error) return base;
 
-    final HirTrait? trait;
+    final List<HirTrait> traits;
     switch (base) {
       case HirType_Self():
-        trait = typeScope.selfTrait;
-        if (trait == null) {
+        final selfTrait = typeScope.selfTrait;
+        if (selfTrait == null) {
           error(
             name.span,
             '`Self` has no associated types here, because this impl '
@@ -98,16 +98,16 @@ class TypeLowerer {
           );
           return const HirType.error();
         }
+        traits = [selfTrait];
       case HirType_Parameter(:final id):
-        final bound = typeScope.find(id.name)?.upperBound;
-        if (bound is! Some<HirTrait>) {
+        traits = typeScope.find(id.name)?.upperBounds ?? const [];
+        if (traits.isEmpty) {
           error(
             name.span,
             '`${id.name}` has no associated types, because it has no bound.',
           );
           return const HirType.error();
         }
-        trait = bound.some;
       case _:
         error(
           name.span,
@@ -117,19 +117,35 @@ class TypeLowerer {
         return const HirType.error();
     }
 
-    final declaration = declarations.associatedTypeOf(
-      trait.declaration,
-      name.rawText,
-    );
-    if (declaration == null) {
+    final matches = [
+      for (final trait in traits)
+        if (declarations.associatedTypeOf(trait.declaration, name.rawText)
+            case final declaration?)
+          (trait, declaration),
+    ];
+    if (matches.isEmpty) {
       error(
         name.span,
-        'Trait `${trait.declaration.name}` has no associated type '
-        '`${name.rawText}`.',
+        traits.length == 1
+            ? 'Trait `${traits.single.declaration.name}` has no associated '
+                  'type `${name.rawText}`.'
+            : 'None of the bounds on `$base` has an associated type '
+                  '`${name.rawText}`.',
+      );
+      return const HirType.error();
+    }
+    if (matches.length > 1) {
+      final traitNames = matches
+          .map((it) => '`${it.$1.declaration.name}`')
+          .join(', ');
+      error(
+        name.span,
+        'Ambiguous associated type `${name.rawText}`: declared by $traitNames.',
       );
       return const HirType.error();
     }
 
+    final (trait, declaration) = matches.single;
     _reference(name.span, declarations.spanOf(declaration));
     return HirType.associated(
       trait: trait,
@@ -270,18 +286,37 @@ class TypeLowerer {
         index: lowered.length,
         name: text,
       );
-      // The bound is lowered against the parameters declared so far, matching
+      // The bounds are lowered against the parameters declared so far, matching
       // the Rust compiler: `[T, U: Compare[T]]` works, `[T: Compare[U], U]`
       // doesn't.
-      final upperBound = switch (parameter.upperBound) {
-        null => null,
-        final bound => lowerTrait(
-          bound.toNullable(),
-          name.span,
-          typeScope.extend(lowered),
+      lowered.add(
+        HirTypeParameter(
+          id: id,
+          upperBounds: lowerBounds(
+            parameter.upperBounds,
+            name.span,
+            typeScope.extend(lowered),
+          ),
         ),
-      };
-      lowered.add(HirTypeParameter(id: id, upperBound: upperBound));
+      );
+    }
+    return lowered;
+  }
+
+  /// Lowers `: Equal + Hash`, dropping bounds that don't resolve to a trait
+  /// and ones that repeat an earlier bound.
+  List<HirTrait> lowerBounds(
+    List<AstErrorOr<AstType>> bounds,
+    SourceSpan fallbackSpan,
+    TypeScope typeScope,
+  ) {
+    final lowered = <HirTrait>[];
+    for (final bound in bounds) {
+      if (lowerTrait(bound.toNullable(), fallbackSpan, typeScope) case Some(
+        some: final trait,
+      )) {
+        if (!lowered.contains(trait)) lowered.add(trait);
+      }
     }
     return lowered;
   }
