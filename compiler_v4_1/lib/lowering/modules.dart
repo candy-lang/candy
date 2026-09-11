@@ -166,6 +166,10 @@ class ImportScope {
   /// Innermost layer wins, except for functions: overloads from every layer
   /// are merged so a local `plus` doesn't hide an imported `plus` with a
   /// different signature. Overload resolution then ranks them by layer.
+  ///
+  /// The same function can reach several layers at once — importing `Core.Int`
+  /// explicitly repeats what the prelude already offers — so the merged
+  /// overloads are deduplicated.
   NamedDeclarations? lookup(String name) {
     final layers = [moduleDeclarations, imports, prelude];
     final found = layers.map((it) => it[name]).nonNulls.toList();
@@ -174,10 +178,11 @@ class ImportScope {
     final first = found.first;
     if (first is! NamedFunctions) return first;
 
-    return NamedFunctions([
-      for (final declarations in found)
-        if (declarations is NamedFunctions) ...declarations.ids,
-    ]);
+    final ids = <DeclarationId>{};
+    for (final declarations in found) {
+      if (declarations is NamedFunctions) ids.addAll(declarations.ids);
+    }
+    return NamedFunctions(ids.toList());
   }
 
   /// Lowest is innermost.

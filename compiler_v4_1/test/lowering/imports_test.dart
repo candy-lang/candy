@@ -164,6 +164,26 @@ void main() {
     ]);
   });
 
+  test('merges an overload reachable through both the prelude and a use', () {
+    final harness = LoweringHarness.fullPackages({
+      'Core': {
+        'text': '''
+          public struct Int = builtin
+          public struct Text {}
+          public fun trim(a: Text) Text { a }
+        ''',
+      },
+      'app': {
+        'main': '''
+          use Core.text
+          fun main() Int { 0 }
+          fun f(a: Text) Text { trim(a) }
+        ''',
+      },
+    });
+    harness.expectNoErrors();
+  });
+
   test('allows a cycle between two packages', () {
     final harness = LoweringHarness.packages({
       'a': {
