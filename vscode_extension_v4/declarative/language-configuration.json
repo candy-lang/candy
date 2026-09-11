@@ -11,7 +11,9 @@
     ["{", "}"]
   ],
   "comments": {
-    "lineComment": "#"
+    "lineComment": {
+      "comment": "#"
+    }
   },
   "indentationRules": {
     "increaseIndentPattern": "^[^#]*(\\([^)]*|\\[[^\\]]*|\\{[^}]*|\"[^\"]*)$",
