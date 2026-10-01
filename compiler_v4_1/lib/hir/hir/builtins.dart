@@ -31,6 +31,8 @@ class WellKnownTypes {
     this.orderingId,
     this.resultId,
     this.boolId,
+    this.typeIdId,
+    this.anyId,
   });
 
   final DeclarationId? intId;
@@ -42,6 +44,10 @@ class WellKnownTypes {
   final DeclarationId? orderingId;
   final DeclarationId? resultId;
   final DeclarationId? boolId;
+  final DeclarationId? typeIdId;
+
+  /// The `Any` trait, which every type implements without an impl.
+  final DeclarationId? anyId;
 
   static const names = {
     'Int',
@@ -53,7 +59,9 @@ class WellKnownTypes {
     'Ordering',
     'Result',
     'Bool',
+    'TypeId',
   };
+  static const traitNames = {'Any'};
 
   static HirType _named(
     DeclarationId? declaration, [
@@ -76,6 +84,9 @@ class WellKnownTypes {
   HirType resultType(HirType value, HirType error) =>
       _named(resultId, [value, error]);
   HirType get boolType => _named(boolId);
+  HirType get typeIdType => _named(typeIdId);
+
+  bool isAny(DeclarationId trait) => anyId != null && trait == anyId;
 
   /// `Never` is assignable to everything.
   bool isNever(HirType type) =>
@@ -111,6 +122,7 @@ enum BuiltinFunction {
   listOf3('builtinListOf'),
   listOf4('builtinListOf'),
   listOf5('builtinListOf'),
+  downcast('builtinDowncast'),
   listRemoveAt('builtinListRemoveAt'),
   listReplace('builtinListReplace'),
   panic('builtinPanic'),
@@ -119,7 +131,9 @@ enum BuiltinFunction {
   textConcat('builtinTextConcat'),
   textGetRange('builtinTextGetRange'),
   textIndexOf('builtinTextIndexOf'),
-  textLength('builtinTextLength');
+  textLength('builtinTextLength'),
+  typeId('builtinTypeId'),
+  typeIdOf('builtinTypeIdOf');
 
   const BuiltinFunction(this.candyName);
 
@@ -144,24 +158,18 @@ enum BuiltinFunction {
     disambiguator: _disambiguators[this]!,
   );
 
-  TypeParameterId get _itemTypeParameter =>
-      TypeParameterId.declared(owner: id, index: 0, name: 'T');
-
   HirFunctionSignature signature(WellKnownTypes types, HirIdGenerator ids) {
-    final t = HirType.parameter(_itemTypeParameter);
     final intType = types.intType;
     final textType = types.textType;
 
     HirFunctionSignature build(
       List<(String, HirType)> parameters,
       HirType returnType, {
-      bool isGeneric = false,
+      List<HirTypeParameter> typeParameters = const [],
     }) => HirFunctionSignature(
       id: id,
       name: candyName,
-      typeParameters: isGeneric
-          ? [HirTypeParameter(id: _itemTypeParameter)]
-          : const [],
+      typeParameters: typeParameters,
       parameters: [
         for (final (name, type) in parameters)
           HirParameter(id: ids.generate(), name: name, type: type),
@@ -169,13 +177,19 @@ enum BuiltinFunction {
       returnType: returnType,
     );
 
+    final tParameter = _typeParameter(0, 'T');
+    final t = tParameter.type;
+    // A value's static type, which may itself be a trait object.
+    final vParameter = _typeParameter(0, 'V');
+    final vAfterTParameter = _typeParameter(1, 'V');
+
     HirFunctionSignature intBinary(String a, String b) =>
         build([(a, intType), (b, intType)], intType);
 
     HirFunctionSignature listOf(int count) => build(
       [for (var i = 0; i < count; i++) ('item$i', t)],
       types.listType(t),
-      isGeneric: true,
+      typeParameters: [tParameter],
     );
 
     return switch (this) {
@@ -200,7 +214,7 @@ enum BuiltinFunction {
       .listFilled => build(
         [('length', intType), ('item', t)],
         types.listType(t),
-        isGeneric: true,
+        typeParameters: [tParameter],
       ),
       .listGenerate => build(
         [
@@ -211,22 +225,22 @@ enum BuiltinFunction {
           ),
         ],
         types.listType(t),
-        isGeneric: true,
+        typeParameters: [tParameter],
       ),
       .listGet => build(
         [('list', types.listType(t)), ('index', intType)],
         types.maybeType(t),
-        isGeneric: true,
+        typeParameters: [tParameter],
       ),
       .listInsert => build(
         [('list', types.listType(t)), ('index', intType), ('item', t)],
         types.listType(t),
-        isGeneric: true,
+        typeParameters: [tParameter],
       ),
       .listLength => build(
         [('list', types.listType(t))],
         intType,
-        isGeneric: true,
+        typeParameters: [tParameter],
       ),
       .listOf0 => listOf(0),
       .listOf1 => listOf(1),
@@ -237,12 +251,12 @@ enum BuiltinFunction {
       .listRemoveAt => build(
         [('list', types.listType(t)), ('index', intType)],
         types.listType(t),
-        isGeneric: true,
+        typeParameters: [tParameter],
       ),
       .listReplace => build(
         [('list', types.listType(t)), ('index', intType), ('newItem', t)],
         types.listType(t),
-        isGeneric: true,
+        typeParameters: [tParameter],
       ),
       .panic => build([('message', textType)], types.neverType),
       .print => build([('message', textType)], types.nothingType),
@@ -261,6 +275,25 @@ enum BuiltinFunction {
         ('b', textType),
       ], types.maybeType(intType)),
       .textLength => build([('text', textType)], intType),
+      .typeId => build(
+        const [],
+        types.typeIdType,
+        typeParameters: [tParameter],
+      ),
+      .typeIdOf => build(
+        [('value', vParameter.type)],
+        types.typeIdType,
+        typeParameters: [vParameter],
+      ),
+      .downcast => build(
+        [('value', vAfterTParameter.type)],
+        types.maybeType(t),
+        typeParameters: [tParameter, vAfterTParameter],
+      ),
     };
   }
+
+  HirTypeParameter _typeParameter(int index, String name) => HirTypeParameter(
+    id: TypeParameterId.declared(owner: id, index: index, name: name),
+  );
 }

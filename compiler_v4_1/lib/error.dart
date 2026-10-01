@@ -48,5 +48,5 @@ List<CompilerError> mergeErrors(Iterable<Iterable<CompilerError>> analyses) {
       if (seen.add(key)) errors.add(error);
     }
   }
-  return errors..sort();
+  return errors.sorted();
 }

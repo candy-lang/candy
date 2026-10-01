@@ -555,15 +555,15 @@ class _Collector {
   WellKnownTypes _findWellKnownTypes() {
     final found = <String, DeclarationId>{};
     for (final declaration in _declarations.values) {
-      if (declaration is! CollectedStruct && declaration is! CollectedEnum) {
-        continue;
-      }
+      final names = switch (declaration) {
+        CollectedStruct() || CollectedEnum() => WellKnownTypes.names,
+        CollectedTrait() => WellKnownTypes.traitNames,
+        _ => const <String>{},
+      };
       if (declaration.module.packageName != ModuleId.corePackageName) continue;
 
       final name = declaration.id.name;
-      if (WellKnownTypes.names.contains(name)) {
-        found.putIfAbsent(name, () => declaration.id);
-      }
+      if (names.contains(name)) found.putIfAbsent(name, () => declaration.id);
     }
 
     return WellKnownTypes(
@@ -576,6 +576,8 @@ class _Collector {
       orderingId: found['Ordering'],
       resultId: found['Result'],
       boolId: found['Bool'],
+      typeIdId: found['TypeId'],
+      anyId: found['Any'],
     );
   }
 }

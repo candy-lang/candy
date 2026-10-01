@@ -48,12 +48,16 @@ void main() {
       expect(harness.errorMessages, ['Expected 1 type argument, got 2.']);
     });
 
-    test('reports a trait used as a type', () {
+    test('reports a trait that cannot be used as a type', () {
       final harness = _lower('''
-        trait ToText { fun toText(self: Self) Text }
-        fun f(a: ToText) Int { 0 }
+        trait Convert { fun convert[T](self: Self) T }
+        fun f(a: Convert) Int { 0 }
       ''');
-      expect(harness.errorMessages, ["Traits can't be used as types."]);
+      expect(harness.errorMessages, [
+        // ignore: no_adjacent_strings_in_list
+        "`Convert` can't be used as a type: its function `convert` has type "
+            'parameters of its own.',
+      ]);
     });
 
     test('reports `Self` outside a trait or impl', () {
@@ -257,10 +261,11 @@ void main() {
         impl Int: Into[Text] { fun into(self: Int) Text { "x" } }
       ''');
       harness.expectNoErrors();
-      expect(
-        harness.signatures.solverEnvironment.rules.single.toString(),
+      expect(harness.signatures.solverEnvironment.rules.map((it) => '$it'), [
         'Into(Text, Int) <- <nothing>',
-      );
+        // Every dyn-compatible trait's object implements it.
+        r'Into(?T, $Dyn$Core.test:Into<?T>) <- <nothing>',
+      ]);
     });
   });
 

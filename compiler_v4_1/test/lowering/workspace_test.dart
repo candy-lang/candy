@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:compiler_v4_1/lowering/modules.dart';
+import 'package:supernova/supernova.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -20,7 +21,7 @@ void main() {
 
   test('discovers every directory holding a package marker', () {
     final workspace = Workspace.discover(root);
-    expect(workspace.packages.keys.toList()..sort(), ['core', 'http']);
+    expect(workspace.packages.keys.sorted(), ['core', 'http']);
   });
 
   test('ignores a directory without a package marker', () {

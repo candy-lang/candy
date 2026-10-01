@@ -1,3 +1,5 @@
+import 'package:supernova/supernova.dart' hide IterableSorted;
+
 import '../../hir/hir/builtins.dart';
 import '../../hir/hir/ids.dart';
 import '../../position.dart';
@@ -36,6 +38,10 @@ class _Context {
     MonoType_Function(:final parameterTypes, :final returnType) =>
       '(${parameterTypes.map(_readableType).join(', ')}) '
           '${_readableType(returnType)}',
+    MonoType_Dyn(:final trait, :final typeArguments) => _readableName(
+      trait,
+      typeArguments,
+    ),
   };
 
   /// The un-mangled Candy name of a declaration instantiated with
@@ -71,6 +77,15 @@ class _Context {
     _push('#include <stdlib.h>\n');
     _push('#include <string.h>\n\n');
 
+    _push('#include <cairo.h>\n\n');
+    _push('#include <SDL3/SDL.h>\n\n');
+    // if (mono.typeDeclarations.keys.any(
+    //   (it) => it is MonoType_Named && it.declaration.name == 'GlfwWindow',
+    // )) {
+    //   // _push('#include <GLFW/glfw3.h>\n\n');
+
+    // }
+
     _push('/// Type Forward Declarations\n\n');
     _lowerTypeForwardDeclarations();
     _push('\n');
@@ -87,6 +102,10 @@ class _Context {
     _lowerFunctionDeclarations();
     _push('\n');
 
+    _push('/// Vtables\n\n');
+    _lowerVtables();
+    _push('\n');
+
     _push('/// Assignment Definitions\n\n');
     _lowerAssignmentDefinitions();
     _push('\n');
@@ -95,6 +114,135 @@ class _Context {
     _lowerFunctionDefinitions();
 
     _push('int main() {\n');
+    _push(r'''
+
+    const int width = 800;
+    const int height = 600;
+
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    SDL_Window *window = NULL;
+    SDL_Renderer *renderer = NULL;
+
+    if (!SDL_CreateWindowAndRenderer(
+            "My language",
+            width,
+            height,
+            SDL_WINDOW_RESIZABLE,
+            &window,
+            &renderer
+    )) {
+        fprintf(stderr, "SDL_CreateWindowAndRenderer: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    /*
+     * Cairo renders into this memory buffer.
+     */
+    cairo_surface_t *surface =
+        cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+
+    cairo_t *cr = cairo_create(surface);
+
+    /*
+     * SDL texture receives Cairo's pixels.
+     */
+    SDL_Texture *texture = SDL_CreateTexture(
+        renderer,
+        SDL_PIXELFORMAT_ARGB8888,
+        SDL_TEXTUREACCESS_STREAMING,
+        width,
+        height
+    );
+    if (!texture) {
+        fprintf(stderr, "SDL_CreateTexture: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    bool running = true;
+
+    while (running) {
+        /*
+         * 1. Handle input/events.
+         */
+        SDL_Event event;
+
+        while (SDL_PollEvent(&event)) {
+            switch (event.type) {
+                case SDL_EVENT_QUIT:
+                    running = false;
+                    break;
+
+                case SDL_EVENT_KEY_DOWN:
+                    printf("key down: %s\n",
+                           SDL_GetKeyName(event.key.key));
+                    break;
+
+                case SDL_EVENT_MOUSE_MOTION:
+                    printf("mouse: %.1f %.1f\n",
+                           event.motion.x,
+                           event.motion.y);
+                    break;
+
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    printf("mouse button: %d\n",
+                           event.button.button);
+                    break;
+            }
+        }
+
+        /*
+         * 2. Render your display list with Cairo.
+         */
+
+        cairo_set_source_rgb(cr, 0.1, 0.1, 0.1);
+        cairo_paint(cr);
+
+        cairo_set_source_rgb(cr, 0.2, 0.5, 1.0);
+        cairo_rectangle(cr, 100, 100, 300, 200);
+        cairo_fill(cr);
+
+        cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+        cairo_set_font_size(cr, 32);
+        cairo_move_to(cr, 140, 220);
+        cairo_show_text(cr, "Hello");
+
+        cairo_surface_flush(surface);
+
+        /*
+         * 3. Copy Cairo's pixels into the SDL texture.
+         */
+        SDL_UpdateTexture(
+            texture,
+            NULL,
+            cairo_image_surface_get_data(surface),
+            cairo_image_surface_get_stride(surface)
+        );
+
+        /*
+         * 4. Present texture in the window.
+         */
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+
+        SDL_RenderTexture(renderer, texture, NULL, NULL);
+
+        SDL_RenderPresent(renderer);
+    }
+
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+
+    SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+
+    SDL_Quit();
+''');
     for (final id in mono.assignmentInitializationOrder) {
       _push('${id.mangled}\$init();\n');
     }
@@ -104,15 +252,21 @@ class _Context {
   void _lowerTypeForwardDeclarations() {
     for (final type in mono.typeDeclarations.keys) {
       _push('typedef struct $type $type;\n');
+      if (type is MonoType_Dyn) {
+        _push('typedef struct ${_vtableType(type)} ${_vtableType(type)};\n');
+      }
     }
   }
+
+  String _vtableType(MonoType_Dyn type) => '$type\$vtable';
 
   void _lowerTypeDeclarations() {
     for (final type in layouts.declarationOrder) {
       final declaration = mono.typeDeclarations[type]!;
-      if (declaration is MonoTypeDeclaration_Function) {
-        // Lambda types have no declaration in the source to point to, so
-        // print the type they were mangled from instead.
+      if (declaration is MonoTypeDeclaration_Function ||
+          declaration is MonoTypeDeclaration_Dyn) {
+        // Lambda types and trait objects have no declaration in the source to
+        // point to, so print the type they were mangled from instead.
         _push('// ${_readableType(type)}\n');
       } else {
         _pushDeclarationComment(_readableType(type), declaration.span);
@@ -124,12 +278,12 @@ class _Context {
           :final typeArguments,
         ):
           switch (builtinType) {
-            case BuiltinType.int:
+            case .int:
               _push('int64_t value;\n');
-            case BuiltinType.list:
+            case .list:
               _push('uint64_t length;\n');
               _push('${typeArguments.first}* values;\n');
-            case BuiltinType.text:
+            case .text:
               _push('char* value;\n');
           }
           _push('};\n');
@@ -169,6 +323,25 @@ class _Context {
             _push(', $parameterType');
           }
           _push(');\n');
+          _push('};\n');
+        case MonoTypeDeclaration_Dyn(:final slots):
+          final vtableType = _vtableType(type as MonoType_Dyn);
+          _push('void* data;\n');
+          _push('const $vtableType* vtable;\n');
+          _push('};\n');
+
+          // The type ID comes first in every vtable, so any of them can be
+          // read as an `Any` vtable.
+          _push('struct $vtableType {\n');
+          _push('int64_t typeId;\n');
+          for (final (index, slot) in slots.indexed) {
+            _push('// ${slot.name}\n');
+            _push('${slot.returnType} (*slot$index)(void*');
+            for (final parameterType in slot.parameterTypes) {
+              _push(', $parameterType');
+            }
+            _push(');\n');
+          }
           _push('};\n');
       }
     }
@@ -222,6 +395,65 @@ class _Context {
       _lowerLambdaSignature(declarationName, id, lambda);
       _push(';\n');
     });
+  }
+
+  void _lowerVtables() {
+    final ids = mono.vtables.keys.sorted();
+    for (final id in ids) {
+      _push(
+        'static const ${_vtableType(id.dynType)} $id;'
+        ' // ${_readableType(id.concreteType)} as '
+        '${_readableType(id.dynType)}\n',
+      );
+    }
+    for (final id in ids) {
+      _lowerVtable(id, mono.vtables[id]!);
+    }
+  }
+
+  /// Each slot gets a thunk that unpacks the receiver from its pointer, and
+  /// boxes a `Self` result back into the object.
+  void _lowerVtable(MonoVtableId id, MonoVtable vtable) {
+    final declaration =
+        mono.typeDeclarations[id.dynType]! as MonoTypeDeclaration_Dyn;
+    final concreteType = id.concreteType;
+
+    for (final (index, slot) in declaration.slots.indexed) {
+      final entry = vtable.entries[index];
+      final parameters = [
+        for (final (index, type) in slot.parameterTypes.indexed)
+          (type, 'parameter$index'),
+      ];
+      final call =
+          '$entry(*($concreteType*) self'
+          '${parameters.map((it) => ', ${it.$2}').join()})';
+
+      _push('static ${slot.returnType} $id\$slot$index(void* self');
+      for (final (type, name) in parameters) {
+        _push(', $type $name');
+      }
+      _push(') {\n');
+      if (slot.returnType == id.dynType &&
+          mono.functions[entry]!.returnType != id.dynType) {
+        _push('''
+$concreteType* data = malloc(sizeof($concreteType));
+*data = $call;
+return (${id.dynType}) {.data = data, .vtable = &$id};
+''');
+      } else {
+        _push('return $call;\n');
+      }
+      _push('}\n');
+    }
+
+    _push(
+      'static const ${_vtableType(id.dynType)} $id = {\n'
+      '.typeId = ${vtable.typeId},\n',
+    );
+    for (var index = 0; index < declaration.slots.length; index++) {
+      _push('.slot$index = $id\$slot$index,\n');
+    }
+    _push('};\n\n');
   }
 
   void _lowerFunctionDefinitions() {
@@ -310,6 +542,7 @@ class _Context {
         case MonoExpressionKind_LocalReference():
         case MonoExpressionKind_CallFunction():
         case MonoExpressionKind_CallLambda():
+        case MonoExpressionKind_ToDyn():
           break;
         case MonoExpressionKind_Switch(:final cases):
           for (final case_ in cases) {
@@ -333,6 +566,13 @@ class _Context {
         _lowerBuiltinFunction(builtinFunction, function, substitutions);
       case MonoBodyOrBuiltin_Body(:final body):
         _lowerBody(declarationName, body);
+      case MonoBodyOrBuiltin_DynDispatch(:final slot):
+        final [self, ...arguments] = function.parameters;
+        _push('return ${self.id}.vtable->slot$slot(${self.id}.data');
+        for (final argument in arguments) {
+          _push(', ${argument.id}');
+        }
+        _push(');');
     }
   }
 
@@ -449,6 +689,18 @@ $type $id = {
   .closure = ${id}_closure,
   .function = $declarationName\$lambda${id}_function,
 };''');
+      case MonoExpressionKind_ToDyn(:final value, vtable: null):
+        _push(
+          '$type $id = {.data = $value.data, '
+          '.vtable = (const ${_vtableType(type as MonoType_Dyn)}*) '
+          '$value.vtable};',
+        );
+      case MonoExpressionKind_ToDyn(:final value, vtable: final vtable?):
+        final concreteType = vtable.concreteType;
+        _push('''
+$concreteType* ${id}_data = malloc(sizeof($concreteType));
+*${id}_data = $value;
+$type $id = {.data = ${id}_data, .vtable = &$vtable};''');
     }
   }
 
@@ -511,6 +763,8 @@ $type $id = {
           break;
         case MonoExpressionKind_LocalReference(:final id):
           referencedIds.add(id);
+        case MonoExpressionKind_ToDyn(:final value):
+          referencedIds.add(value);
         case MonoExpressionKind_CallFunction(:final arguments):
           referencedIds.addAll(arguments);
         case MonoExpressionKind_CallLambda(:final lambda, :final arguments):
@@ -588,6 +842,17 @@ $type $id = {
   /// includes it even when nothing calls it.
   String get _panicFunction => BuiltinFunction.panic.id.mangled;
 
+  /// A `Maybe.some` of [maybeType] holding [value], boxed if the variant is.
+  String _some(MonoType maybeType, MonoType valueType, String value) {
+    if (!_boxedVariants(maybeType).contains('some')) {
+      return '($maybeType) {.variant = ${maybeType}_some, '
+          '.value.some = $value}';
+    }
+    return '({ $valueType* boxed = malloc(sizeof($valueType)); '
+        '*boxed = $value; '
+        '($maybeType) {.variant = ${maybeType}_some, .value.some = boxed}; })';
+  }
+
   void _lowerBuiltinFunction(
     BuiltinFunction builtinFunction,
     MonoFunction function,
@@ -600,6 +865,67 @@ $type $id = {
     final intType = _builtinType(BuiltinType.int);
 
     switch (builtinFunction) {
+      //       case .glfwInit:
+      //         _push('''
+      // if (!glfwInit()) {
+      //     $_panicFunction((($textType) {.value = "Failed to initialize GLFW."}));
+      // }
+
+      // glfwSetErrorCallback((GLFWerrorfun) (int error, const char* description) {
+      //     char* message_format = "GLFW error %d: %s";
+      //     int length = snprintf(NULL, 0, message_format, error, description);
+      //     $textType message = {.value = malloc(length + 1)};
+      //     snprintf(message.value, length + 1, message_format, error, description);
+      //     ${BuiltinFunction.print.id.mangled}(message);
+      // });
+      // ''');
+      //       case .glfwCreateWindow:
+      //         _push('''
+      // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+      // GLFWwindow* window = glfwCreateWindow(
+      //     ${parameters[0].id}.value,
+      //     ${parameters[1].id}.value,
+      //     ${parameters[2].id}.value,
+      //     ${parameters[3].id}.value
+      // );
+      // if (window == NULL) {
+      //     $_panicFunction((($textType) {.value = "Failed to create GLFW window."}));
+      // }
+
+      // glfwMakeContextCurrent(window);
+      // return window;''');
+      case .typeId:
+        _push('''
+$returnType result = {{.value = ${mono.typeIds[itemType()]}}};
+return result;''');
+      case .typeIdOf:
+        final value = parameters.single.id;
+        final id = itemType() is MonoType_Dyn
+            ? '$value.vtable->typeId'
+            : '${mono.typeIds[itemType()]}';
+        _push('''
+$returnType result = {{.value = $id}};
+return result;''');
+      case .downcast:
+        final target = substitutions.entries
+            .firstWhere((it) => it.key.name == 'T')
+            .value;
+        final source = parameters.single.type;
+        final value = parameters.single.id;
+        final none = '($returnType) {.variant = ${returnType}_none}';
+        if (source == target) {
+          _push('return ${_some(returnType, target, '$value')};');
+        } else if (source is MonoType_Dyn) {
+          _push('''
+if ($value.vtable->typeId == ${mono.typeIds[target]}) {
+    return ${_some(returnType, target, '*($target*) $value.data')};
+}
+return $none;''');
+        } else {
+          _push('return $none;');
+        }
       case .intAdd:
         _push('''
 $returnType result = {.value = ${parameters[0].id}.value + ${parameters[1].id}.value};
@@ -969,8 +1295,4 @@ extension<T> on List<T> {
       yield (this[i], other[i]);
     }
   }
-}
-
-extension<T extends Comparable<T>> on Iterable<T> {
-  List<T> sorted() => toList()..sort();
 }

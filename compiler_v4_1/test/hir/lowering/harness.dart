@@ -289,3 +289,24 @@ enum Ordering { less, equal, greater }
 enum Maybe[T] { none, some: T }
 enum Result[T, E] { ok: T, error: E }
 ''';
+
+/// `Any` and `TypeId` as Core declares them, minus the `Equal` impl that
+/// [preludeSource] has no trait for.
+// ignore: avoid-top-level-members-in-tests
+const anyPreludeSource = '''
+struct TypeId { id: Int }
+impl TypeId {
+  fun of[T]() TypeId { builtinTypeId[T]() }
+}
+trait Any {
+  fun typeId(self: Self) TypeId { builtinTypeIdOf[Self](self) }
+  fun is[T](self: Self) Bool {
+    switch builtinIntCompareTo(self.typeId().id, TypeId.of[T]().id) {
+      less => Bool.false_(),
+      equal => Bool.true_(),
+      greater => Bool.false_(),
+    }
+  }
+  fun downcast[T](self: Self) Maybe[T] { builtinDowncast[T, Self](self) }
+}
+''';

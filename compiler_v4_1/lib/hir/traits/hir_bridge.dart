@@ -26,6 +26,10 @@ SolverType? _solverTypeOf(HirType type) => switch (type) {
       baseType,
       ...trait.typeArguments,
     ]),
+  HirType_Dyn(:final trait) => _value(
+    SolverTypeName.synthetic('\$Dyn\$${trait.declaration}'),
+    trait.typeArguments,
+  ),
   HirType_Function() || HirType_Error() || HirType_Variable() => null,
 };
 

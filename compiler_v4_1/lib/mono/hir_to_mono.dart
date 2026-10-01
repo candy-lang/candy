@@ -1,6 +1,7 @@
 import '../hir/hir/builtins.dart';
 import '../hir/hir/hir.dart';
 import '../hir/hir/ids.dart';
+import '../hir/traits/dyn_compatibility.dart';
 import '../hir/traits/projections.dart';
 import 'mono/ids.dart';
 import 'mono/mono.dart';
@@ -44,6 +45,11 @@ class Monomorphizer {
   final _assignments = <DeclarationId, MonoAssignment?>{};
   final _assignmentInitializationOrder = <DeclarationId>[];
 
+  /// A `null` value marks a vtable whose entries are being lowered, since one
+  /// of them may box a value into the same trait object again.
+  final _vtables = <MonoVtableId, MonoVtable?>{};
+  final _typeIds = <MonoType, int>{};
+
   Mono run(DeclarationId mainFunction) {
     final main = lowerFunction(mainFunction, const {});
 
@@ -61,6 +67,10 @@ class Monomorphizer {
       functions: {
         for (final MapEntry(:key, :value) in _functions.entries) key: value!,
       },
+      vtables: {
+        for (final MapEntry(:key, :value) in _vtables.entries) key: value!,
+      },
+      typeIds: _typeIds,
       mainFunction: main,
     );
   }
@@ -88,21 +98,73 @@ class Monomorphizer {
           ),
       ],
       returnType: types.monomorphize(call.signature.returnType, environment),
-      body: switch (call.body) {
-        HirBodyOrBuiltin_Body(:final body) => .body(
+      body: switch (call) {
+        ResolvedCall(dynSlot: final slot?) => .dynDispatch(slot: slot),
+        ResolvedCall(body: HirBodyOrBuiltin_Body(:final body)) => .body(
           BodyMonomorphizer(this, environment).lower(body),
         ),
-        HirBodyOrBuiltin_Builtin(:final function) => .builtin(
-          function: function,
-          substitutions: {
-            for (final parameter in call.signature.typeParameters)
-              parameter.id: types.monomorphize(parameter.type, environment),
-          },
-        ),
+        ResolvedCall(body: HirBodyOrBuiltin_Builtin(:final function)) =>
+          _lowerBuiltin(function, call.signature, environment),
+        _ => throw StateError('`$monoId` has no body.'),
       },
       span: call.signature.span,
     );
     return monoId;
+  }
+
+  MonoBodyOrBuiltin _lowerBuiltin(
+    BuiltinFunction function,
+    HirFunctionSignature signature,
+    Map<TypeParameterId, HirType> environment,
+  ) {
+    final substitutions = {
+      for (final parameter in signature.typeParameters)
+        parameter.id: types.monomorphize(parameter.type, environment),
+    };
+    if (const <BuiltinFunction>{
+      .typeId,
+      .typeIdOf,
+      .downcast,
+    }.contains(function)) {
+      substitutions.values.forEach(typeIdOf);
+    }
+    return .builtin(function: function, substitutions: substitutions);
+  }
+
+  /// IDs are handed out in the order types are first asked about, which is
+  /// deterministic for a given program.
+  int typeIdOf(MonoType type) =>
+      _typeIds.putIfAbsent(type, () => _typeIds.length);
+
+  /// The vtable that lets [concreteType] be used as the trait object
+  /// [dynType]. Both must already be concrete.
+  MonoVtableId vtableFor(HirType concreteType, HirType_Dyn dynType) {
+    final concrete = types.monomorphize(concreteType, const {});
+    final object = types.monomorphize(dynType, const {}) as MonoType_Dyn;
+    final id = MonoVtableId(concreteType: concrete, dynType: object);
+    if (_vtables.containsKey(id)) return id;
+    _vtables[id] = null;
+
+    final trait = dynType.trait;
+    final definition = hir.traits[trait.declaration];
+    if (definition == null) {
+      throw StateError('Unknown trait: `${trait.declaration}`.');
+    }
+    final substitutions = {
+      ...HirType.buildEnvironment(
+        definition.typeParameters,
+        trait.typeArguments,
+      ),
+      TypeParameterId.self(trait.declaration): concreteType,
+    };
+    _vtables[id] = MonoVtable(
+      typeId: typeIdOf(concrete),
+      entries: [
+        for (final function in vtableSlotsOf(hir, trait.declaration))
+          lowerFunction(function, substitutions),
+      ],
+    );
+    return id;
   }
 
   ResolvedCall _resolve(

@@ -105,6 +105,9 @@ class BodyLowerer {
       context: context,
       declarations: declarations,
       scope: declarations.scopeOf(module),
+      // Signatures are complete by now, so this can be decided right away.
+      checkTraitObject: (trait, span) =>
+          checkTraitObject(context, signatures, trait, span),
     );
   }
 
@@ -154,6 +157,20 @@ class BodyLowerer {
       context.addReference(span, targets);
 
   void _declare(SourceSpan span) => context.addDeclaration(span);
+
+  /// Runs [check] against a copy of the type variables first, and against the
+  /// real ones only if that succeeds, so a failed attempt binds nothing.
+  bool tryUnify(bool Function(Unifier unifier) check) {
+    final scratch = Unifier(
+      variables: variables.speculate(),
+      wellKnownTypes: types,
+      normalize: signatures.normalizer.normalize,
+    );
+    return check(scratch) && check(unifier);
+  }
+
+  bool canCoerce(HirType from, HirType to) =>
+      resolver.canCoerce(from, to, variables, solverContext);
 
   /// Lowers one function or assignment body.
   HirBody lower(
@@ -249,7 +266,16 @@ class _Builder {
 
   HirExpressionKind _finalKind(_Entry entry) {
     final pending = entry.pendingCall;
-    if (pending == null) return entry.kind;
+    if (pending == null) {
+      return switch (entry.kind) {
+        HirExpressionKind_ToDyn(:final value, :final sourceType) =>
+          HirExpressionKind.toDyn(
+            value: value,
+            sourceType: variables.finalize(sourceType),
+          ),
+        final kind => kind,
+      };
+    }
     return HirExpressionKind.call(
       function: pending.candidate.id,
       substitutions: {
@@ -367,17 +393,55 @@ class _Builder {
     final span = _spanOf(expression);
     switch (lowerRaw(expression, expectedType)) {
       case _Value(:final id, :final type):
-        if (expectedType != null && !unifier.assignable(type, expectedType)) {
-          _error(
-            span,
-            'Expected type `${variables.resolve(expectedType)}`, '
-            'got `${variables.resolve(type)}`.',
-          );
-          return (pushError(), const HirType.error());
+        if (expectedType == null || unifier.assignable(type, expectedType)) {
+          return (id, type);
+        }
+        if (_coerce(id, type, expectedType) case final coerced?) {
+          return (coerced, expectedType);
+        }
+        _error(
+          span,
+          'Expected type `${variables.resolve(expectedType)}`, '
+          'got `${variables.resolve(type)}`.',
+        );
+        return (pushError(), const HirType.error());
+      case _TypeReference():
+        _error(span, 'A type must be instantiated to be used as a value.');
+        return (pushError(), const HirType.error());
+      case _LoweringError():
+        return (pushError(), const HirType.error());
+    }
+  }
+
+  /// Boxes [id] into the trait object [to], or returns `null` if [from] can't
+  /// be used as one.
+  HirId? _coerce(HirId id, HirType from, HirType to) {
+    if (!lowerer.canCoerce(from, to)) return null;
+    return push(HirExpressionKind.toDyn(value: id, sourceType: from), to);
+  }
+
+  /// Lowers a call argument against the type the callee expects, boxing it
+  /// into a trait object if that's what makes it fit. A mismatch is left for
+  /// overload resolution to report, since it can describe the whole call.
+  (HirId, HirType) _lowerArgument(
+    AstExpression argument,
+    HirType? expectedType,
+  ) {
+    switch (lowerRaw(argument, expectedType)) {
+      case _Value(:final id, :final type):
+        if (expectedType == null ||
+            lowerer.tryUnify((it) => it.assignable(type, expectedType))) {
+          return (id, type);
+        }
+        if (_coerce(id, type, expectedType) case final coerced?) {
+          return (coerced, expectedType);
         }
         return (id, type);
       case _TypeReference():
-        _error(span, 'A type must be instantiated to be used as a value.');
+        _error(
+          _spanOf(argument),
+          'A type must be instantiated to be used as a value.',
+        );
         return (pushError(), const HirType.error());
       case _LoweringError():
         return (pushError(), const HirType.error());
@@ -412,7 +476,7 @@ class _Builder {
         return _lowerNavigation(navigation);
 
       case AstExpression_Call(:final call_):
-        return _lowerCall(call_);
+        return _lowerCall(call_, expectedType);
 
       case AstExpression_Lambda(:final lambda):
         return _lowerLambda(lambda, expectedType);
@@ -650,8 +714,12 @@ class _Builder {
         );
       } else if (expectedFunction != null &&
           index < expectedFunction.parameterTypes.length) {
-        // The expected type says what this parameter is.
+        // The expected type says what this parameter is, though maybe only as
+        // a variable the enclosing call has yet to pin down.
         type = expectedFunction.parameterTypes[index];
+        if (variables.isUnresolved(type)) {
+          lowerer.checkInferred(name.rawText, name.span, () => type);
+        }
       } else {
         // Nothing to go on yet. Overload resolution of the call this lambda is
         // an argument to usually binds this by unifying the whole lambda type.
@@ -818,7 +886,7 @@ class _Builder {
     );
   }
 
-  _Lowered _lowerCall(AstCall call) {
+  _Lowered _lowerCall(AstCall call, HirType? expectedType) {
     final typeArguments = call.typeArguments?.arguments
         .map((it) => lowerer.typeLowerer.lowerType(it, lowerer.typeScope))
         .toList();
@@ -833,7 +901,6 @@ class _Builder {
         final receiver = lowerRaw(navigation.receiver, null);
         switch (receiver) {
           case _Value(:final id, :final type):
-            final arguments = _lowerArguments(call.arguments);
             return _resolveCall(
               name: key.rawText,
               nameSpan: key.span,
@@ -842,10 +909,10 @@ class _Builder {
                 key.rawText,
                 lowerer.solverContext,
               ),
-              driver: type,
-              arguments: [(id, type), ...arguments],
+              receiver: (id, type),
+              arguments: call.arguments,
               typeArguments: typeArguments,
-              isMember: true,
+              expectedType: expectedType,
             );
           case _TypeReference(:final declaration):
             if (_isVariant(declaration, key.rawText) ||
@@ -856,18 +923,18 @@ class _Builder {
                 call,
                 typeArguments,
                 argumentSpan,
+                expectedType,
               );
             }
 
-            final arguments = _lowerArguments(call.arguments);
             return _resolveCall(
               name: key.rawText,
               nameSpan: key.span,
               candidates: () => _staticCandidates(declaration, key.rawText),
-              driver: null,
-              arguments: arguments,
+              receiver: null,
+              arguments: call.arguments,
               typeArguments: typeArguments,
-              isMember: false,
+              expectedType: expectedType,
             );
           case _LoweringError():
             return const _LoweringError();
@@ -891,6 +958,7 @@ class _Builder {
             typeArguments,
             identifier.span,
             argumentSpan,
+            expectedType,
           );
         }
 
@@ -912,19 +980,19 @@ class _Builder {
             typeArguments,
             identifier.span,
             argumentSpan,
+            expectedType,
           );
         }
 
-        final arguments = _lowerArguments(call.arguments);
         return _resolveCall(
           name: name,
           nameSpan: identifier.span,
           candidates: () =>
               lowerer.resolver.freeCandidates(lowerer.scope, name),
-          driver: null,
-          arguments: arguments,
+          receiver: null,
+          arguments: call.arguments,
           typeArguments: typeArguments,
-          isMember: false,
+          expectedType: expectedType,
         );
 
       default:
@@ -948,11 +1016,12 @@ class _Builder {
       return const _LoweringError();
     }
 
-    final arguments = _lowerArguments(call.arguments);
-    if (arguments.length != resolved.parameterTypes.length) {
+    final parameterTypes = resolved.parameterTypes;
+    final arguments = _lowerArgumentsAgainst(call.arguments, parameterTypes);
+    if (arguments.length != parameterTypes.length) {
       _error(
         span,
-        'Expected ${resolved.parameterTypes.length} arguments, '
+        'Expected ${parameterTypes.length} arguments, '
         'got ${arguments.length}.',
       );
       return const _LoweringError();
@@ -980,16 +1049,32 @@ class _Builder {
     );
   }
 
-  /// Resolves an overloaded call, deferring while [driver] is still unknown.
+  /// Resolves an overloaded call, deferring while the [receiver]'s type is
+  /// still unknown.
   _Lowered _resolveCall({
     required String name,
     required SourceSpan nameSpan,
     required List<CandidateSource> Function() candidates,
-    required HirType? driver,
-    required List<(HirId, HirType)> arguments,
+    required (HirId, HirType)? receiver,
+    required AstErrorOr<AstArguments> arguments,
     required List<HirType>? typeArguments,
-    required bool isMember,
+    required HirType? expectedType,
   }) {
+    final argumentAsts = arguments.argumentsOrDefault;
+    final expectedArgumentTypes = _expectedArgumentTypes(
+      candidates: candidates,
+      receiver: receiver,
+      argumentCount: argumentAsts.length,
+      typeArguments: typeArguments,
+      expectedType: expectedType,
+    );
+    final loweredArguments = [
+      ?receiver,
+      for (final (index, argument) in argumentAsts.indexed)
+        _lowerArgument(argument, expectedArgumentTypes?[index]),
+    ];
+    final driver = receiver?.$2;
+
     final resultType = variables.fresh();
     final entryId = lowerer.ids.generate();
     final entry = _Entry(
@@ -1004,7 +1089,7 @@ class _Builder {
     void attempt() {
       attempts++;
       // A member call can't be resolved until the receiver's type is known.
-      if (isMember && driver != null && variables.isUnresolved(driver)) {
+      if (driver != null && variables.isUnresolved(driver)) {
         if (attempts < 2) {
           lowerer._retries.add(attempt);
           return;
@@ -1020,7 +1105,7 @@ class _Builder {
       final sources = candidates();
       final resolution = lowerer.resolver.resolve(
         candidates: sources,
-        argumentTypes: arguments.map((it) => it.$2).toList(),
+        argumentTypes: loweredArguments.map((it) => it.$2).toList(),
         typeArguments: typeArguments,
         variables: variables,
         solverContext: lowerer.solverContext,
@@ -1035,23 +1120,34 @@ class _Builder {
             return;
           }
 
-          entry.pendingCall = _PendingCall(
-            candidate,
-            arguments.map((it) => it.$1).toList(),
-          );
+          // Only an overloaded call gets here with arguments that still need
+          // boxing; a single candidate's are boxed as they're lowered.
+          entry.pendingCall = _PendingCall(candidate, [
+            for (final (index, (id, type)) in loweredArguments.indexed)
+              _coerceBefore(
+                    entry,
+                    id,
+                    type,
+                    candidate.signature.parameters[index].type,
+                  ) ??
+                  id,
+          ]);
           entry.type = candidate.signature.returnType;
           unifier.unify(resultType, candidate.signature.returnType);
 
         case OverloadNotFound(:final rejections):
           _referenceCandidates(nameSpan, sources);
-          _error(nameSpan, _notFoundMessage(name, arguments, rejections));
+          _error(
+            nameSpan,
+            _notFoundMessage(name, loweredArguments, rejections),
+          );
 
         case OverloadAmbiguous(:final candidates):
           _referenceCandidates(nameSpan, candidates);
           _error(
             nameSpan,
             'Multiple functions match this call:\n'
-            '  ${_callSignature(name, arguments)}\n'
+            '  ${_callSignature(name, loweredArguments)}\n'
             'These are the candidates:'
             '${candidates.map((it) => '\n• ${it.signature}').join()}',
           );
@@ -1060,6 +1156,71 @@ class _Builder {
 
     attempt();
     return _Value(entryId, resultType);
+  }
+
+  /// The parameter types of the only function a call can resolve to, so its
+  /// arguments are lowered knowing what they should be: a lambda learns its
+  /// parameter types, and a value can be boxed into the trait object the
+  /// function takes. The call's own expected type flows in first, which is
+  /// what lets `List.of(label, counter)` build a `List[Widget]`.
+  ///
+  /// `null` while several candidates are in the running, since binding one's
+  /// types could contradict the one that wins.
+  List<HirType>? _expectedArgumentTypes({
+    required List<CandidateSource> Function() candidates,
+    required (HirId, HirType)? receiver,
+    required int argumentCount,
+    required List<HirType>? typeArguments,
+    required HirType? expectedType,
+  }) {
+    if (receiver != null && variables.isUnresolved(receiver.$2)) return null;
+
+    final receiverCount = receiver == null ? 0 : 1;
+    final matching = candidates()
+        .where(
+          (it) =>
+              it.signature.parameters.length == receiverCount + argumentCount &&
+              (typeArguments == null ||
+                  it.signature.typeParameters.length == typeArguments.length),
+        )
+        .toList();
+    if (matching.length != 1) return null;
+
+    final candidate = matching.single.instantiate(variables);
+    if (typeArguments != null) {
+      for (final (index, parameter)
+          in matching.single.signature.typeParameters.indexed) {
+        unifier.unify(
+          candidate.substitutions[parameter.id]!,
+          typeArguments[index],
+        );
+      }
+    }
+    if (expectedType != null) {
+      lowerer.tryUnify(
+        (it) => it.unify(candidate.signature.returnType, expectedType),
+      );
+    }
+    return candidate.signature.parameters
+        .skip(receiverCount)
+        .map((it) => it.type)
+        .toList();
+  }
+
+  /// Boxes [id] into the trait object [to] just before [anchor], for a call
+  /// whose callee was picked after its arguments were lowered. `null` if it
+  /// needs no boxing.
+  HirId? _coerceBefore(_Entry anchor, HirId id, HirType from, HirType to) {
+    if (!lowerer.canCoerce(from, to)) return null;
+
+    final coerced = _Entry(
+      id: lowerer.ids.generate(),
+      name: null,
+      type: to,
+      kind: HirExpressionKind.toDyn(value: id, sourceType: from),
+    );
+    _entries.insert(_entries.indexOf(anchor), coerced);
+    return coerced.id;
   }
 
   /// A call that inference couldn't narrow down still points somewhere useful:
@@ -1117,6 +1278,7 @@ class _Builder {
     List<HirType>? typeArguments,
     SourceSpan receiverSpan,
     SourceSpan argumentSpan,
+    HirType? expectedType,
   ) {
     final type = lowerer.signatures.typeDeclarations[declaration];
     if (type == null) {
@@ -1157,7 +1319,18 @@ class _Builder {
     );
     if (substitutions == null) return const _LoweringError();
 
-    final arguments = _lowerArguments(call.arguments);
+    final structType = HirType.named(
+      declaration: declaration,
+      typeArguments: type.typeParameters
+          .map((it) => substitutions[it.id]!)
+          .toList(),
+    );
+    _expect(structType, expectedType);
+
+    final fieldTypes = [
+      for (final field in fields) field.type.substitute(substitutions),
+    ];
+    final arguments = _lowerArgumentsAgainst(call.arguments, fieldTypes);
     if (arguments.length != fields.length) {
       _error(
         argumentSpan,
@@ -1168,7 +1341,7 @@ class _Builder {
     }
 
     for (final (index, field) in fields.indexed) {
-      final expected = field.type.substitute(substitutions);
+      final expected = fieldTypes[index];
       if (!unifier.assignable(arguments[index].$2, expected)) {
         _error(
           argumentSpan,
@@ -1179,12 +1352,6 @@ class _Builder {
       }
     }
 
-    final structType = HirType.named(
-      declaration: declaration,
-      typeArguments: type.typeParameters
-          .map((it) => substitutions[it.id]!)
-          .toList(),
-    );
     return _Value(
       push(
         HirExpressionKind.createStruct(
@@ -1202,6 +1369,7 @@ class _Builder {
     AstCall call,
     List<HirType>? typeArguments,
     SourceSpan argumentSpan,
+    HirType? expectedType,
   ) {
     final type = lowerer.signatures.typeDeclarations[declaration];
     final kind = type?.kind;
@@ -1235,7 +1403,17 @@ class _Builder {
     );
     if (substitutions == null) return const _LoweringError();
 
-    final arguments = _lowerArguments(call.arguments);
+    final enumType = HirType.named(
+      declaration: declaration,
+      typeArguments: type.typeParameters
+          .map((it) => substitutions[it.id]!)
+          .toList(),
+    );
+    _expect(enumType, expectedType);
+
+    final arguments = _lowerArgumentsAgainst(call.arguments, [
+      if (variant.type case final payload?) payload.substitute(substitutions),
+    ]);
     final expectedCount = variant.type == null ? 0 : 1;
     if (arguments.length != expectedCount) {
       final noun = expectedCount == 1 ? 'argument' : 'arguments';
@@ -1258,12 +1436,6 @@ class _Builder {
       }
     }
 
-    final enumType = HirType.named(
-      declaration: declaration,
-      typeArguments: type.typeParameters
-          .map((it) => substitutions[it.id]!)
-          .toList(),
-    );
     return _Value(
       push(
         HirExpressionKind.createEnum(
@@ -1299,11 +1471,28 @@ class _Builder {
     };
   }
 
-  List<(HirId, HirType)> _lowerArguments(AstErrorOr<AstArguments> arguments) =>
-      [
-        for (final argument in arguments.argumentsOrDefault)
-          lowerExpression(argument, null),
-      ];
+  /// Lowers each argument against its parameter type, or against nothing if
+  /// the counts don't match, which the caller reports.
+  List<(HirId, HirType)> _lowerArgumentsAgainst(
+    AstErrorOr<AstArguments> arguments,
+    List<HirType> parameterTypes,
+  ) {
+    final asts = arguments.argumentsOrDefault;
+    final matches = asts.length == parameterTypes.length;
+    return [
+      for (final (index, argument) in asts.indexed)
+        _lowerArgument(argument, matches ? parameterTypes[index] : null),
+    ];
+  }
+
+  /// Lets a value's expected type pin down its type arguments before its
+  /// fields are lowered, so `Maybe.some(label)` builds a `Maybe[Widget]` where
+  /// one is expected. Ignored if it doesn't fit, since the value may still be
+  /// boxed into a trait object afterwards.
+  void _expect(HirType type, HirType? expectedType) {
+    if (expectedType == null) return;
+    lowerer.tryUnify((it) => it.unify(type, expectedType));
+  }
 }
 
 extension on _Builder {

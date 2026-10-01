@@ -104,6 +104,7 @@ void main() {
         }
       ''');
       expect(harness.errorMessages, [
+        // ignore: no_adjacent_strings_in_list
         '`Opaque` does not satisfy the bound `ToText` on associated type '
             '`Item`.',
       ]);
@@ -115,9 +116,11 @@ void main() {
         impl Int: Weird { type Item: ToText }
       ''');
       expect(harness.errorMessages, [
+        // ignore: no_adjacent_strings_in_list
         "A trait's associated type can't have a value; only an impl gives it "
             'one.',
         'Missing binding for associated type `Item`.',
+        // ignore: no_adjacent_strings_in_list
         "An impl's associated type can't have a bound; only the trait declares "
             'one.',
         'This associated type is missing a value.',
@@ -163,6 +166,7 @@ void main() {
         fun f() Int.Item { 0 }
       ''');
       expect(harness.errorMessages, [
+        // ignore: no_adjacent_strings_in_list
         'Associated types can only be read off `Self` or a bounded type '
             'parameter.',
       ]);
@@ -171,6 +175,7 @@ void main() {
     test('reports `Self.Item` in an impl without a trait', () {
       final harness = _lower('impl Int { fun f(self: Int) Self.Item { 0 } }');
       expect(harness.errorMessages, [
+        // ignore: no_adjacent_strings_in_list
         "`Self` has no associated types here, because this impl doesn't "
             'implement a trait.',
       ]);

@@ -47,6 +47,7 @@ class _Lowerer {
       assignments: _assignments,
       functions: _functions,
       mainFunction: _findMainFunction(),
+      anyTrait: _signatures.wellKnownTypes.anyId,
     );
   }
 

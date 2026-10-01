@@ -21,6 +21,7 @@ class Hir {
     required this.assignments,
     required this.functions,
     required this.mainFunction,
+    this.anyTrait,
   });
 
   final SolverEnvironment solverEnvironment;
@@ -31,6 +32,9 @@ class Hir {
   final Map<DeclarationId, HirFunction> functions;
 
   final DeclarationId? mainFunction;
+
+  /// The `Any` trait, which every type implements without an impl.
+  final DeclarationId? anyTrait;
 }
 
 // Types
@@ -63,6 +67,10 @@ sealed class HirType with _$HirType {
     required DeclarationId declaration,
   }) = HirType_Associated;
 
+  /// A trait object: some value whose type implements [trait], with the
+  /// concrete type only known at runtime. Written as the bare trait name.
+  const factory HirType.dyn(HirTrait trait) = HirType_Dyn;
+
   /// An error was already reported, so anything involving this stays silent.
   const factory HirType.error() = HirType_Error;
 
@@ -83,6 +91,9 @@ sealed class HirType with _$HirType {
     HirType_Associated(:final trait, :final baseType) =>
       trait.typeArguments.any((it) => it.containsError) ||
           baseType.containsError,
+    HirType_Dyn(:final trait) => trait.typeArguments.any(
+      (it) => it.containsError,
+    ),
     HirType_Error() => true,
     HirType_Variable() => false,
   };
@@ -113,6 +124,7 @@ sealed class HirType with _$HirType {
             baseType: baseType.substitute(environment),
             declaration: declaration,
           ),
+        HirType_Dyn(:final trait) => .dyn(trait.substitute(environment)),
         HirType_Error() || HirType_Variable() => this,
       };
 
@@ -122,6 +134,7 @@ sealed class HirType with _$HirType {
     HirType_Self(:final baseType) => baseType.selfOwner,
     HirType_Function() ||
     HirType_Associated() ||
+    HirType_Dyn() ||
     HirType_Error() ||
     HirType_Variable() => throw StateError(
       'This type can never be the base type of `Self`.',
@@ -164,6 +177,7 @@ sealed class HirType with _$HirType {
       '(${parameterTypes.join(', ')}) $returnType',
     HirType_Associated(:final baseType, :final declaration) =>
       '$baseType.${declaration.name}',
+    HirType_Dyn(:final trait) => '$trait',
     HirType_Error() => '<error>',
     HirType_Variable(:final id) => '$id',
   };
@@ -475,6 +489,14 @@ sealed class HirExpressionKind with _$HirExpressionKind {
     required List<HirParameter> parameters,
     required HirBody body,
   }) = HirExpressionKind_Lambda;
+
+  /// Boxes [value] into the trait object that is the enclosing expression's
+  /// type. [sourceType] is [value]'s type, which monomorphization needs to
+  /// pick the vtable.
+  const factory HirExpressionKind.toDyn({
+    required HirId value,
+    required HirType sourceType,
+  }) = HirExpressionKind_ToDyn;
 
   const factory HirExpressionKind.error() = HirExpressionKind_Error;
 }

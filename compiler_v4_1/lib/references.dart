@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:supernova/supernova.dart' hide IterableSorted;
+
 import 'position.dart';
 
 /// Where a name in the source points, recorded while lowering resolves it.
@@ -87,7 +89,7 @@ class ReferenceIndex {
         found[_keyOf(reference)] = reference;
       }
     }
-    return found.values.toList()..sort(_bySourceOrder);
+    return found.values.sorted(_bySourceOrder);
   }
 
   /// Falls back to what references point at, which covers the few targets

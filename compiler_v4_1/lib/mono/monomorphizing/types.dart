@@ -1,5 +1,6 @@
 import '../../hir/hir/hir.dart';
 import '../../hir/hir/ids.dart';
+import '../../hir/traits/dyn_compatibility.dart';
 import '../../hir/traits/projections.dart';
 import '../mono/ids.dart';
 import '../mono/mono.dart';
@@ -47,6 +48,10 @@ class TypeMonomorphizer {
     // the trait, so no substitution replaces it — but its base type is the
     // impl's type, which the environment has already made concrete.
     HirType_Self(:final baseType) => _convert(baseType),
+    HirType_Dyn(:final trait) => .dyn(
+      trait: trait.declaration,
+      typeArguments: trait.typeArguments.map(_convert).toList(),
+    ),
     HirType_Parameter() || HirType_Variable() || HirType_Associated() =>
       throw StateError('`$type` should have been monomorphized away.'),
     HirType_Error() => throw StateError('The HIR still contains errors.'),
@@ -67,6 +72,27 @@ class TypeMonomorphizer {
         return .function(
           parameterTypes: parameterTypes,
           returnType: returnType,
+        );
+
+      case MonoType_Dyn(:final trait, :final typeArguments):
+        typeArguments.forEach(_declare);
+        final hirTrait = hir.traits[trait];
+        if (hirTrait == null) throw StateError('Unknown trait: `$trait`.');
+
+        // `Self` is the object itself, so a slot returning `Self` returns a
+        // boxed value again.
+        final environment = {
+          ...HirType.buildEnvironment(
+            hirTrait.typeParameters,
+            typeArguments.map(_hirTypeOf).toList(),
+          ),
+          TypeParameterId.self(trait): _hirTypeOf(type),
+        };
+        return .dyn(
+          slots: [
+            for (final id in vtableSlotsOf(hir, trait))
+              _slotOf(hirTrait.functions[id]!.signature, environment),
+          ],
         );
 
       case MonoType_Named(:final declaration, :final typeArguments):
@@ -113,6 +139,18 @@ class TypeMonomorphizer {
     }
   }
 
+  MonoDynSlot _slotOf(
+    HirFunctionSignature signature,
+    Map<TypeParameterId, HirType> environment,
+  ) => MonoDynSlot(
+    name: signature.name,
+    parameterTypes: [
+      for (final parameter in signature.parameters.skip(1))
+        monomorphize(parameter.type, environment),
+    ],
+    returnType: monomorphize(signature.returnType, environment),
+  );
+
   HirType _hirTypeOf(MonoType type) => switch (type) {
     MonoType_Named(:final declaration, :final typeArguments) => .named(
       declaration: declaration,
@@ -121,6 +159,12 @@ class TypeMonomorphizer {
     MonoType_Function(:final parameterTypes, :final returnType) => .function(
       parameterTypes: parameterTypes.map(_hirTypeOf).toList(),
       returnType: _hirTypeOf(returnType),
+    ),
+    MonoType_Dyn(:final trait, :final typeArguments) => .dyn(
+      HirTrait(
+        declaration: trait,
+        typeArguments: typeArguments.map(_hirTypeOf).toList(),
+      ),
     ),
   };
 }

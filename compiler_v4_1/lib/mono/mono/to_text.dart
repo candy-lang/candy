@@ -1,3 +1,5 @@
+import 'package:supernova/supernova.dart';
+
 import 'ids.dart';
 import 'mono.dart';
 
@@ -5,14 +7,17 @@ import 'mono.dart';
 String monoToText(Mono mono) {
   final builder = _TextBuilder();
 
-  for (final type in mono.typeDeclarations.keys.toList()..sort()) {
+  for (final type in mono.typeDeclarations.keys.sorted()) {
     builder.writeTypeDeclaration(type, mono.typeDeclarations[type]!);
   }
   for (final id in mono.assignmentInitializationOrder) {
     builder.writeAssignment(mono.assignments[id]!);
   }
-  for (final id in mono.functions.keys.toList()..sort()) {
+  for (final id in mono.functions.keys.sorted()) {
     builder.writeFunction(mono.functions[id]!);
+  }
+  for (final id in mono.vtables.keys.sorted()) {
+    builder.writeVtable(id, mono.vtables[id]!);
   }
 
   builder.writeLine('main: ${mono.mainFunction}');
@@ -75,7 +80,28 @@ class _TextBuilder {
             );
           }
         }, '}');
+      case MonoTypeDeclaration_Dyn(:final slots):
+        if (slots.isEmpty) {
+          writeLine('dyn $type {}');
+          return;
+        }
+        writeBlock('dyn $type {', () {
+          for (final slot in slots) {
+            writeLine(
+              '${slot.name}(${slot.parameterTypes.join(', ')}) '
+              '${slot.returnType},',
+            );
+          }
+        }, '}');
     }
+  }
+
+  void writeVtable(MonoVtableId id, MonoVtable vtable) {
+    writeBlock('vtable $id (type ID ${vtable.typeId}) {', () {
+      for (final entry in vtable.entries) {
+        writeLine('$entry,');
+      }
+    }, '}');
   }
 
   void writeAssignment(MonoAssignment assignment) {
@@ -102,6 +128,8 @@ class _TextBuilder {
         );
       case MonoBodyOrBuiltin_Body(:final body):
         writeBlock('$header {', () => writeBodyEntries(body), '}');
+      case MonoBodyOrBuiltin_DynDispatch(:final slot):
+        writeLine('$header = vtable slot $slot');
     }
   }
 
@@ -159,6 +187,10 @@ class _TextBuilder {
           '$prefix($parameterText) => {',
           () => writeBodyEntries(body),
           '}',
+        );
+      case MonoExpressionKind_ToDyn(:final value, :final vtable):
+        writeLine(
+          '${prefix}toDyn $value${vtable == null ? '' : ' via $vtable'}',
         );
     }
   }

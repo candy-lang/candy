@@ -20,6 +20,12 @@ sealed class MonoType with _$MonoType implements Comparable<MonoType> {
     required MonoType returnType,
   }) = MonoType_Function;
 
+  /// A trait object of [trait] instantiated with [typeArguments].
+  const factory MonoType.dyn({
+    required DeclarationId trait,
+    @Default(<MonoType>[]) List<MonoType> typeArguments,
+  }) = MonoType_Dyn;
+
   const MonoType._();
 
   @override
@@ -34,6 +40,8 @@ sealed class MonoType with _$MonoType implements Comparable<MonoType> {
     MonoType_Function(:final parameterTypes, :final returnType) =>
       r'$Fun'
           '${mangleArguments(parameterTypes)}\$returns\$$returnType',
+    MonoType_Dyn(:final trait, :final typeArguments) =>
+      '\$Dyn\$${trait.mangled}${mangleArguments(typeArguments)}',
   };
 }
 
@@ -77,4 +85,22 @@ extension DeclarationIdMangling on DeclarationId {
         : parent.mangled;
     return '$prefix\$$name${disambiguator == 0 ? '' : '\$\$$disambiguator'}';
   }
+}
+
+/// The vtable that lets [concreteType] be used as the trait object [dynType].
+@freezed
+sealed class MonoVtableId
+    with _$MonoVtableId
+    implements Comparable<MonoVtableId> {
+  const factory MonoVtableId({
+    required MonoType concreteType,
+    required MonoType_Dyn dynType,
+  }) = _MonoVtableId;
+  const MonoVtableId._();
+
+  @override
+  int compareTo(MonoVtableId other) => toString().compareTo(other.toString());
+
+  @override
+  String toString() => '$concreteType\$as\$$dynType';
 }

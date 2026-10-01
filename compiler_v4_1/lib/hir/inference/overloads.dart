@@ -1,10 +1,11 @@
-import 'package:supernova/supernova.dart';
+import 'package:supernova/supernova.dart' hide IterableSorted;
 
 import '../../lowering/modules.dart';
 import '../../lowering/signatures.dart';
 import '../../lowering/types.dart';
 import '../hir/hir.dart';
 import '../hir/ids.dart';
+import '../traits/dyn_compatibility.dart';
 import '../traits/hir_bridge.dart';
 import '../traits/solver.dart';
 import '../traits/solver_values.dart';
@@ -248,8 +249,52 @@ class OverloadResolver {
     String name,
     SolverContext solverContext,
   ) {
-    final candidates = <CandidateSource>[];
     final receiver = signatures.normalizer.normalize(rawReceiver);
+    final candidates = _ownMemberCandidates(receiver, name, solverContext);
+
+    // Every type implements `Any` without an impl. A bound on `Any`, or `Any`'s
+    // own `Self`, may have added its functions already.
+    final anyId = signatures.wellKnownTypes.anyId;
+    if (anyId != null && !candidates.any((it) => it.function.owner == anyId)) {
+      final isOpaque =
+          receiver is HirType_Associated ||
+          receiver.isTraitSelf ||
+          receiver is HirType_Parameter ||
+          receiver is HirType_Dyn;
+      _addTraitFunctions(
+        candidates,
+        HirTrait(declaration: anyId),
+        receiver,
+        name,
+        group: isOpaque ? 0 : _traitGroup,
+        goals: const [],
+      );
+    }
+    return candidates;
+  }
+
+  List<CandidateSource> _ownMemberCandidates(
+    HirType receiver,
+    String name,
+    SolverContext solverContext,
+  ) {
+    final candidates = <CandidateSource>[];
+
+    // A trait object only offers what its vtable holds.
+    if (receiver is HirType_Dyn) {
+      _addTraitFunctions(
+        candidates,
+        receiver.trait,
+        receiver,
+        name,
+        group: 0,
+        goals: const [],
+        onlyDispatchable: !signatures.wellKnownTypes.isAny(
+          receiver.trait.declaration,
+        ),
+      );
+      return candidates;
+    }
 
     // A projection that no impl resolves stands for one unknown type, so like
     // a type parameter it only offers what its declared bound provides.
@@ -468,6 +513,7 @@ class OverloadResolver {
     required List<SolverGoal> goals,
     LoweredImpl? impl,
     Map<TypeParameterId, HirType> implSubstitutions = const {},
+    bool onlyDispatchable = false,
   }) {
     final trait = signatures.traits[traitRef.declaration];
     if (trait == null) return;
@@ -481,6 +527,10 @@ class OverloadResolver {
       final traitFunction = signatures.functions[traitFunctionId];
       if (traitFunction == null) continue;
       if (traitFunction.signature.name != name) continue;
+      if (onlyDispatchable &&
+          whyNotDispatchable(traitFunction.signature) != null) {
+        continue;
+      }
 
       // An impl that doesn't override a defaulted trait function inherits it.
       // Without an impl the receiver is a type parameter, so the trait
@@ -545,7 +595,7 @@ class OverloadResolver {
     final rejections = <(HirFunctionSignature, String)>[];
     var applicable = <(CandidateSource, OverloadCandidate)>[];
 
-    final groups = candidates.map((it) => it.group).toSet().toList()..sort();
+    final groups = candidates.map((it) => it.group).toSet().sorted();
     for (final group in groups) {
       for (final source in candidates.where((it) => it.group == group)) {
         final scratch = variables.speculate();
@@ -569,7 +619,10 @@ class OverloadResolver {
     if (applicable.isEmpty) return OverloadNotFound(rejections);
 
     if (applicable.length > 1) {
-      final best = _mostSpecific(applicable.map((it) => it.$2).toList());
+      final best = _mostSpecific(
+        applicable.map((it) => it.$2).toList(),
+        solverContext,
+      );
       if (best == null) {
         return OverloadAmbiguous(applicable.map((it) => it.$1).toList());
       }
@@ -612,11 +665,21 @@ class OverloadResolver {
     }
 
     for (final (index, parameter) in candidate.signature.parameters.indexed) {
-      if (!unifier.assignable(argumentTypes[index], parameter.type)) {
-        final expected = variables.resolve(parameter.type);
-        final got = variables.resolve(argumentTypes[index]);
-        return 'expected `$expected` for `${parameter.name}`, got `$got`';
+      final argumentType = argumentTypes[index];
+      if (unifier.assignable(argumentType, parameter.type) ||
+          canCoerce(argumentType, parameter.type, variables, solverContext)) {
+        continue;
       }
+
+      final expected = variables.resolve(parameter.type);
+      final got = variables.resolve(argumentType);
+      // A generic parameter already pinned to one type by another argument is
+      // the usual way to end up here when mixing types.
+      final hint = original.parameters[index].type is HirType_Parameter
+          ? '; to mix types, annotate the expected type with a trait, e.g. '
+                '`let items: List[MyTrait] = …`'
+          : '';
+      return 'expected `$expected` for `${parameter.name}`, got `$got`$hint';
     }
 
     final resolvedSubstitutions = {
@@ -665,42 +728,93 @@ class OverloadResolver {
   }
 
   /// The single candidate that every other one is at least as general as.
-  OverloadCandidate? _mostSpecific(List<OverloadCandidate> candidates) {
+  OverloadCandidate? _mostSpecific(
+    List<OverloadCandidate> candidates,
+    SolverContext solverContext,
+  ) {
+    bool isMoreSpecific(OverloadCandidate a, OverloadCandidate b) =>
+        _isMoreSpecific(a, b, solverContext);
+
     OverloadCandidate? best;
     for (final candidate in candidates) {
-      if (best == null || _isMoreSpecific(candidate, best)) best = candidate;
+      if (best == null || isMoreSpecific(candidate, best)) best = candidate;
     }
     if (best == null) return null;
 
     for (final candidate in candidates) {
       if (identical(candidate, best)) continue;
-      if (!_isMoreSpecific(best, candidate)) return null;
+      if (!isMoreSpecific(best, candidate)) return null;
     }
     return best;
   }
 
-  bool _isMoreSpecific(OverloadCandidate a, OverloadCandidate b) {
-    if (!_acceptsAllOf(a, b)) return false;
+  bool _isMoreSpecific(
+    OverloadCandidate a,
+    OverloadCandidate b,
+    SolverContext solverContext,
+  ) {
+    if (!_acceptsAllOf(a, b, solverContext)) return false;
     // Interchangeable both ways: prefer the concrete signature, as Kotlin does
     // when a generic and a non-generic overload both apply.
-    if (_acceptsAllOf(b, a)) return !a.isGeneric && b.isGeneric;
+    if (_acceptsAllOf(b, a, solverContext)) return !a.isGeneric && b.isGeneric;
     return true;
   }
 
-  /// Whether every argument [a] accepts is also accepted by [b].
-  bool _acceptsAllOf(OverloadCandidate a, OverloadCandidate b) {
+  /// Whether every argument [a] accepts is also accepted by [b], so `f(Label)`
+  /// is more specific than `f(Widget)` when `Label` implements `Widget`.
+  bool _acceptsAllOf(
+    OverloadCandidate a,
+    OverloadCandidate b,
+    SolverContext solverContext,
+  ) {
     if (a.signature.parameters.length != b.signature.parameters.length) {
       return false;
     }
-    final unifier = _unifier(TypeVariables());
+    final variables = TypeVariables();
+    final unifier = _unifier(variables);
     for (final (index, parameter) in a.signature.parameters.indexed) {
-      if (!unifier.assignable(
-        parameter.type,
-        b.signature.parameters[index].type,
-      )) {
+      final other = b.signature.parameters[index].type;
+      if (!unifier.assignable(parameter.type, other) &&
+          !canCoerce(parameter.type, other, variables, solverContext)) {
         return false;
       }
     }
     return true;
+  }
+
+  /// Whether a value of type [from] can be boxed into the trait object [to].
+  ///
+  /// Only decidable once both are known: a type variable could still turn out
+  /// to be the object type itself.
+  bool canCoerce(
+    HirType from,
+    HirType to,
+    TypeVariables variables,
+    SolverContext solverContext,
+  ) {
+    final target = signatures.normalizer.normalize(variables.resolve(to));
+    if (target is! HirType_Dyn || variables.isUnresolved(target)) return false;
+    final source = signatures.normalizer.normalize(variables.resolve(from));
+    if (variables.isUnresolved(source)) return false;
+
+    // Every vtable starts with the concrete type's ID, so any object can be
+    // reread as an `Any`. Other upcasts would need supertraits.
+    if (source is HirType_Dyn) {
+      return signatures.wellKnownTypes.isAny(target.trait.declaration);
+    }
+
+    final goal = solverGoalOf(
+      target.trait,
+      source,
+      normalizer: signatures.normalizer,
+    );
+    if (goal == null) return false;
+    return signatures.solverEnvironment
+        .solve(
+          goal,
+          solverContext.conditions,
+          opaqueVariables: solverContext.opaqueVariables,
+        )
+        .isUnique;
   }
 }

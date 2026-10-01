@@ -25,7 +25,15 @@ class BodyMonomorphizer {
     id: entry.id,
     name: entry.name,
     expression: MonoExpression(
-      kind: _lowerKind(entry.expression.kind),
+      kind: switch (entry.expression.kind) {
+        // The only kind that needs the expression's type besides the kind.
+        HirExpressionKind_ToDyn(:final value, :final sourceType) => _lowerToDyn(
+          value,
+          sourceType,
+          entry.expression.type,
+        ),
+        final kind => _lowerKind(kind),
+      },
       type: _type(entry.expression.type),
     ),
   );
@@ -72,10 +80,37 @@ class BodyMonomorphizer {
       ],
       body: lower(body),
     ),
+    HirExpressionKind_ToDyn() => throw StateError(
+      'Boxing needs its target type, which `_lowerEntry` passes on.',
+    ),
     HirExpressionKind_Error() => throw StateError(
       'The HIR still contains errors.',
     ),
   };
+
+  /// Substitution can turn a coercion into a no-op, e.g. a `T: Widget` that
+  /// turns out to be `Widget` itself.
+  MonoExpressionKind _lowerToDyn(
+    HirId value,
+    HirType sourceType,
+    HirType targetType,
+  ) {
+    final source = _concrete(sourceType);
+    final target = _concrete(targetType);
+    if (target is! HirType_Dyn) {
+      throw StateError('Boxing into `$target`, which is not a trait object.');
+    }
+    if (source == target) return .localReference(value);
+    // Only an upcast to `Any` gets here with an object as the source.
+    if (source is HirType_Dyn) return .toDyn(value: value, vtable: null);
+    return .toDyn(
+      value: value,
+      vtable: monomorphizer.vtableFor(source, target),
+    );
+  }
+
+  HirType _concrete(HirType type) =>
+      _types.normalizer.normalize(type.substitute(environment)).unwrapSelf;
 
   MonoExpressionKind _lowerSwitch(
     HirId value,

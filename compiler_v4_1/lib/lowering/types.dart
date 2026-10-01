@@ -42,11 +42,17 @@ class TypeLowerer {
     required this.context,
     required this.declarations,
     required this.scope,
+    required this.checkTraitObject,
   });
 
   final Context context;
   final CollectedDeclarations declarations;
   final ImportScope scope;
+
+  /// Called for every trait used as a type. Whether it can be one depends on
+  /// its functions, which may not be lowered yet, so the caller decides when
+  /// to check.
+  final void Function(HirTrait trait, SourceSpan span) checkTraitObject;
 
   void error(SourceSpan span, String message) =>
       context.addError(CompilerError(span: span, message: message));
@@ -193,9 +199,14 @@ class TypeLowerer {
           declaration: id,
           typeArguments: _checkArity(id, arguments, name.span),
         );
-      case NamedTrait():
-        error(name.span, "Traits can't be used as types.");
-        return const HirType.error();
+      case NamedTrait(:final id):
+        _reference(name.span, declarations.spanOf(id));
+        final trait = HirTrait(
+          declaration: id,
+          typeArguments: _checkArity(id, arguments, name.span),
+        );
+        checkTraitObject(trait, name.span);
+        return HirType.dyn(trait);
       case NamedAmbiguous(:final originsText):
         error(name.span, 'Ambiguous name `$text`, imported from $originsText.');
         return const HirType.error();

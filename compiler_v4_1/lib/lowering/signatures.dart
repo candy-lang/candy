@@ -6,6 +6,7 @@ import '../error.dart';
 import '../hir/hir/builtins.dart';
 import '../hir/hir/hir.dart';
 import '../hir/hir/ids.dart';
+import '../hir/traits/dyn_compatibility.dart';
 import '../hir/traits/hir_bridge.dart';
 import '../hir/traits/projections.dart';
 import '../hir/traits/solver.dart';
@@ -158,6 +159,24 @@ class Signatures {
     final owner = functions[functionId]?.owner;
     return owner == null ? null : implsById[owner];
   }
+
+  /// Why [trait] can't be used as a type, or `null` if it can.
+  ///
+  /// A function that isn't dispatchable is fine as long as it has a default
+  /// body; it just can't be called on a trait object. `Any`'s generic functions
+  /// are exempt because no impl can override them, so running their defaults
+  /// on a trait object is sound.
+  String? whyNotDynCompatible(DeclarationId trait) {
+    if (wellKnownTypes.isAny(trait)) return null;
+    for (final id in traits[trait]?.functionIds ?? const <DeclarationId>[]) {
+      final function = functions[id];
+      if (function == null || function.ast?.body != null) continue;
+      if (whyNotDispatchable(function.signature) case final reason?) {
+        return 'its function `${id.name}` $reason';
+      }
+    }
+    return null;
+  }
 }
 
 Signatures lowerSignatures(
@@ -184,6 +203,7 @@ class _SignatureLowerer {
   final _builtinIds = <DeclarationId, BuiltinFunction>{};
   final _solverEnvironment = SolverEnvironment();
   final _ids = HirIdGenerator();
+  final _traitObjectUses = <(HirTrait, SourceSpan)>[];
 
   void _error(SourceSpan span, String message) =>
       context.addError(CompilerError(span: span, message: message));
@@ -192,6 +212,7 @@ class _SignatureLowerer {
     context: context,
     declarations: declarations,
     scope: declarations.scopeOf(module),
+    checkTraitObject: (trait, span) => _traitObjectUses.add((trait, span)),
   );
 
   /// Only valid once every impl head is lowered, which is why it's lazy.
@@ -222,7 +243,7 @@ class _SignatureLowerer {
     declarations.ofKind<CollectedImpl>().forEach(_checkImpl);
     _checkOverloads();
 
-    return Signatures(
+    final signatures = Signatures(
       typeDeclarations: _typeDeclarations,
       traits: _traits,
       impls: _impls,
@@ -232,6 +253,39 @@ class _SignatureLowerer {
       wellKnownTypes: declarations.wellKnownTypes,
       builtinIds: _builtinIds,
     );
+    for (final (trait, span) in _traitObjectUses) {
+      checkTraitObject(context, signatures, trait, span);
+    }
+    _addTraitObjectRules(signatures);
+    return signatures;
+  }
+
+  /// Every type implements `Any`, and every trait object implements its own
+  /// trait. Neither has an impl in the source to read a rule off.
+  void _addTraitObjectRules(Signatures signatures) {
+    for (final trait in _traits.values) {
+      if (declarations.wellKnownTypes.isAny(trait.id)) {
+        _solverEnvironment.addRule(
+          SolverRule(
+            goal: trait.solverGoal,
+            subgoals: const [],
+            origin: trait.id,
+          ),
+        );
+        continue;
+      }
+      if (signatures.whyNotDynCompatible(trait.id) != null) continue;
+
+      final goal = solverGoalOf(trait.selfTrait, HirType.dyn(trait.selfTrait));
+      if (goal == null) continue;
+      _solverEnvironment.addRule(
+        SolverRule(
+          goal: goal,
+          subgoals: trait.solverSubgoals,
+          origin: trait.id,
+        ),
+      );
+    }
   }
 
   void _addBuiltins() {
@@ -420,7 +474,12 @@ class _SignatureLowerer {
     );
     _scopes[impl.id] = typeScope;
 
-    if (trait == null) {
+    if (type is HirType_Dyn) {
+      _error(implSpan, "Can't implement for a trait object.");
+    } else if (traitRef != null &&
+        declarations.wellKnownTypes.isAny(traitRef.declaration)) {
+      _error(implSpan, 'Every type implements `Any` already.');
+    } else if (trait == null) {
       // A blanket inherent impl would add its functions to every type, which
       // no bound could then constrain. Rust rules them out the same way.
       if (type is HirType_Parameter) {
@@ -832,4 +891,21 @@ class _SignatureLowerer {
       }
     }
   }
+}
+
+/// Reports [trait] at [span] if it can't be used as a type.
+void checkTraitObject(
+  Context context,
+  Signatures signatures,
+  HirTrait trait,
+  SourceSpan span,
+) {
+  final reason = signatures.whyNotDynCompatible(trait.declaration);
+  if (reason == null) return;
+  context.addError(
+    CompilerError(
+      span: span,
+      message: "`${trait.declaration.name}` can't be used as a type: $reason.",
+    ),
+  );
 }

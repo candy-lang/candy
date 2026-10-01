@@ -54,6 +54,11 @@ class TypeVariables {
           baseType: resolve(baseType),
           declaration: declaration,
         ),
+      HirType_Dyn(:final trait) => HirType.dyn(
+        trait.copyWith(
+          typeArguments: trait.typeArguments.map(resolve).toList(),
+        ),
+      ),
       _ => head,
     };
   }
@@ -83,6 +88,11 @@ class TypeVariables {
           baseType: finalize(baseType),
           declaration: declaration,
         ),
+      HirType_Dyn(:final trait) => HirType.dyn(
+        trait.copyWith(
+          typeArguments: trait.typeArguments.map(finalize).toList(),
+        ),
+      ),
       _ => resolved,
     };
   }
@@ -111,6 +121,9 @@ class TypeVariables {
       HirType_Associated(:final trait, :final baseType) =>
         trait.typeArguments.any((it) => _occurs(id, it)) ||
             _occurs(id, baseType),
+      HirType_Dyn(:final trait) => trait.typeArguments.any(
+        (it) => _occurs(id, it),
+      ),
       _ => false,
     };
   }
@@ -129,6 +142,9 @@ extension on HirType {
     HirType_Associated(:final trait, :final baseType) =>
       trait.typeArguments.any((it) => it.containsVariable) ||
           baseType.containsVariable,
+    HirType_Dyn(:final trait) => trait.typeArguments.any(
+      (it) => it.containsVariable,
+    ),
     _ => false,
   };
 }
@@ -136,7 +152,9 @@ extension on HirType {
 /// Unifies and checks assignability against a set of [TypeVariables].
 ///
 /// Candy has no subtyping between named types, so assignability is
-/// unification plus escapes for `Never`, error types, and `Self`.
+/// unification plus escapes for `Never`, error types, and `Self`. Coercing a
+/// value into a trait object needs the trait solver, so body lowering does that
+/// on top.
 class Unifier {
   Unifier({
     required this.variables,
@@ -207,6 +225,16 @@ class Unifier {
           }
         }
         return unify(l.baseType, r.baseType);
+
+      case (HirType_Dyn(), HirType_Dyn()):
+        final l = (left as HirType_Dyn).trait;
+        final r = (right as HirType_Dyn).trait;
+        if (l.declaration != r.declaration) return false;
+        if (l.typeArguments.length != r.typeArguments.length) return false;
+        for (var i = 0; i < l.typeArguments.length; i++) {
+          if (!unify(l.typeArguments[i], r.typeArguments[i])) return false;
+        }
+        return true;
 
       // `Self` unifies with whatever it stands for.
       case (HirType_Self(:final baseType), _):

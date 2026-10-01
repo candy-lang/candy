@@ -1,6 +1,7 @@
 import 'package:compiler_v4_1/mono/hir_to_mono.dart';
 import 'package:compiler_v4_1/mono/mono/ids.dart';
 import 'package:compiler_v4_1/mono/mono/mono.dart';
+import 'package:supernova/supernova.dart';
 import 'package:test/test.dart';
 
 import '../hir/lowering/harness.dart';
@@ -22,12 +23,10 @@ class MonoHarness {
   final Mono mono;
 
   /// The instantiations of every function named [name], e.g. `identity[Int]`.
-  List<String> instancesOf(String name) =>
-      mono.functions.keys
-          .where((it) => it.declaration.name == name)
-          .map(describeInstance)
-          .toList()
-        ..sort();
+  List<String> instancesOf(String name) => mono.functions.keys
+      .where((it) => it.declaration.name == name)
+      .map(describeInstance)
+      .sorted();
 
   MonoFunction instance(String description) {
     final matches = mono.functions.entries
@@ -38,7 +37,7 @@ class MonoHarness {
       hasLength(1),
       reason:
           'Expected exactly one `$description`, but the program has '
-          '${mono.functions.keys.map(describeInstance).toList()..sort()}.',
+          '${mono.functions.keys.map(describeInstance).sorted()}.',
     );
     return matches.single.value;
   }
@@ -87,7 +86,7 @@ class MonoHarness {
 
   /// The declared types, e.g. `Maybe[Int]`.
   List<String> get typeNames =>
-      mono.typeDeclarations.keys.map(describeType).toList()..sort();
+      mono.typeDeclarations.keys.map(describeType).sorted();
 
   List<String> get assignmentOrder => mono.assignmentInitializationOrder
       .map((it) => mono.assignments[it]!.name)
@@ -104,6 +103,10 @@ String describeType(MonoType type) => switch (type) {
   MonoType_Function(:final parameterTypes, :final returnType) =>
     '(${parameterTypes.map(describeType).join(', ')}) '
         '${describeType(returnType)}',
+  MonoType_Dyn(:final trait, :final typeArguments) =>
+    typeArguments.isEmpty
+        ? trait.name
+        : '${trait.name}[${typeArguments.map(describeType).join(', ')}]',
 };
 
 /// `identity[Int]`, or `$impl.toText[Int]` for a function declared in a trait

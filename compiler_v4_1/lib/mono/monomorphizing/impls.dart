@@ -4,6 +4,7 @@ import '../../hir/hir/builtins.dart';
 import '../../hir/hir/hir.dart';
 import '../../hir/hir/ids.dart';
 import '../../hir/inference/inference.dart';
+import '../../hir/traits/dyn_compatibility.dart';
 import '../../hir/traits/hir_bridge.dart';
 import '../../hir/traits/projections.dart';
 
@@ -11,12 +12,21 @@ import '../../hir/traits/projections.dart';
 class ResolvedCall {
   const ResolvedCall({
     required this.signature,
-    required this.body,
+    required HirBodyOrBuiltin this.body,
     required this.substitutions,
-  });
+  }) : dynSlot = null;
+
+  /// A call through a trait object, which runs whatever its vtable holds in
+  /// [dynSlot].
+  const ResolvedCall.dynDispatch({
+    required this.signature,
+    required int this.dynSlot,
+    required this.substitutions,
+  }) : body = null;
 
   final HirFunctionSignature signature;
-  final HirBodyOrBuiltin body;
+  final HirBodyOrBuiltin? body;
+  final int? dynSlot;
   final Map<TypeParameterId, HirType> substitutions;
 }
 
@@ -65,6 +75,31 @@ class ImplResolver {
     final selfType = substitutions[TypeParameterId.self(trait.id)];
     if (selfType == null) {
       throw StateError('`Self` is unknown when calling `$id`.');
+    }
+
+    // No impl of `Any` exists, so its functions always run their defaults.
+    if (trait.id == hir.anyTrait) {
+      final defaultBody = traitFunction.body;
+      if (defaultBody == null) {
+        throw StateError('`$id` of `Any` has no default implementation.');
+      }
+      return ResolvedCall(
+        signature: traitFunction.signature,
+        body: .body(defaultBody),
+        substitutions: substitutions,
+      );
+    }
+
+    if (normalizer.normalize(selfType) case HirType_Dyn(
+      trait: HirTrait(declaration: final objectTrait),
+    ) when objectTrait == trait.id) {
+      final slot = vtableSlotsOf(hir, trait.id).indexOf(id);
+      if (slot < 0) throw StateError('`$id` is not in a vtable.');
+      return ResolvedCall.dynDispatch(
+        signature: traitFunction.signature,
+        dynSlot: slot,
+        substitutions: substitutions,
+      );
     }
     final traitArguments = [
       for (final parameter in trait.typeParameters)

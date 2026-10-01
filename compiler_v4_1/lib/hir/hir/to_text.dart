@@ -25,10 +25,6 @@ String hirToText(Hir hir) {
   return builder.toString();
 }
 
-extension on Iterable<DeclarationId> {
-  List<DeclarationId> sorted() => toList()..sort();
-}
-
 class _TextBuilder {
   final _buffer = StringBuffer();
   var _indentation = 0;
@@ -228,6 +224,8 @@ class _TextBuilder {
           () => writeBodyEntries(body),
           '}',
         );
+      case HirExpressionKind_ToDyn(:final value, :final sourceType):
+        writeLine('${prefix}toDyn $value: $sourceType');
       case HirExpressionKind_Error():
         writeLine('$prefix<error>');
     }

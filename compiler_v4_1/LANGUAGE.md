@@ -125,8 +125,58 @@ impl's own type parameters are inferred from the call site. An enum variant of
 the same name wins over a function, since `Maybe.none()` has to keep building a
 value.
 
-Type parameters everywhere use `[T, U: Bound]`, with at most one trait bound
-per parameter.
+Type parameters everywhere use `[T, U: Bound]`, and a parameter can have
+several bounds joined by `+`: `[T: Equal + Hash]`.
+
+### Trait objects and `Any`
+
+A trait's name used as a type is a *trait object*: a value of any type that
+implements the trait, with the concrete type only known at runtime. Calls on it
+dispatch through a vtable.
+
+```candy
+trait Widget { fun describe(self: Self) Text }
+struct Column { children: List[Widget] }
+
+Column(List.of(Label("hi"), Counter(3)))
+```
+
+A value is boxed into a trait object implicitly wherever one is expected: a
+`let` with an annotation, a function's or lambda's result, a struct field, an
+enum payload, or a call argument. The expected type also flows into a call
+with a single candidate, which is how `List.of(...)` above becomes a
+`List[Widget]`. Without an expected type, `List.of(Label("hi"), Counter(3))`
+is an error, since `T` can only be one type. There is no variance: a
+`List[Label]` is not a `List[Widget]`.
+
+A trait can be used as a type unless one of its functions without a default
+body can't be called through a vtable. A function can be called that way if:
+
+- its first parameter is `self: Self`,
+- it has no type parameters of its own,
+- no other parameter mentions `Self`,
+- its result mentions `Self` at most as exactly `Self` (which is boxed back into
+  the object), and
+- it never mentions an associated type of `Self`.
+
+A function with a default body that breaks these rules doesn't disqualify the
+trait; it just can't be called on a trait object. A trait object implements its
+own trait, so it can be passed where `[T: Widget]` is expected. Nothing can
+implement a trait object type itself.
+
+Every type implements `Core.Any` without an impl, and writing one is an error,
+so the type ID it reports can be trusted:
+
+```candy
+let state: Any = CounterState(0)
+state.typeId().equals(TypeId.of[CounterState]())  # true
+state.is[CounterState]()                          # true
+state.downcast[CounterState]()                    # Maybe.some(...)
+```
+
+On a trait object these see the concrete type, not the object type. Any trait
+object can be used as an `Any`; other conversions between object types aren't
+supported.
 
 ### `fun`
 
@@ -181,9 +231,12 @@ library code built from `switch` and recursive functions.
 
 Types are inferred bidirectionally: `let` bindings without annotations take
 the type implied by later use, and lambda parameter types are inferred from
-the expected function type at the call site. An overload is resolved to the
-most specific applicable candidate; genuinely ambiguous or unresolvable
-cases are compile errors.
+the expected function type at the call site. When only one function can match
+a call, its parameter types are the expected types of the arguments, and the
+call's own expected type pins down its type parameters first. An overload is
+resolved to the most specific applicable candidate, where a parameter of a
+concrete type beats a trait object it implements; genuinely ambiguous or
+unresolvable cases are compile errors.
 
 ## Builtins
 

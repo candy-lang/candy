@@ -90,6 +90,14 @@ class TypeNormalizer {
         declaration,
         depth,
       ),
+    HirType_Dyn(:final trait) => .dyn(
+      HirTrait(
+        declaration: trait.declaration,
+        typeArguments: trait.typeArguments
+            .map((it) => _normalize(it, depth))
+            .toList(),
+      ),
+    ),
     HirType_Parameter() || HirType_Error() || HirType_Variable() => type,
   };
 

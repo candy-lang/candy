@@ -1,10 +1,12 @@
+import 'package:supernova/supernova.dart';
+
 import 'error.dart';
 import 'position.dart';
 import 'references.dart';
 
 class Context {
   final _errors = <CompilerError>{};
-  List<CompilerError> get errors => _errors.toList()..sort();
+  List<CompilerError> get errors => _errors.sorted();
 
   final references = ReferenceIndex();
 

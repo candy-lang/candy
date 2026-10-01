@@ -139,7 +139,7 @@ class NamedAmbiguous extends NamedDeclarations {
   final List<DeclarationId> ids;
 
   String get originsText {
-    final modules = ids.map((it) => '${it.module}').toSet().toList()..sort();
+    final modules = ids.map((it) => '${it.module}').toSet().sorted();
     return modules.map((it) => '`$it`').join(' and ');
   }
 }

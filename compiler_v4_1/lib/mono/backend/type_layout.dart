@@ -59,6 +59,9 @@ class _Context {
       case null:
       case MonoTypeDeclaration_Builtin():
       case MonoTypeDeclaration_Function():
+      // The value lives behind a pointer, so the object has no by-value
+      // members to lay out first.
+      case MonoTypeDeclaration_Dyn():
         break;
       case MonoTypeDeclaration_Struct(:final fields):
         for (final field in fields) {
