@@ -29,7 +29,7 @@ const names = {
   'yam',
 };
 
-Future<void> main(List<String> args) async {
+Future<void> main() async {
   final resultFile = File('result.md');
   if (!resultFile.existsSync()) {
     await resultFile.writeAsString(
@@ -53,6 +53,7 @@ Future<void> main(List<String> args) async {
       isGitHubOrganizationAvailable(name),
       isGitHubOrganizationAvailable('$name-lang'),
     ]);
+    // ignore: prefer-first
     final domainShort = results[0];
     final domainLong = results[1];
     final gitHubShort = results[2];
