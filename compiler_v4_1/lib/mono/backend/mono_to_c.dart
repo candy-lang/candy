@@ -622,7 +622,7 @@ return (${id.dynType}) {.data = data, .vtable = &$id};
               .firstWhere((it) => it.name == variant)
               .type!;
           _push('''
-$valueType* ${id}_value_boxed = malloc(sizeof($valueType*));
+$valueType* ${id}_value_boxed = malloc(sizeof($valueType));
 *${id}_value_boxed = $value;
 $type $id = {
   .variant = ${type}_$variant,
@@ -1048,7 +1048,7 @@ if ($length.value < 0) {
 
 $returnType result = {
     .length = $length.value,
-    .values = malloc($length.value * sizeof(${itemType()}*)),
+    .values = malloc($length.value * sizeof(${itemType()})),
 };
 for (uint64_t i = 0; i < $length.value; i++) {
     $intType index = {.value = i};
@@ -1087,7 +1087,7 @@ $returnType result = {
     .length = length,
     .values = malloc(length * sizeof(${itemType()})),
 };
-memcpy(result.values, $list.values, $index.value * sizeof(${itemType()}*));
+memcpy(result.values, $list.values, $index.value * sizeof(${itemType()}));
 result.values[$index.value] = $item;
 memcpy(result.values + $index.value + 1, $list.values + $index.value, ($list.length - $index.value) * sizeof(${itemType()}));
 return result;''');
@@ -1169,8 +1169,8 @@ $returnType result = {
     .length = length,
     .values = malloc(length * sizeof(${itemType()})),
 };
-memcpy(result.values, $list.values, $index.value * sizeof(${itemType()}*));
-memcpy(result.values + $index.value, $list.values + $index.value + 1, ($list.length - $index.value - 1) * sizeof(${itemType()}*));
+memcpy(result.values, $list.values, $index.value * sizeof(${itemType()}));
+memcpy(result.values + $index.value, $list.values + $index.value + 1, ($list.length - $index.value - 1) * sizeof(${itemType()}));
 return result;''');
       case .listReplace:
         final list = parameters[0].id;
@@ -1189,7 +1189,7 @@ $returnType result = {
     .length = $list.length,
     .values = malloc($list.length * sizeof(${itemType()})),
 };
-memcpy(result.values, $list.values, $list.length * sizeof(${itemType()}*));
+memcpy(result.values, $list.values, $list.length * sizeof(${itemType()}));
 result.values[$index.value] = $newItem;
 return result;''');
       case .panic:
