@@ -187,6 +187,37 @@ void main() {
       expect(harness.instancesOf('label'), [r'$impl.label[Int]']);
       expect(harness.callsIn(r'$impl.label[Int]'), [r'$impl#1.name']);
     });
+
+    test(
+      'resolves an associated type of blanket impls told apart by bounds',
+      () {
+        final harness = MonoHarness.of('''
+        trait Leaf {}
+        trait Branch {}
+        trait Stateful {
+          type State
+          fun initialState(self: Self) Self.State
+        }
+        impl[T: Leaf] T: Stateful {
+          type State = Int
+          fun initialState(self: T) Self.State { 0 }
+        }
+        impl[T: Branch] T: Stateful {
+          type State = Text
+          fun initialState(self: T) Self.State { "" }
+        }
+        impl Int: Branch {}
+        fun start[T: Stateful](value: T) T.State { value.initialState() }
+        fun main() Int {
+          start(1)
+          0
+        }
+      ''');
+        expect(harness.instancesOf('initialState'), [
+          r'$impl#1.initialState[Int]',
+        ]);
+      },
+    );
   });
 
   group('inherent impls', () {

@@ -94,5 +94,22 @@ List<SolverGoal> solverGoalsOfBounds(
       ?solverGoalOf(bound, parameter.type, normalizer: normalizer),
 ];
 
+/// Whether every bound of [parameters] holds once [substitutions], which must
+/// be concrete, are applied. Without conditions to assume, they either do or
+/// they don't.
+bool boundsHold(
+  SolverEnvironment environment,
+  List<HirTypeParameter> parameters,
+  Map<TypeParameterId, HirType> substitutions, {
+  TypeNormalizer? normalizer,
+}) => solverGoalsOfBounds(parameters, normalizer: normalizer).every(
+  (goal) => environment
+      .solve(
+        substituteGoal(goal, substitutions, normalizer: normalizer),
+        const [],
+      )
+      .isUnique,
+);
+
 Set<SolverVariable> solverVariablesOf(List<HirTypeParameter> parameters) =>
     parameters.map((it) => SolverVariable.parameter(it.id)).toSet();

@@ -213,21 +213,12 @@ class ImplResolver {
       for (final MapEntry(:key, :value) in substitutions.entries)
         key: scratch.finalize(value),
     };
-    // Everything is concrete by now, so the bounds hold or they don't; there
-    // are no conditions to assume.
-    for (final goal in solverGoalsOfBounds(
+    final holds = boundsHold(
+      hir.solverEnvironment,
       impl.typeParameters,
+      resolved,
       normalizer: normalizer,
-    )) {
-      if (!hir.solverEnvironment
-          .solve(
-            substituteGoal(goal, resolved, normalizer: normalizer),
-            const [],
-          )
-          .isUnique) {
-        return null;
-      }
-    }
-    return resolved;
+    );
+    return holds ? resolved : null;
   }
 }

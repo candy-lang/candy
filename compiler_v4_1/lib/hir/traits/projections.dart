@@ -4,19 +4,33 @@ import '../hir/builtins.dart';
 import '../hir/hir.dart';
 import '../hir/ids.dart';
 import '../inference/inference.dart';
+import 'hir_bridge.dart';
 
-TypeNormalizer normalizerOf(Hir hir) => TypeNormalizer([
-  for (final impl in hir.impls)
-    ProjectionImpl(
-      typeParameters: impl.typeParameters,
-      type: impl.type,
-      trait: switch (impl.trait) {
-        null || None() => null,
-        Some(:final some) => some,
-      },
-      associatedTypes: impl.associatedTypes,
+/// Unlike the normalizer used during lowering, this one checks impl bounds:
+/// the solver is complete by now.
+TypeNormalizer normalizerOf(Hir hir) {
+  late final TypeNormalizer normalizer;
+  return normalizer = TypeNormalizer(
+    [
+      for (final impl in hir.impls)
+        ProjectionImpl(
+          typeParameters: impl.typeParameters,
+          type: impl.type,
+          trait: switch (impl.trait) {
+            null || None() => null,
+            Some(:final some) => some,
+          },
+          associatedTypes: impl.associatedTypes,
+        ),
+    ],
+    checkBounds: (impl, substitutions) => boundsHold(
+      hir.solverEnvironment,
+      impl.typeParameters,
+      substitutions,
+      normalizer: normalizer,
     ),
-]);
+  );
+}
 
 /// Everything resolving a projection needs to know about one impl.
 ///
@@ -47,9 +61,19 @@ class ProjectionImpl {
 /// *rigid* projection, which only unifies with itself and only offers the
 /// methods of its declared bound.
 class TypeNormalizer {
-  TypeNormalizer(this.impls);
+  TypeNormalizer(this.impls, {this.checkBounds});
 
   final List<ProjectionImpl> impls;
+
+  /// Whether the impl's bounds hold for its concrete substitutions. Without
+  /// it, two impls that only a bound tells apart (like the blanket impls of
+  /// `TypedWidget` for `LeafWidget` and `SingleChildWidget`) leave the
+  /// projection rigid.
+  final bool Function(
+    ProjectionImpl impl,
+    Map<TypeParameterId, HirType> substitutions,
+  )?
+  checkBounds;
   final _cache = <HirType, HirType>{};
 
   /// `type Item = Self.Item` is legal to write and would otherwise never stop
@@ -140,6 +164,7 @@ class TypeNormalizer {
 
       final substitutions = _match(impl, traitRef, concrete, trait);
       if (substitutions == null) continue;
+      if (checkBounds?.call(impl, substitutions) == false) continue;
 
       (impl.isBlanket ? blanketMatches : matches).add(
         binding.substitute(substitutions),
@@ -180,10 +205,9 @@ class TypeNormalizer {
   /// What unification pins the impl's type parameters down to, or `null` if
   /// the impl doesn't apply.
   ///
-  /// Unlike `ImplResolver._match` this doesn't check the impl's bounds, which
-  /// would need the solver — and the solver needs this. Two impls that only a
-  /// bound tells apart therefore leave the projection rigid rather than
-  /// resolving it.
+  /// This doesn't check the impl's bounds, which would need the solver — and
+  /// the solver needs this. [checkBounds] does that once the solver is
+  /// complete.
   Map<TypeParameterId, HirType>? _match(
     ProjectionImpl impl,
     HirTrait traitRef,
