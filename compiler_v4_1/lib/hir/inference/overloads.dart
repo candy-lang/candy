@@ -595,7 +595,10 @@ class OverloadResolver {
     final rejections = <(HirFunctionSignature, String)>[];
     var applicable = <(CandidateSource, OverloadCandidate)>[];
 
-    final groups = candidates.map((it) => it.group).toSet().sorted();
+    final groups = candidates
+        .map((it) => it.group)
+        .toSet()
+        .sorted((a, b) => a.compareTo(b));
     for (final group in groups) {
       for (final source in candidates.where((it) => it.group == group)) {
         final scratch = variables.speculate();

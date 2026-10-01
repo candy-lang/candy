@@ -117,8 +117,11 @@ class TypeNormalizer {
     // `Self` stands for the impl's type, which is what an impl is matched
     // against — the same unwrapping `Unifier` does.
     final concrete = baseType.unwrapSelf;
-    if (concrete is HirType_Parameter ||
-        concrete is HirType_Associated ||
+    if (concrete is HirType_Parameter) {
+      final binding = _ownBinding(trait, concrete, declaration);
+      return binding == null ? rigid : _normalize(binding, depth + 1);
+    }
+    if (concrete is HirType_Associated ||
         concrete is HirType_Variable ||
         concrete is HirType_Error) {
       return rigid;
@@ -149,6 +152,29 @@ class TypeNormalizer {
     if (candidates.length != 1) return rigid;
 
     return _normalize(candidates.single, depth + 1);
+  }
+
+  /// Inside `impl[W: LeafWidget] W: TypedWidget`, `Self.State` can only mean
+  /// this impl's binding, even though other blanket impls also match any `W`.
+  /// [parameter] is only in scope inside the impl that declares it.
+  HirType? _ownBinding(
+    HirTrait trait,
+    HirType_Parameter parameter,
+    DeclarationId declaration,
+  ) {
+    for (final impl in impls) {
+      if (!impl.typeParameters.any((it) => it.id == parameter.id)) continue;
+
+      final traitRef = impl.trait;
+      if (traitRef == null || traitRef.declaration != trait.declaration) {
+        return null;
+      }
+      final binding = impl.associatedTypes[declaration];
+      if (binding == null) return null;
+      if (_match(impl, traitRef, parameter, trait) == null) return null;
+      return binding;
+    }
+    return null;
   }
 
   /// What unification pins the impl's type parameters down to, or `null` if

@@ -268,6 +268,50 @@ void main() {
       harness.expectNoErrors();
       expect(harness.bindingsOf('f').values, isNot(contains('Wrapper.Item')));
     });
+
+    test("resolves `Self`'s projection in a blanket impl to its binding", () {
+      final harness = _lowerFull('''
+        trait Source {
+          type Value
+          fun get(self: Self) Self.Value
+        }
+        trait Typed {
+          type Value
+          fun read(self: Self) Self.Value
+          fun echo(self: Self, value: Self.Value) Self.Value
+        }
+        impl[T: Source] T: Typed {
+          type Value = T.Value
+          fun read(self: Self) Self.Value { self.get() }
+          fun echo(self: Self, value: Self.Value) Self.Value {
+            pass(self, value)
+          }
+        }
+        fun pass[T: Source](it: T, value: T.Value) T.Value { value }
+        fun main() Int { 0 }
+      ''');
+      harness.expectNoErrors();
+    });
+
+    test('reads a field through a projection the impl binds', () {
+      final harness = _lowerFull('''
+        trait Source {
+          type Value
+          fun get(self: Self) Self.Value
+        }
+        struct Box[T] { inner: T }
+        trait Boxed {
+          type Value
+          fun unbox(self: Self, value: Self.Value) Int
+        }
+        impl[T: Source] T: Boxed {
+          type Value = Box[Int]
+          fun unbox(self: Self, value: Self.Value) Int { value.inner }
+        }
+        fun main() Int { 0 }
+      ''');
+      harness.expectNoErrors();
+    });
   });
 
   group('monomorphization', () {

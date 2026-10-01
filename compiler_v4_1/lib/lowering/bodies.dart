@@ -628,7 +628,7 @@ class _Builder {
   _Lowered _lowerFieldAccess(HirId receiverId, HirType receiver, Token key) {
     final resolved = variables.resolve(receiver);
     if (resolved is HirType_Error) return const _LoweringError();
-    final unwrapped = resolved.unwrapSelf;
+    final unwrapped = lowerer.signatures.normalizer.normalize(resolved);
     if (unwrapped is! HirType_Named) {
       _error(
         key.span,
