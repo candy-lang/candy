@@ -22,6 +22,7 @@ Future<void> main(List<String> arguments) async {
   final runner = CommandRunner<void>('candy', 'The 🍭 Candy CLI.')
     ..addCommand(CheckCommand())
     ..addCommand(CompileCommand())
+    ..addCommand(RunCommand())
     ..addCommand(LspCommand())
     ..addCommand(DebugCommand());
 
@@ -193,60 +194,84 @@ class CompileCommand() extends Command<void> {
       await _compile(path, exitOnError: false);
     }
   }
+}
 
-  Future<void> _compile(String path, {bool exitOnError = true}) async {
-    try {
-      final loaded = _time('Parsing', () => loadPackageForFile(File(path)));
-      final hir = _time(
-        'AST → HIR',
-        () => astToHir(loaded.context, loaded.modules),
-      );
+// `run`
 
-      if (loaded.context.errors.isNotEmpty) {
-        printErrors(loaded.context);
-        throw const Exit(Exit.codeContainsErrors);
-      }
+class RunCommand() extends Command<void> {
+  @override
+  final name = 'run';
+  @override
+  final description = 'Run a Candy program.';
 
-      final mono = _time('HIR → Mono', () => hirToMono(hir));
-      if (mono == null) {
-        stderr.writeln('No `main` function found.');
-        throw const Exit(Exit.codeContainsErrors);
-      }
+  @override
+  Future<void> run() async {
+    final path = _requirePath(argResults!);
+    final executable = await _compile(path);
 
-      final cCode = _time('Mono → C', () => monoToC(mono));
-      final cPath = '${path.substring(0, path.lastIndexOf('.'))}.c';
-      File(cPath).writeAsStringSync(cCode);
-      await _timeAsync(
-        'clang-format',
-        () => Process.run('clang-format', ['-i', cPath]),
-      );
+    final process = await Process.start(executable!.path, []);
+    await Future.wait([
+      stdout.addStream(process.stdout),
+      stderr.addStream(process.stderr),
+      process.exitCode,
+    ]);
+  }
+}
 
-      final executablePath = path.substring(0, path.lastIndexOf('.'));
-      final flags = await Process.run('pkg-config', [
-        '--cflags',
-        '--libs',
-        'cairo',
-        'sdl3',
-      ]);
-      final gcc = await _timeAsync(
-        'gcc',
-        () => Process.run('gcc', [
-          cPath,
-          ...flags.stdout.toString().trim().split(' '),
-          '-O3',
-          '-o',
-          executablePath,
-        ]),
-      );
-      if (gcc.exitCode != 0) {
-        stderr.write(gcc.stderr);
-        throw const Exit(Exit.codeContainsErrors);
-      }
+Future<File?> _compile(String path, {bool exitOnError = true}) async {
+  try {
+    final loaded = _time('Parsing', () => loadPackageForFile(File(path)));
+    final hir = _time(
+      'AST → HIR',
+      () => astToHir(loaded.context, loaded.modules),
+    );
 
-      print('Done 🎉');
-    } on Exit {
-      if (exitOnError) rethrow;
+    if (loaded.context.errors.isNotEmpty) {
+      printErrors(loaded.context);
+      throw const Exit(Exit.codeContainsErrors);
     }
+
+    final mono = _time('HIR → Mono', () => hirToMono(hir));
+    if (mono == null) {
+      stderr.writeln('No `main` function found.');
+      throw const Exit(Exit.codeContainsErrors);
+    }
+
+    final cCode = _time('Mono → C', () => monoToC(mono));
+    final cPath = '${path.substring(0, path.lastIndexOf('.'))}.c';
+    File(cPath).writeAsStringSync(cCode);
+    await _timeAsync(
+      'clang-format',
+      () => Process.run('clang-format', ['-i', cPath]),
+    );
+
+    final executablePath = path.substring(0, path.lastIndexOf('.'));
+    final flags = await Process.run('pkg-config', [
+      '--cflags',
+      '--libs',
+      'cairo',
+      'sdl3',
+    ]);
+    final gcc = await _timeAsync(
+      'gcc',
+      () => Process.run('gcc', [
+        cPath,
+        ...flags.stdout.toString().trim().split(' '),
+        '-O3',
+        '-o',
+        executablePath,
+      ]),
+    );
+    if (gcc.exitCode != 0) {
+      stderr.write(gcc.stderr);
+      throw const Exit(Exit.codeContainsErrors);
+    }
+
+    print('Done compiling 🎉');
+    return File(executablePath);
+  } on Exit {
+    if (exitOnError) rethrow;
+    return null;
   }
 }
 
