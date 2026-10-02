@@ -1,0 +1,11 @@
+public struct Color {
+  public red: Int,
+  public green: Int,
+  public blue: Int,
+  public alpha: Int,
+}
+impl Color {
+  public fun toText(self: Self) Text {
+    "Color(red: {self.red.toText()}, green: {self.green.toText()}, blue: {self.blue.toText()}, alpha: {self.alpha.toText()})"
+  }
+}

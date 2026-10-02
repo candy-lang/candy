@@ -18,6 +18,9 @@ class _Context {
   _Context(this.mono) : layouts = TypeLayouts.compute(mono.typeDeclarations);
 
   final Mono mono;
+  bool get usesOxygen => mono.functions.containsKey(
+    MonoFunctionId(declaration: BuiltinFunction.cairoRender.id),
+  );
   final TypeLayouts layouts;
   final _c = StringBuffer();
 
@@ -79,12 +82,6 @@ class _Context {
 
     _push('#include <cairo.h>\n\n');
     _push('#include <SDL3/SDL.h>\n\n');
-    // if (mono.typeDeclarations.keys.any(
-    //   (it) => it is MonoType_Named && it.declaration.name == 'GlfwWindow',
-    // )) {
-    //   // _push('#include <GLFW/glfw3.h>\n\n');
-
-    // }
 
     _push('/// Type Forward Declarations\n\n');
     _lowerTypeForwardDeclarations();
@@ -108,145 +105,114 @@ class _Context {
 
     _push('/// Assignment Definitions\n\n');
     _lowerAssignmentDefinitions();
+    if (usesOxygen) {
+      _push('''
+SDL_Window *oxygen_window;
+SDL_Renderer *oxygen_renderer;
+cairo_surface_t *oxygen_surface;
+cairo_t *oxygen_cairo;
+SDL_Texture *oxygen_texture;
+''');
+    }
     _push('\n');
 
     _push('/// Function Definitions\n\n');
     _lowerFunctionDefinitions();
 
     _push('int main() {\n');
-    _push(r'''
-
-    const int width = 800;
-    const int height = 600;
-
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
-        fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
-        return 1;
-    }
-
-    SDL_Window *window = NULL;
-    SDL_Renderer *renderer = NULL;
-
-    if (!SDL_CreateWindowAndRenderer(
-            "My language",
-            width,
-            height,
-            SDL_WINDOW_RESIZABLE,
-            &window,
-            &renderer
-    )) {
-        fprintf(stderr, "SDL_CreateWindowAndRenderer: %s\n", SDL_GetError());
-        SDL_Quit();
-        return 1;
-    }
-
-    /*
-     * Cairo renders into this memory buffer.
-     */
-    cairo_surface_t *surface =
-        cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
-
-    cairo_t *cr = cairo_create(surface);
-
-    /*
-     * SDL texture receives Cairo's pixels.
-     */
-    SDL_Texture *texture = SDL_CreateTexture(
-        renderer,
-        SDL_PIXELFORMAT_ARGB8888,
-        SDL_TEXTUREACCESS_STREAMING,
-        width,
-        height
-    );
-    if (!texture) {
-        fprintf(stderr, "SDL_CreateTexture: %s\n", SDL_GetError());
-        return 1;
-    }
-
-    bool running = true;
-
-    while (running) {
-        /*
-         * 1. Handle input/events.
-         */
-        SDL_Event event;
-
-        while (SDL_PollEvent(&event)) {
-            switch (event.type) {
-                case SDL_EVENT_QUIT:
-                    running = false;
-                    break;
-
-                case SDL_EVENT_KEY_DOWN:
-                    printf("key down: %s\n",
-                           SDL_GetKeyName(event.key.key));
-                    break;
-
-                case SDL_EVENT_MOUSE_MOTION:
-                    printf("mouse: %.1f %.1f\n",
-                           event.motion.x,
-                           event.motion.y);
-                    break;
-
-                case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                    printf("mouse button: %d\n",
-                           event.button.button);
-                    break;
-            }
-        }
-
-        /*
-         * 2. Render your display list with Cairo.
-         */
-
-        cairo_set_source_rgb(cr, 0.1, 0.1, 0.1);
-        cairo_paint(cr);
-
-        cairo_set_source_rgb(cr, 0.2, 0.5, 1.0);
-        cairo_rectangle(cr, 100, 100, 300, 200);
-        cairo_fill(cr);
-
-        cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
-        cairo_set_font_size(cr, 32);
-        cairo_move_to(cr, 140, 220);
-        cairo_show_text(cr, "Hello");
-
-        cairo_surface_flush(surface);
-
-        /*
-         * 3. Copy Cairo's pixels into the SDL texture.
-         */
-        SDL_UpdateTexture(
-            texture,
-            NULL,
-            cairo_image_surface_get_data(surface),
-            cairo_image_surface_get_stride(surface)
-        );
-
-        /*
-         * 4. Present texture in the window.
-         */
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer);
-
-        SDL_RenderTexture(renderer, texture, NULL, NULL);
-
-        SDL_RenderPresent(renderer);
-    }
-
-    cairo_destroy(cr);
-    cairo_surface_destroy(surface);
-
-    SDL_DestroyTexture(texture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-
-    SDL_Quit();
-''');
     for (final id in mono.assignmentInitializationOrder) {
       _push('${id.mangled}\$init();\n');
     }
-    _push('return ${mono.mainFunction}().value;\n}\n');
+
+    if (usesOxygen) {
+      _push('''
+const int width = 800;
+const int height = 600;
+
+if (!SDL_Init(SDL_INIT_VIDEO)) {
+    fprintf(stderr, "SDL_Init: %s\\n", SDL_GetError());
+    return 1;
+}
+
+if (!SDL_CreateWindowAndRenderer(
+        "Oxygen",
+        width,
+        height,
+        SDL_WINDOW_RESIZABLE,
+        &oxygen_window,
+        &oxygen_renderer
+)) {
+    fprintf(stderr, "SDL_CreateWindowAndRenderer: %s\\n", SDL_GetError());
+    SDL_Quit();
+    return 1;
+}
+
+// Cairo renders into this memory buffer.
+oxygen_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+
+oxygen_cairo = cairo_create(oxygen_surface);
+
+// SDL texture receives Cairo's pixels.
+oxygen_texture = SDL_CreateTexture(
+    oxygen_renderer,
+    SDL_PIXELFORMAT_ARGB8888,
+    SDL_TEXTUREACCESS_STREAMING,
+    width,
+    height
+);
+if (!oxygen_texture) {
+    fprintf(stderr, "SDL_CreateTexture: %s\\n", SDL_GetError());
+    return 1;
+}
+
+bool running = true;
+
+while (running) {
+    // Handle input/events.
+    SDL_Event event;
+
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+            case SDL_EVENT_QUIT:
+                running = false;
+                break;
+
+            case SDL_EVENT_KEY_DOWN:
+                printf("key down: %s\\n",
+                        SDL_GetKeyName(event.key.key));
+                break;
+
+            case SDL_EVENT_MOUSE_MOTION:
+                printf("mouse: %.1f %.1f\\n",
+                        event.motion.x,
+                        event.motion.y);
+                break;
+
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                printf("mouse button: %d\\n",
+                        event.button.button);
+                break;
+        }
+    }
+
+    ${mono.mainFunction}();
+    SDL_Delay(1000);
+}
+
+cairo_destroy(oxygen_cairo);
+cairo_surface_destroy(oxygen_surface);
+
+SDL_DestroyTexture(oxygen_texture);
+SDL_DestroyRenderer(oxygen_renderer);
+SDL_DestroyWindow(oxygen_window);
+
+SDL_Quit();
+return 0;
+''');
+    } else {
+      _push('return ${mono.mainFunction}().value;\n');
+    }
+    _push('}\n');
   }
 
   void _lowerTypeForwardDeclarations() {
@@ -896,6 +862,63 @@ $type $id = {.data = ${id}_data, .vtable = &$vtable};''');
 
       // glfwMakeContextCurrent(window);
       // return window;''');
+      case .cairoRender:
+        _push('''
+cairo_set_source_rgb(oxygen_cairo, 0, 0, 0);
+cairo_paint(oxygen_cairo);
+
+int length = ${parameters[0].id}.length;
+for (int i = 0; i < length; i++) {
+    Oxygen\$DrawCommand\$DrawCommand command = ${parameters[0].id}.values[i];
+    switch (command.variant) {
+        case Oxygen\$DrawCommand\$DrawCommand_save:
+            cairo_save(oxygen_cairo);
+            break;
+        case Oxygen\$DrawCommand\$DrawCommand_restore:
+            cairo_restore(oxygen_cairo);
+            break;
+        case Oxygen\$DrawCommand\$DrawCommand_translate:
+            Oxygen\$Offset\$Offset offset = command.value.translate;
+            cairo_translate(oxygen_cairo, offset.x.value, offset.y.value);
+            break;
+        case Oxygen\$DrawCommand\$DrawCommand_drawRect:
+            Oxygen\$DrawCommand\$DrawRect drawRect = command.value.drawRect;
+            cairo_rectangle(oxygen_cairo,
+                drawRect.rect.left.value,
+                drawRect.rect.top.value,
+                drawRect.rect.right.value - drawRect.rect.left.value,
+                drawRect.rect.bottom.value - drawRect.rect.top.value);
+            cairo_set_source_rgba(oxygen_cairo,
+                drawRect.paint.fill.red.value / 255,
+                drawRect.paint.fill.green.value / 255,
+                drawRect.paint.fill.blue.value / 255,
+                drawRect.paint.fill.alpha.value / 255);
+            cairo_fill(oxygen_cairo);
+            break;
+        default:
+            fprintf(stderr, "Unhandled draw command variant: %d\\n", command.variant);
+            abort();
+            break;
+    }
+}
+
+cairo_surface_flush(oxygen_surface);
+
+// Copy Cairo's pixels into the SDL texture.
+SDL_UpdateTexture(
+    oxygen_texture,
+    NULL,
+    cairo_image_surface_get_data(oxygen_surface),
+    cairo_image_surface_get_stride(oxygen_surface)
+);
+
+// Present texture in the window.
+SDL_SetRenderDrawColor(oxygen_renderer, 0, 0, 0, 255);
+SDL_RenderClear(oxygen_renderer);
+
+SDL_RenderTexture(oxygen_renderer, oxygen_texture, NULL, NULL);
+
+SDL_RenderPresent(oxygen_renderer);''');
       case .typeId:
         _push('''
 $returnType result = {{.value = ${mono.typeIds[itemType()]}}};

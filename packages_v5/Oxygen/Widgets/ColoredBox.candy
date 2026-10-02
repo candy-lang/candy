@@ -1,0 +1,35 @@
+use Oxygen.Color
+use Oxygen.Constraints
+use Oxygen.DrawCommand
+use Oxygen.Offset
+use Oxygen.Rect
+use Oxygen.Size
+use Oxygen.Widget
+
+public struct ColoredBox {
+  public color: Color,
+  public child: Maybe[Widget],
+}
+impl ColoredBox: SingleChildWidget {
+  type State = Nothing
+  fun initialState(self: Self) Self.State {
+    Nothing()
+  }
+  fun child(self: Self) Maybe[Widget] {
+    self.child
+  }
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
+    let child = self.child.map((child) {
+      child.layout(child.initialState(), constraints, context).place(Offset(0, 0))
+    })
+    LaidOutSingleChildWidget(
+      child.map((it) { it.rect.size() }).unwrapOr(constraints.min),
+      state,
+      child,
+    )
+  }
+  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand] {
+    List.of(DrawCommand.drawRect(DrawRect(Rect.fromOffsetAndSize(Offset(0, 0), size), Paint(self.color))))
+      .concat(child.map((child) { child.paint() }).unwrapOr(List.of()))
+  }
+}

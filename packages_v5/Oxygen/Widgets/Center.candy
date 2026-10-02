@@ -1,0 +1,38 @@
+use Core.Maybe
+use Oxygen.Constraints
+use Oxygen.DrawCommand
+use Oxygen.Offset
+use Oxygen.Size
+use Oxygen.Widget
+
+public struct Center {
+  public child: Maybe[Widget],
+}
+impl Center: SingleChildWidget {
+  type State = Nothing
+  fun initialState(self: Self) Self.State {
+    Nothing()
+  }
+  fun child(self: Self) Maybe[Widget] {
+    self.child
+  }
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
+    let size = constraints.max
+    let child = self.child.map((child) {
+      let child = child.layout(child.initialState(), Constraints.loose(size), context)
+      let offset = Offset(
+        (size.width.subtract(child.size.width)),
+        (size.height.subtract(child.size.height)),
+      ).divideTruncating(2)
+      child.place(offset)
+    })
+    LaidOutSingleChildWidget(size, state, child)
+  }
+  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand] {
+    child.map((child) {
+      List.of(DrawCommand.save(), DrawCommand.translate(child.rect.topLeft()))
+        .concat(child.paint())
+        .concat(List.of(DrawCommand.restore()))
+    }).unwrapOr(List.of())
+  }
+}

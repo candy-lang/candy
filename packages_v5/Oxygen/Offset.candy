@@ -1,0 +1,34 @@
+# TODO(JonasWanke): float
+public struct Offset {
+  public x: Int,
+  public y: Int,
+}
+impl Offset: Add[Offset] {
+  type Result = Self
+  fun add(self: Self, other: Self) Self {
+    Offset(self.x.add(other.x), self.y.add(other.y))
+  }
+}
+impl Offset: Subtract[Offset] {
+  type Result = Self
+  fun subtract(self: Self, other: Self) Self {
+    Offset(self.x.subtract(other.x), self.y.subtract(other.y))
+  }
+}
+impl Offset: Multiply[Int] {
+  type Result = Self
+  fun multiply(self: Self, other: Int) Self {
+    Offset(self.x.multiply(other), self.y.multiply(other))
+  }
+}
+impl Offset: DivideTruncating[Int] {
+  type Result = Self
+  fun divideTruncating(self: Self, other: Int) Self {
+    Offset(self.x.divideTruncating(other), self.y.divideTruncating(other))
+  }
+}
+impl Offset: ToText {
+  fun toText(self: Self) Text {
+    "({self.x.toText()}, {self.y.toText()})"
+  }
+}

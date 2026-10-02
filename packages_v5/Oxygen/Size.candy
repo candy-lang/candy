@@ -1,0 +1,27 @@
+# TODO(JonasWanke): float
+public struct Size {
+  public width: Int,
+  public height: Int,
+}
+impl Size {
+  public fun coerceAtLeast(self: Self, other: Self) Self {
+    Size(
+      self.width.coerceAtLeast(other.width),
+      self.height.coerceAtLeast(other.height),
+    )
+  }
+  public fun coerceAtMost(self: Self, other: Self) Self {
+    Size(
+      self.width.coerceAtMost(other.width),
+      self.height.coerceAtMost(other.height),
+    )
+  }
+  public fun coerceIn(self: Self, min: Self, max: Self) Self {
+    self.coerceAtLeast(min).coerceAtMost(max)
+  }
+}
+impl Size: ToText {
+  fun toText(self: Self) Text {
+    "{self.width.toText()}×{self.height.toText()}"
+  }
+}

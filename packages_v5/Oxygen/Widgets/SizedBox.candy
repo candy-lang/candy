@@ -1,0 +1,30 @@
+use Core.Maybe
+use Oxygen.Constraints
+use Oxygen.DrawCommand
+use Oxygen.Offset
+use Oxygen.Size
+use Oxygen.Widget
+
+public struct SizedBox {
+  public size: Size,
+  public child: Maybe[Widget],
+}
+impl SizedBox: SingleChildWidget {
+  type State = Nothing
+  fun initialState(self: Self) Self.State {
+    Nothing()
+  }
+  fun child(self: Self) Maybe[Widget] {
+    self.child
+  }
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
+    let size = constraints.constrain(self.size)
+    let child = self.child.map((child) {
+      child.layout(child.initialState(), Constraints.tight(size), context).place(Offset(0, 0))
+    })
+    LaidOutSingleChildWidget(size, state, child)
+  }
+  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand] {
+    child.map((child) { child.paint() }).unwrapOr(List.of())
+  }
+}

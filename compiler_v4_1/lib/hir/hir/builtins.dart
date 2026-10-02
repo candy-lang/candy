@@ -20,35 +20,25 @@ enum BuiltinType {
 
 /// Types the compiler needs to name. They're declared in ordinary Candy
 /// source, so a program that omits one gets [HirType.error] in its place.
-class WellKnownTypes {
-  const WellKnownTypes({
-    this.intId,
-    this.textId,
-    this.listId,
-    this.nothingId,
-    this.neverId,
-    this.maybeId,
-    this.orderingId,
-    this.resultId,
-    this.boolId,
-    this.typeIdId,
-    this.anyId,
-  });
-
-  final DeclarationId? intId;
-  final DeclarationId? textId;
-  final DeclarationId? listId;
-  final DeclarationId? nothingId;
-  final DeclarationId? neverId;
-  final DeclarationId? maybeId;
-  final DeclarationId? orderingId;
-  final DeclarationId? resultId;
-  final DeclarationId? boolId;
-  final DeclarationId? typeIdId;
-
-  /// The `Any` trait, which every type implements without an impl.
-  final DeclarationId? anyId;
-
+class const WellKnownTypes({
+  final DeclarationId? intId,
+  final DeclarationId? textId,
+  final DeclarationId? listId,
+  final DeclarationId? nothingId,
+  final DeclarationId? neverId,
+  final DeclarationId? maybeId,
+  final DeclarationId? orderingId,
+  final DeclarationId? resultId,
+  final DeclarationId? boolId,
+  final DeclarationId? typeIdId,
+  final DeclarationId? anyId,
+  final DeclarationId? oxygenColorId,
+  final DeclarationId? oxygenDrawCommandId,
+  final DeclarationId? oxygenDrawRectId,
+  final DeclarationId? oxygenOffsetId,
+  final DeclarationId? oxygenPaintId,
+  final DeclarationId? oxygenRectId,
+}) {
   static const names = {
     'Int',
     'Text',
@@ -60,6 +50,12 @@ class WellKnownTypes {
     'Result',
     'Bool',
     'TypeId',
+    'Color',
+    'DrawCommand',
+    'DrawRect',
+    'Offset',
+    'Paint',
+    'Rect',
   };
   static const traitNames = {'Any'};
 
@@ -85,6 +81,12 @@ class WellKnownTypes {
       _named(resultId, [value, error]);
   HirType get boolType => _named(boolId);
   HirType get typeIdType => _named(typeIdId);
+  HirType get oxygenColorType => _named(oxygenColorId);
+  HirType get oxygenDrawCommandType => _named(oxygenDrawCommandId);
+  HirType get oxygenDrawRectType => _named(oxygenDrawRectId);
+  HirType get oxygenPaintType => _named(oxygenPaintId);
+  HirType get oxygenOffsetType => _named(oxygenOffsetId);
+  HirType get oxygenRectType => _named(oxygenRectId);
 
   bool isAny(DeclarationId trait) => anyId != null && trait == anyId;
 
@@ -98,6 +100,7 @@ class WellKnownTypes {
 
 /// Implemented by the backend rather than in Candy.
 enum BuiltinFunction {
+  cairoRender('builtinCairoRender'),
   intAdd('builtinIntAdd'),
   intBitwiseAnd('builtinIntBitwiseAnd'),
   intBitwiseOr('builtinIntBitwiseOr'),
@@ -193,6 +196,9 @@ enum BuiltinFunction {
     );
 
     return switch (this) {
+      .cairoRender => build([
+        ('drawCommands', types.listType(types.oxygenDrawCommandType)),
+      ], types.nothingType),
       .intAdd => intBinary('a', 'b'),
       .intBitwiseAnd => intBinary('a', 'b'),
       .intBitwiseOr => intBinary('a', 'b'),

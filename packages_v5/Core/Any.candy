@@ -1,0 +1,27 @@
+use Builtins
+use Core.Bool
+use Core.Int
+use Core.Maybe
+use Core.Operators.Equal
+
+# Every type implements `Any` without an impl, and none can be written, so a
+# downcast can trust the type ID.
+public trait Any {
+  fun typeId(self: Self) TypeId { builtinTypeIdOf[Self](self) }
+  fun is[T](self: Self) Bool { self.typeId().equals(TypeId.of[T]()) }
+  fun downcast[T](self: Self) Maybe[T] { builtinDowncast[T, Self](self) }
+}
+
+public struct TypeId {
+  id: Int
+}
+impl TypeId {
+  fun of[T]() Self {
+    builtinTypeId[T]()
+  }
+}
+impl TypeId: Equal {
+  fun equals(self: TypeId, other: TypeId) Bool {
+    self.id.equals(other.id)
+  }
+}

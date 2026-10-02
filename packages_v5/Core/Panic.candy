@@ -21,3 +21,10 @@ public fun needs(condition: Bool, message: Text) {
     false => panic("Needs not fulfilled: {message}"),
   }
 }
+
+public fun check(condition: Bool, message: Text) {
+  switch condition {
+    true => Nothing(),
+    false => panic("Check failed: {message}"),
+  }
+}

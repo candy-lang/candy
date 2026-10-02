@@ -1,0 +1,23 @@
+use Oxygen.Size
+
+public struct Constraints {
+  public min: Size,
+  public max: Size,
+}
+impl Constraints {
+  public fun tight(size: Size) Self {
+    Constraints(size, size)
+  }
+  public fun loose(size: Size) Self {
+    Constraints(Size(0, 0), size)
+  }
+
+  public fun constrain(self: Self, size: Size) Size {
+    size.coerceIn(self.min, self.max)
+  }
+}
+impl Constraints: ToText {
+  fun toText(self: Self) Text {
+    "Constraints(min: {self.min.toText()}, max: {self.max.toText()})"
+  }
+}

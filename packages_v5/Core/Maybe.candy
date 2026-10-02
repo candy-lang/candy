@@ -15,6 +15,13 @@ public fun none[T]() Maybe[T] {
   Maybe.none()
 }
 impl[T] Maybe[T] {
+  public fun map[U](self: Self, f: (T) U) Maybe[U] {
+    switch self {
+      some(value) => some(f(value)),
+      none => none(),
+    }
+  }
+
   public fun unwrap(self: Self) T {
     # TODO: reuse `unwrapOrElse(…)` when `Never` gets unified with `T`
     # self.unwrapOrElse(() { panic("`unwrap()` called on `none()`") })
@@ -32,6 +39,7 @@ impl[T] Maybe[T] {
       none => getDefaultValue(),
     }
   }
+
   public fun isSome(self: Self) Bool {
     switch self {
       some(value) => true,

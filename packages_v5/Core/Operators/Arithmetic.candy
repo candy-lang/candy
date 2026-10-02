@@ -1,9 +1,21 @@
-public trait Add {
-  fun add(self: Self, other: Self) Self
+public trait Add[Other] {
+  type Result
+  fun add(self: Self, other: Other) Self.Result
 }
 
-public trait Subtract {
-  fun subtract(self: Self, other: Self) Self
+public trait Subtract[Other] {
+  type Result
+  fun subtract(self: Self, other: Other) Self.Result
+}
+
+public trait Multiply[Other] {
+  type Result
+  fun multiply(self: Self, other: Other) Self.Result
+}
+
+public trait DivideTruncating[Other] {
+  type Result
+  fun divideTruncating(self: Self, other: Other) Self.Result
 }
 
 # TODO: `impl[T: Add] T: OperatorPlus[T] {}`, etc.

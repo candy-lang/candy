@@ -23,10 +23,13 @@
           with pkgs;
           mkShell {
             buildInputs = [
+              cairo
               dart
               gcc13
               hyperfine
               nodejs_22
+              pkg-config
+              sdl3
               vsce
             ];
           };

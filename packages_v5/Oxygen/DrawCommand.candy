@@ -1,0 +1,38 @@
+use Oxygen.Color
+use Oxygen.Offset
+use Oxygen.Rect
+
+public enum DrawCommand {
+  save,
+  restore,
+  translate: Offset,
+  drawRect: DrawRect,
+}
+impl DrawCommand: ToText {
+  fun toText(self: Self) Text {
+    switch self {
+      save => "DrawCommand.save",
+      restore => "DrawCommand.restore",
+      translate(offset) => "DrawCommand.translate({offset.toText()})",
+      drawRect(drawRect) => "DrawCommand.drawRect({drawRect.toText()})",
+    }
+  }
+}
+public struct DrawRect {
+  public rect: Rect,
+  public paint: Paint,
+}
+impl DrawRect: ToText {
+  fun toText(self: Self) Text {
+    "DrawRect(rect: {self.rect.toText()}, paint: {self.paint.toText()})"
+  }
+}
+
+public struct Paint {
+  public fill: Color,
+}
+impl Paint: ToText {
+  fun toText(self: Self) Text {
+    "Paint(fill: {self.fill.toText()})"
+  }
+}

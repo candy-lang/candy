@@ -1,3 +1,13 @@
+use Builtins
+use Oxygen.Color
+use Oxygen.Constraints
+use Oxygen.Offset
+use Oxygen.Size
+use Oxygen.Widget
+use Oxygen.Widgets.Center
+use Oxygen.Widgets.ColoredBox
+use Oxygen.Widgets.SizedBox
+
 fun main() Int {
   identity(1)
   identity("foo")
@@ -12,27 +22,50 @@ fun main() Int {
 #  print("The answer is {theAnswerText}!")
 #
 #  theAnswer
-  print("fibonacci(20) = {fibonacci(20).toText()}")
-  print(Ordering.less())
-  print(true)
-  print(false)
-  print("1.equals(2): {1.equals(2).toText()}")
+  # print("fibonacci(20) = {fibonacci(20).toText()}")
+  # print(Ordering.less())
+  # print(true)
+  # print(false)
+  # print("1.equals(2): {1.equals(2).toText()}")
 
-  let list = removeAt(replace(insert(listOf(0, 1), 1, 2), 0, 3), 2)
-  print("Length: {list.length().toText()}")
-  print("[{get(list, 0).toText()}, {get(list, 1).toText()}, {get(list, 2).toText()}]")
+  # let list = removeAt(replace(insert(listOf(0, 1), 1, 2), 0, 3), 2)
+  # print("Length: {list.length().toText()}")
+  # print("[{get(list, 0).toText()}, {get(list, 1).toText()}, {get(list, 2).toText()}]")
 
-  print(isEmpty(endsWith("orld!", "World!").toText()))
+  # print(isEmpty(endsWith("orld!", "World!").toText()))
 
-  let foo = 123
-  let addCaptured = (x: Int) { x.add(foo) }
-  print("addCaptured(1) = {addCaptured(1).toText()}")
+  # let foo = 123
+  # let addCaptured = (x: Int) { x.add(foo) }
+  # print("addCaptured(1) = {addCaptured(1).toText()}")
 
-  repeat(3, () { print("Hello, World!") })
+  # repeat(3, () { print("Hello, World!") })
 
-  print(map(listOf(1, 2, 3), (x: Int) { multiply(x, 2) }))
+  # print(map(listOf(1, 2, 3), (x: Int) { multiply(x, 2) }))
 
-  day6Part1("1")
+  # day6Part1("1")
+
+  let widget = Center(
+    Maybe.some(SizedBox(
+      Size(200, 100),
+      Maybe.some(ColoredBox(
+        Color(0, 255, 0, 255),
+        Maybe.none(),
+      )),
+    )),
+  )
+  run(widget, Size(800, 600))
 
   0
+}
+
+fun run(widget: Widget, windowSize: Size) {
+  let state = widget.initialState()
+  let laidOutChild = widget.layout(state, Constraints.tight(windowSize), Context())
+  print("Laid out child: {laidOutChild.toText()}")
+  let positionedChild = laidOutChild.place(Offset(0, 0))
+  print("Positioned child: {positionedChild.toText()}")
+  let drawCommands = positionedChild.paint()
+  print("Draw commands: {drawCommands.toText()}")
+
+  builtinCairoRender(drawCommands)
 }

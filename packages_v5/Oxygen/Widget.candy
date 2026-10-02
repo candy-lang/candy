@@ -1,0 +1,156 @@
+use Core.Any
+use Oxygen.Color
+use Oxygen.Constraints
+use Oxygen.DrawCommand
+use Oxygen.Offset
+use Oxygen.Rect
+use Oxygen.Size
+
+public trait Widget {
+  fun initialState(self: Self) Any
+  fun layout(self: Self, state: Any, constraints: Constraints, context: Context) LaidOutChild[Any]
+  fun paint(self: Self, state: Any, size: Size) List[DrawCommand]
+  fun handle(self: Self, state: Any, path: List[Int], message: Any) Any
+}
+public struct LaidOutChild[S] {
+  public widget: Widget,
+  public state: S,
+  public size: Size,
+}
+impl [S] LaidOutChild[S] {
+  public fun place(self: Self, offset: Offset) PositionedChild[S] {
+    PositionedChild(self.widget, self.state, Rect.fromOffsetAndSize(offset, self.size))
+  }
+}
+impl [S: ToText] LaidOutChild[S] {
+  public fun toText(self: Self) Text {
+    # TODO(JonasWanke): print widget if possible
+    "LaidOutChild(widget: <opaque>, state: {self.state.toText()}, size: {self.size.toText()})"
+  }
+}
+impl LaidOutChild[Any] {
+  public fun toText(self: Self) Text {
+    # TODO(JonasWanke): print widget, state if possible
+    "LaidOutChild(widget: <opaque>, state: <opaque>, size: {self.size.toText()})"
+  }
+}
+
+public struct PositionedChild[S] {
+  public widget: Widget,
+  public state: S,
+  public rect: Rect,
+}
+impl [S] PositionedChild[S] {
+  public fun paint(self: Self) List[DrawCommand] {
+    self.widget.paint(self.state, self.rect.size())
+  }
+}
+impl [S: ToText] PositionedChild[S] {
+  public fun toText(self: Self) Text {
+    # TODO(JonasWanke): print widget if possible
+    "PositionedChild(widget: <opaque>, state: {self.state.toText()}, rect: {self.rect.toText()})"
+  }
+}
+impl PositionedChild[Any] {
+  public fun toText(self: Self) Text {
+    # TODO(JonasWanke): print widget, state if possible
+    "PositionedChild(widget: <opaque>, state: <opaque>, rect: {self.rect.toText()})"
+  }
+}
+
+public struct Context {
+  # TODO(JonasWanke): add more fields
+}
+
+# TypedWidget
+
+# TODO(JonasWanke): private
+public trait TypedWidget {
+  type State
+  fun initialState(self: Self) Self.State
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutChild[Self.State]
+  fun paint(self: Self, state: Self.State, size: Size) List[DrawCommand]
+  fun handle(self: Self, state: Self.State, path: List[Int], message: Any) Self.State
+}
+impl[W: TypedWidget] W: Widget {
+  fun initialState(self: Self) Any {
+    self.initialState()
+  }
+  fun layout(self: Self, state: Any, constraints: Constraints, context: Context) LaidOutChild[Any] {
+    let result = self.layout(state.downcast[W.State]().unwrap(), constraints, context)
+    LaidOutChild(self, result.state, result.size)
+  }
+  fun paint(self: Self, state: Any, size: Size) List[DrawCommand] {
+    self.paint(state.downcast[W.State]().unwrap(), size)
+  }
+  fun handle(self: Self, state: Any, path: List[Int], message: Any) Any {
+    self.handle(state.downcast[W.State]().unwrap(), path, message)
+  }
+}
+
+# LeafWidget
+
+public trait LeafWidget {
+  type State
+  fun initialState(self: Self) Self.State
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutChild[Self.State]
+  fun paint(self: Self, state: Self.State, size: Size) List[DrawCommand]
+  fun handle(self: Self, state: Self.State, path: List[Int], message: Any) Self.State { state }
+}
+struct LeafState {}
+impl[W: LeafWidget] W: TypedWidget {
+  type State = W.State
+  fun initialState(self: Self) Self.State {
+    self.initialState()
+  }
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutChild[Self.State] {
+    self.layout(state, constraints, context)
+  }
+  fun paint(self: Self, state: Self.State, size: Size) List[DrawCommand] {
+    self.paint(state, size)
+  }
+  fun handle(self: Self, state: Self.State, path: List[Int], message: Any) Self.State {
+    self.handle(state, path, message)
+  }
+}
+
+# SingleChildWidget
+
+public trait SingleChildWidget {
+  type State
+  fun initialState(self: Self) Self.State
+  fun child(self: Self) Maybe[Widget]
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State]
+  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand]
+  fun handle(self: Self, state: Self.State, path: List[Int], message: Any) Self.State { state }
+}
+struct SingleChildState[S] {
+  own: S,
+  child: Maybe[PositionedChild[Any]],
+}
+public struct LaidOutSingleChildWidget[S] {
+  public size: Size,
+  public state: S,
+  public child: Maybe[PositionedChild[Any]],
+}
+impl[W: SingleChildWidget] W: TypedWidget {
+  type State = SingleChildState[W.State]
+  fun initialState(self: Self) Self.State {
+    SingleChildState(self.initialState(), Maybe.none())
+  }
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutChild[Self.State] {
+    let result = self.layout(state.own, constraints, context)
+    check(
+      self.child().isNone().equals(result.child.isNone()),
+      "SingleChildWidget must have a child iff the layout result has a child",
+    )
+    LaidOutChild(self, SingleChildState(result.state, result.child), result.size)
+  }
+  fun paint(self: Self, state: Self.State, size: Size) List[DrawCommand] {
+    self.paint(state.own, state.child, size)
+  }
+  fun handle(self: Self, state: Self.State, path: List[Int], message: Any) Self.State {
+    # TODO(JonasWanke): handle child messages
+    SingleChildState(self.handle(state.own, path, message), state.child)
+  }
+}

@@ -1,0 +1,37 @@
+use Oxygen.Offset
+use Oxygen.Size
+
+# TODO(JonasWanke): float
+public struct Rect {
+  public left: Int,
+  public top: Int,
+  public right: Int,
+  public bottom: Int,
+}
+impl Rect {
+  public fun fromLTWH(left: Int, top: Int, width: Int, height: Int) Rect {
+    Rect(left, top, left.add(width), top.add(height))
+  }
+  public fun fromOffsetAndSize(offset: Offset, size: Size) Rect {
+    Self.fromLTWH(offset.x, offset.y, size.width, size.height)
+  }
+
+  public fun width(self: Self) Int {
+    self.right.subtract(self.left)
+  }
+  public fun height(self: Self) Int {
+    self.bottom.subtract(self.top)
+  }
+  public fun size(self: Self) Size {
+    Size(self.width(), self.height())
+  }
+
+  public fun topLeft(self: Self) Offset {
+    Offset(self.left, self.top)
+  }
+}
+impl Rect: ToText {
+  fun toText(self: Self) Text {
+    "Rect(left: {self.left.toText()}, top: {self.top.toText()}, right: {self.right.toText()}, bottom: {self.bottom.toText()})"
+  }
+}

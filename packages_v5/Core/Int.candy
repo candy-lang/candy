@@ -114,16 +114,32 @@ impl Int {
     self.bitwiseAnd(mask)
   }
 }
-impl Int: Add {
-  fun add(self: Int, other: Int) Int {
+
+impl Int: Add[Int] {
+  type Result = Self
+  fun add(self: Self, other: Int) Self.Result {
     builtinIntAdd(self, other)
   }
 }
-impl Int: Subtract {
-  fun subtract(self: Int, other: Int) Int {
+impl Int: Subtract[Int] {
+  type Result = Self
+  fun subtract(self: Self, other: Int) Self.Result {
     builtinIntSubtract(self, other)
   }
 }
+impl Int: Multiply[Int] {
+  type Result = Self
+  fun multiply(self: Self, other: Int) Self.Result {
+    builtinIntMultiply(self, other)
+  }
+}
+impl Int: DivideTruncating[Int] {
+  type Result = Self
+  fun divideTruncating(self: Self, other: Int) Self.Result {
+    builtinIntDivideTruncating(self, other)
+  }
+}
+
 impl Int: ToText {
   fun toText(self: Int) Text {
     builtinIntToText(self)

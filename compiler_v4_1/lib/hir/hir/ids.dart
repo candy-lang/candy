@@ -15,8 +15,9 @@ sealed class ModuleId with _$ModuleId implements Comparable<ModuleId> {
   static const builtin = ModuleId(packageName: builtinPackageName, path: []);
   static const builtinPackageName = 'Builtins';
 
-  /// Well-known types resolve only from this package.
+  /// Well-known types resolve only from these two packages.
   static const corePackageName = 'Core';
+  static const oxygenPackageName = 'Oxygen';
 
   @override
   int compareTo(ModuleId other) {

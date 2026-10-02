@@ -560,7 +560,10 @@ class _Collector {
         CollectedTrait() => WellKnownTypes.traitNames,
         _ => const <String>{},
       };
-      if (declaration.module.packageName != ModuleId.corePackageName) continue;
+      if (declaration.module.packageName != ModuleId.corePackageName &&
+          declaration.module.packageName != ModuleId.oxygenPackageName) {
+        continue;
+      }
 
       final name = declaration.id.name;
       if (names.contains(name)) found.putIfAbsent(name, () => declaration.id);
@@ -578,6 +581,12 @@ class _Collector {
       boolId: found['Bool'],
       typeIdId: found['TypeId'],
       anyId: found['Any'],
+      oxygenColorId: found['Color'],
+      oxygenDrawCommandId: found['DrawCommand'],
+      oxygenDrawRectId: found['DrawRect'],
+      oxygenPaintId: found['Paint'],
+      oxygenOffsetId: found['Offset'],
+      oxygenRectId: found['Rect'],
     );
   }
 }
