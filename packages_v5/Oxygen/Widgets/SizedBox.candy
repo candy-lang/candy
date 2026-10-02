@@ -24,7 +24,4 @@ impl SizedBox: SingleChildWidget {
     })
     LaidOutSingleChildWidget(size, state, child)
   }
-  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand] {
-    child.map((child) { child.paint() }).unwrapOr(List.of())
-  }
 }

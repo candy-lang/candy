@@ -1,0 +1,29 @@
+use Oxygen.Offset
+
+# TODO(JonasWanke): float
+public struct EdgeInsets {
+  public left: Int,
+  public top: Int,
+  public right: Int,
+  public bottom: Int,
+}
+impl EdgeInsets {
+  public fun all(value: Int) EdgeInsets {
+    EdgeInsets(value, value, value, value)
+  }
+  # TODO(JonasWanke): default parameter values
+  public fun symmetric(horizontal: Int, vertical: Int) EdgeInsets {
+    EdgeInsets(horizontal, vertical, horizontal, vertical)
+  }
+
+  public fun horizontal(self: Self) Int {
+    self.left.add(self.right)
+  }
+  public fun vertical(self: Self) Int {
+    self.top.add(self.bottom)
+  }
+
+  public fun topLeft(self: Self) Offset {
+    Offset(self.left, self.top)
+  }
+}

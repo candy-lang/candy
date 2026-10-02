@@ -1,3 +1,4 @@
+use Oxygen.EdgeInsets
 use Oxygen.Size
 
 public struct Constraints {
@@ -16,6 +17,18 @@ impl Constraints {
     size.coerceIn(self.min, self.max)
   }
 }
+
+impl Constraints: Subtract[EdgeInsets] {
+  type Result = Self
+  fun subtract(self: Self, other: EdgeInsets) Self.Result {
+    let min = self.min.subtract(other).coerceAtLeast(Size(0, 0))
+    Constraints(
+      min,
+      self.max.subtract(other).coerceAtLeast(min),
+    )
+  }
+}
+
 impl Constraints: ToText {
   fun toText(self: Self) Text {
     "Constraints(min: {self.min.toText()}, max: {self.max.toText()})"

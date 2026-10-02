@@ -42,7 +42,9 @@ public struct PositionedChild[S] {
 }
 impl [S] PositionedChild[S] {
   public fun paint(self: Self) List[DrawCommand] {
-    self.widget.paint(self.state, self.rect.size())
+    List.of(DrawCommand.save(), DrawCommand.translate(self.rect.topLeft()))
+      .concat(self.widget.paint(self.state, self.rect.size()))
+      .concat(List.of(DrawCommand.restore()))
   }
 }
 impl [S: ToText] PositionedChild[S] {
@@ -121,7 +123,9 @@ public trait SingleChildWidget {
   fun initialState(self: Self) Self.State
   fun child(self: Self) Maybe[Widget]
   fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State]
-  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand]
+  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand] {
+    child.map((child) { child.paint() }).unwrapOr(List.of())
+  }
   fun handle(self: Self, state: Self.State, path: List[Int], message: Any) Self.State { state }
 }
 struct SingleChildState[S] {

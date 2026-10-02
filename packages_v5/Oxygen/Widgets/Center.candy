@@ -28,11 +28,4 @@ impl Center: SingleChildWidget {
     })
     LaidOutSingleChildWidget(size, state, child)
   }
-  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand] {
-    child.map((child) {
-      List.of(DrawCommand.save(), DrawCommand.translate(child.rect.topLeft()))
-        .concat(child.paint())
-        .concat(List.of(DrawCommand.restore()))
-    }).unwrapOr(List.of())
-  }
 }

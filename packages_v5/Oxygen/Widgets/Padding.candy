@@ -1,0 +1,28 @@
+use Core.Maybe
+use Oxygen.Constraints
+use Oxygen.DrawCommand
+use Oxygen.EdgeInsets
+use Oxygen.Offset
+use Oxygen.Size
+use Oxygen.Widget
+
+public struct Padding {
+  public padding: EdgeInsets,
+  public child: Maybe[Widget],
+}
+impl Padding: SingleChildWidget {
+  type State = Nothing
+  fun initialState(self: Self) Self.State {
+    Nothing()
+  }
+  fun child(self: Self) Maybe[Widget] {
+    self.child
+  }
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
+    let innerConstraints = constraints.subtract(self.padding)
+    let child = self.child.map((child) {
+      child.layout(child.initialState(), innerConstraints, context).place(self.padding.topLeft())
+    })
+    LaidOutSingleChildWidget(child.map((it) { it.rect.size().add(self.padding) }).unwrapOr(constraints.max), state, child)
+  }
+}

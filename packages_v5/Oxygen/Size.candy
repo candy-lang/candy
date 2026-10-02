@@ -1,3 +1,5 @@
+use Oxygen.EdgeInsets
+
 # TODO(JonasWanke): float
 public struct Size {
   public width: Int,
@@ -20,6 +22,26 @@ impl Size {
     self.coerceAtLeast(min).coerceAtMost(max)
   }
 }
+
+impl Size: Add[EdgeInsets] {
+  type Result = Size
+  fun add(self: Self, other: EdgeInsets) Self.Result {
+    Size(
+      self.width.add(other.horizontal()),
+      self.height.add(other.vertical()),
+    )
+  }
+}
+impl Size: Subtract[EdgeInsets] {
+  type Result = Size
+  fun subtract(self: Self, other: EdgeInsets) Self.Result {
+    Size(
+      self.width.subtract(other.horizontal()),
+      self.height.subtract(other.vertical()),
+    )
+  }
+}
+
 impl Size: ToText {
   fun toText(self: Self) Text {
     "{self.width.toText()}×{self.height.toText()}"

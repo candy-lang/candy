@@ -1,0 +1,152 @@
+# fun main() Int {
+#   print(42)
+#   0
+# }
+
+# trait Add[Other, Output] {
+#   fun add(self: Self, other: Other) Output
+# }
+# trait Subtract[Other, Output] {
+#   fun subtract(self: Self, other: Other) Output
+# }
+
+# impl Int: Add[Int, Int] {
+#   fun add(self: Int, other: Int) Int {
+#     builtinIntAdd(self, other)
+#   }
+# }
+# impl Int: Subtract[Int, Int] {
+#   fun subtract(self: Int, other: Int) Int {
+#     builtinIntSubtract(self, other)
+#   }
+# }
+
+
+# struct Size {
+#   width: Int,
+#   height: Int,
+# }
+# # impl Size {
+# #   fun square(size: Int) Size {
+# #     Size(size, size)
+# #   }
+# # }
+# impl Size: Add[Size, Size] {
+#   fun add(self: Size, other: Size) Size {
+#     Size(
+#       self.width.add(other.width),
+#       self.height.add(other.height),
+#     )
+#   }
+# }
+# impl Size: Subtract[Size, Size] {
+#   fun subtract(self: Size, other: Size) Size {
+#     Size(
+#       self.width.subtract(other.width),
+#       self.height.subtract(other.height),
+#     )
+#   }
+# }
+
+# struct Point {
+#   x: Int,
+#   y: Int,
+# }
+
+# struct Rect {
+#   topLeft: Point,
+#   size: Size,
+# }
+
+# struct Color {
+#   r: Int,
+#   g: Int,
+#   b: Int,
+#   a: Int,
+# }
+
+# trait Widget {
+#   type State
+#   fun initialState(self: Self) State
+#   fun layout(
+#     self: Self,
+#     state: State,
+#     constraints: Constraints,
+#     layoutChild: (Widget, Constraints) Size,
+#   ) LayoutResult[State]
+#   fun paint(
+#     self: Self,
+#     state: State,
+#     size: Size,
+#     paintChild: (Widget, Offset) List[DrawCommand],
+#   ) List[DrawCommand]
+#   fun handleEvent(self: Self, state: State, event: Event) State
+# }
+# struct LayoutResult[State] {
+#   state: State,
+#   size: Size,
+# }
+
+# trait StatefulWidget {
+#   type State
+#   type Msg
+#   fun initialState(self: Self) State
+#   fun update(self: Self, state: State, msg: Msg) State
+#   fun build(self: Self, state: State, dispatch: (Msg) Nothing) Widget
+# }
+# impl[T: StatefulWidget] Widget for T {
+#   type State = StatefulWidgetState[T.State]
+#   fun initialState(self: T) StatefulWidgetState[T.State] {
+#     StatefulWidgetState {
+#       state: self.initialState(),
+#       child: None,
+#     }
+#   }
+#   fun layout(self: T, state: T.State, constraints: Constraints) LayoutResult[State] {
+#     let dispatch = (msg: T.Msg) Nothing {
+#       # TODO
+#     }
+#     let child = self.build(state, dispatch)
+#     let (childState, size) = child.layout(child.initialState(), constraints)
+#     LayoutResult[State] {
+#       state: StatefulWidgetState {
+#         state: state,
+#         child: Some(child),
+#       },
+#       size: size,
+#     }
+#   }
+#   fun paint(self: T, state: T.State, size: Size) List[DrawCommand] {
+#     let child = self.build(state, TODO)
+#     child.paint(child.initialState(), size)
+#   }
+# }
+# struct StatefulWidgetState[State] {
+#   state: State,
+#   child: Option[(Widget, )],
+# }
+
+# struct Text {
+#   text: String,
+# }
+
+# struct Row {
+#   children: List[Widget],
+# }
+# impl Row: Widget {
+#   # fun layou
+# }
+
+# struct Counter {
+#   count: Int,
+# }
+# impl Counter: Widget {
+#   fun layout(self: Counter, state: State, constraints: Constraints) (Size, LayoutState) {
+#     # Implement layout logic for Counter widget
+#     Size(100, 50), LayoutState()
+#   }
+#   fun paint(self: Counter, state: State, layoutState: LayoutState) List[PaintCommand] {
+#     # Implement paint logic for Counter widget
+#     List[PaintCommand]()
+#   }
+# }

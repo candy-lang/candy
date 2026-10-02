@@ -1,11 +1,13 @@
 use Builtins
 use Oxygen.Color
 use Oxygen.Constraints
+use Oxygen.EdgeInsets
 use Oxygen.Offset
 use Oxygen.Size
 use Oxygen.Widget
 use Oxygen.Widgets.Center
 use Oxygen.Widgets.ColoredBox
+use Oxygen.Widgets.Padding
 use Oxygen.Widgets.SizedBox
 
 fun main() Int {
@@ -49,7 +51,13 @@ fun main() Int {
       Size(200, 100),
       Maybe.some(ColoredBox(
         Color(0, 255, 0, 255),
-        Maybe.none(),
+        Maybe.some(Padding(
+          EdgeInsets(10, 20, 30, 40),
+          Maybe.some(ColoredBox(
+            Color(0, 0, 255, 255),
+            Maybe.none(),
+          )),
+        )),
       )),
     )),
   )
