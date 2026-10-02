@@ -17,12 +17,8 @@ import '../position.dart';
 Future<void> runLanguageServer() =>
     LanguageServer(Connection(stdin, stdout)).run();
 
-class LanguageServer {
-  LanguageServer(this._connection);
-
+class LanguageServer(final Connection _connection) {
   static const _debounce = Duration(milliseconds: 300);
-
-  final Connection _connection;
 
   final _overlay = FileOverlay();
   final _openFiles = <Uri, File>{};

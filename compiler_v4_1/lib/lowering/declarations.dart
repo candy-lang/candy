@@ -10,108 +10,80 @@ import '../lexer/token.dart';
 import '../position.dart';
 import 'modules.dart';
 
-sealed class CollectedDeclaration {
-  const CollectedDeclaration();
-
+sealed class const CollectedDeclaration() {
   DeclarationId get id;
   ModuleId get module => id.module;
   AstVisibility get visibility;
 }
 
-class CollectedStruct extends CollectedDeclaration {
-  const CollectedStruct({required this.id, required this.ast});
-  @override
-  final DeclarationId id;
-  final AstStruct ast;
-  @override
-  AstVisibility get visibility => ast.visibility;
-}
-
-class CollectedEnum extends CollectedDeclaration {
-  const CollectedEnum({required this.id, required this.ast});
-  @override
-  final DeclarationId id;
-  final AstEnum ast;
+class const CollectedStruct({
+  @override required final DeclarationId id,
+  required final AstStruct ast,
+}) extends CollectedDeclaration {
   @override
   AstVisibility get visibility => ast.visibility;
 }
 
-class CollectedTrait extends CollectedDeclaration {
-  const CollectedTrait({
-    required this.id,
-    required this.ast,
-    required this.associatedTypes,
-    required this.functions,
-  });
-  @override
-  final DeclarationId id;
-  final AstTrait ast;
-  final List<CollectedAssociatedType> associatedTypes;
-  final List<CollectedFunction> functions;
+class const CollectedEnum({
+  @override required final DeclarationId id,
+  required final AstEnum ast,
+}) extends CollectedDeclaration {
   @override
   AstVisibility get visibility => ast.visibility;
 }
 
-class CollectedImpl extends CollectedDeclaration {
-  const CollectedImpl({
-    required this.id,
-    required this.ast,
-    required this.associatedTypes,
-    required this.functions,
-  });
+class const CollectedTrait({
+  @override required final DeclarationId id,
+  required final AstTrait ast,
+  required final List<CollectedAssociatedType> associatedTypes,
+  required final List<CollectedFunction> functions,
+}) extends CollectedDeclaration {
   @override
-  final DeclarationId id;
-  final AstImpl ast;
-  final List<CollectedAssociatedType> associatedTypes;
-  final List<CollectedFunction> functions;
+  AstVisibility get visibility => ast.visibility;
+}
 
+class const CollectedImpl({
+  @override required final DeclarationId id,
+  required final AstImpl ast,
+  required final List<CollectedAssociatedType> associatedTypes,
+  required final List<CollectedFunction> functions,
+}) extends CollectedDeclaration {
   /// Impls are never named, so they are never imported.
   @override
   AstVisibility get visibility => .private;
 }
 
-class CollectedAssociatedType extends CollectedDeclaration {
-  const CollectedAssociatedType({required this.id, required this.ast});
-  @override
-  final DeclarationId id;
-  final AstAssociatedType ast;
-
+class const CollectedAssociatedType({
+  @override required final DeclarationId id,
+  required final AstAssociatedType ast,
+}) extends CollectedDeclaration {
   /// Members of a trait or impl are never named from the outside.
   @override
   AstVisibility get visibility => .private;
 }
 
-class CollectedFunction extends CollectedDeclaration {
-  const CollectedFunction({required this.id, required this.ast});
-  @override
-  final DeclarationId id;
-  final AstFunction ast;
-  @override
-  AstVisibility get visibility => ast.visibility;
-}
-
-class CollectedAssignment extends CollectedDeclaration {
-  const CollectedAssignment({required this.id, required this.ast});
-  @override
-  final DeclarationId id;
-  final AstAssignment ast;
+class const CollectedFunction({
+  @override required final DeclarationId id,
+  required final AstFunction ast,
+}) extends CollectedDeclaration {
   @override
   AstVisibility get visibility => ast.visibility;
 }
 
-class CollectedDeclarations {
-  CollectedDeclarations({
-    required this.modules,
-    required this.scopes,
-    required this.declarations,
-    required this.wellKnownTypes,
-  });
+class const CollectedAssignment({
+  @override required final DeclarationId id,
+  required final AstAssignment ast,
+}) extends CollectedDeclaration {
+  @override
+  AstVisibility get visibility => ast.visibility;
+}
 
-  final List<Module> modules;
-  final Map<ModuleId, ImportScope> scopes;
-  final Map<DeclarationId, CollectedDeclaration> declarations;
-  final WellKnownTypes wellKnownTypes;
-
+class CollectedDeclarations({
+  required final List<Module> modules,
+  required final Map<ModuleId, ImportScope> scopes,
+  required final Map<DeclarationId, CollectedDeclaration> declarations,
+  required final WellKnownTypes wellKnownTypes,
+}) {
   Iterable<T> ofKind<T extends CollectedDeclaration>() =>
       declarations.values.whereType<T>();
 
@@ -123,10 +95,7 @@ CollectedDeclarations collectDeclarations(
   List<Module> modules,
 ) => _Collector(context)._collect(modules);
 
-class _Collector {
-  _Collector(this.context);
-
-  final Context context;
+class _Collector(final Context context) {
   final _declarations = <DeclarationId, CollectedDeclaration>{};
   final _scopes = <ModuleId, ImportScope>{};
 

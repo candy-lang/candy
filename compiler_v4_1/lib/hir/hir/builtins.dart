@@ -2,14 +2,10 @@ import 'hir.dart';
 import 'ids.dart';
 
 /// Declared in source as `struct Int = builtin`.
-enum BuiltinType {
+enum BuiltinType(final String candyName) {
   int('Int'),
   list('List'),
   text('Text');
-
-  const BuiltinType(this.candyName);
-
-  final String candyName;
 
   static BuiltinType? fromName(String name) =>
       values.where((it) => it.candyName == name).firstOrNull;
@@ -138,7 +134,7 @@ enum BuiltinFunction {
   typeId('builtinTypeId'),
   typeIdOf('builtinTypeIdOf');
 
-  const BuiltinFunction(this.candyName);
+  new(this.candyName);
 
   /// Not unique: the `builtinListOf` overloads share one.
   final String candyName;

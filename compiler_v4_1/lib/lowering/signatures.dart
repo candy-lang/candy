@@ -16,84 +16,56 @@ import 'declarations.dart';
 import 'types.dart';
 
 /// A function together with everything a later pass needs to lower its body.
-class LoweredFunction {
-  const LoweredFunction({
-    required this.signature,
-    required this.ast,
-    required this.typeScope,
-    required this.owner,
-  });
-
-  final HirFunctionSignature signature;
+class const LoweredFunction({
+  required final HirFunctionSignature signature,
 
   /// `null` for builtins, which have no source.
-  final AstFunction? ast;
+  required final AstFunction? ast,
 
   /// Type parameters and `Self` from the enclosing trait or impl, plus the
   /// function's own.
-  final TypeScope typeScope;
+  required final TypeScope typeScope,
 
   /// The trait or impl this function belongs to.
-  final DeclarationId? owner;
-
+  required final DeclarationId? owner,
+}) {
   DeclarationId get id => signature.id;
   bool get isBuiltin => ast == null;
 }
 
-class LoweredTrait {
-  LoweredTrait({
-    required this.id,
-    required this.typeParameters,
-    required this.solverGoal,
-    required this.solverSubgoals,
-    required this.associatedTypes,
-    required this.functionIds,
-    required this.selfBaseType,
-    required this.selfTrait,
-  });
-
-  final DeclarationId id;
-  final List<HirTypeParameter> typeParameters;
-  final SolverGoal solverGoal;
-  final List<SolverGoal> solverSubgoals;
-  final List<HirAssociatedType> associatedTypes;
+class LoweredTrait({
+  required final DeclarationId id,
+  required final List<HirTypeParameter> typeParameters,
+  required final SolverGoal solverGoal,
+  required final List<SolverGoal> solverSubgoals,
+  required final List<HirAssociatedType> associatedTypes,
 
   /// Filled in once every impl's associated types are known.
-  List<DeclarationId> functionIds;
-  final HirType selfBaseType;
+  required var List<DeclarationId> functionIds,
+  required final HirType selfBaseType,
 
   /// `Self`'s own trait, i.e. this trait applied to its type parameters.
-  final HirTrait selfTrait;
-
+  required final HirTrait selfTrait,
+}) {
   HirAssociatedType? associatedType(DeclarationId id) =>
       associatedTypes.where((it) => it.id == id).firstOrNull;
 }
 
-class LoweredImpl {
-  LoweredImpl({
-    required this.id,
-    required this.typeParameters,
-    required this.type,
-    required this.trait,
-    required this.associatedTypes,
-    required this.functionsByTraitFunction,
-    required this.inherentFunctionIds,
-  });
-
-  final DeclarationId id;
-  final List<HirTypeParameter> typeParameters;
-  final HirType type;
+class LoweredImpl({
+  required final DeclarationId id,
+  required final List<HirTypeParameter> typeParameters,
+  required final HirType type,
 
   /// `null` for an inherent impl, which names no trait.
-  final HirErrorOr<HirTrait>? trait;
+  required final HirErrorOr<HirTrait>? trait,
 
   /// Keyed by the trait's associated type each one binds.
-  final Map<DeclarationId, HirType> associatedTypes;
+  required final Map<DeclarationId, HirType> associatedTypes,
 
   /// Both are filled in once every impl's associated types are known.
-  Map<DeclarationId, DeclarationId> functionsByTraitFunction;
-  List<DeclarationId> inherentFunctionIds;
-
+  required var Map<DeclarationId, DeclarationId> functionsByTraitFunction,
+  required var List<DeclarationId> inherentFunctionIds,
+}) {
   bool get isInherent => trait == null;
 
   ProjectionImpl get forProjection => ProjectionImpl(
@@ -107,43 +79,25 @@ class LoweredImpl {
   );
 }
 
-class LoweredAssignment {
-  const LoweredAssignment({
-    required this.id,
-    required this.name,
-    required this.declaredType,
-    required this.ast,
-  });
-
-  final DeclarationId id;
-  final String name;
+class const LoweredAssignment({
+  required final DeclarationId id,
+  required final String name,
 
   /// `null` when the assignment has no annotation and its type is inferred.
-  final HirType? declaredType;
-  final AstAssignment ast;
-}
+  required final HirType? declaredType,
+  required final AstAssignment ast,
+});
 
-class Signatures {
-  Signatures({
-    required this.typeDeclarations,
-    required this.traits,
-    required this.impls,
-    required this.functions,
-    required this.assignments,
-    required this.solverEnvironment,
-    required this.wellKnownTypes,
-    required this.builtinIds,
-  });
-
-  final Map<DeclarationId, HirTypeDeclaration> typeDeclarations;
-  final Map<DeclarationId, LoweredTrait> traits;
-  final List<LoweredImpl> impls;
-  final Map<DeclarationId, LoweredFunction> functions;
-  final Map<DeclarationId, LoweredAssignment> assignments;
-  final SolverEnvironment solverEnvironment;
-  final WellKnownTypes wellKnownTypes;
-  final Map<DeclarationId, BuiltinFunction> builtinIds;
-
+class Signatures({
+  required final Map<DeclarationId, HirTypeDeclaration> typeDeclarations,
+  required final Map<DeclarationId, LoweredTrait> traits,
+  required final List<LoweredImpl> impls,
+  required final Map<DeclarationId, LoweredFunction> functions,
+  required final Map<DeclarationId, LoweredAssignment> assignments,
+  required final SolverEnvironment solverEnvironment,
+  required final WellKnownTypes wellKnownTypes,
+  required final Map<DeclarationId, BuiltinFunction> builtinIds,
+}) {
   late final normalizer = TypeNormalizer(
     impls.map((it) => it.forProjection).toList(),
   );
@@ -184,12 +138,10 @@ Signatures lowerSignatures(
   CollectedDeclarations declarations,
 ) => _SignatureLowerer(context, declarations)._lower();
 
-class _SignatureLowerer {
-  _SignatureLowerer(this.context, this.declarations);
-
-  final Context context;
-  final CollectedDeclarations declarations;
-
+class _SignatureLowerer(
+  final Context context,
+  final CollectedDeclarations declarations,
+) {
   final _typeDeclarations = <DeclarationId, HirTypeDeclaration>{};
   final _traits = <DeclarationId, LoweredTrait>{};
   final _impls = <LoweredImpl>[];

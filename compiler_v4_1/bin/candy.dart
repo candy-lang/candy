@@ -1,4 +1,5 @@
 #!/usr/bin/env dart
+
 // ignore_for_file: avoid_print
 
 import 'dart:convert';
@@ -35,11 +36,7 @@ Future<void> main(List<String> arguments) async {
 }
 
 /// Thrown to terminate the CLI with a specific exit code.
-class Exit implements Exception {
-  const Exit(this.code);
-
-  final int code;
-
+class const Exit(final int code) implements Exception {
   static const fileNotFound = 1;
   static const directoryNotFound = 2;
   static const codeContainsErrors = 3;
@@ -98,8 +95,8 @@ void printErrors(Context context) {
 
 // `check`
 
-class CheckCommand extends Command<void> {
-  CheckCommand() {
+class CheckCommand() extends Command<void> {
+  this {
     argParser.addFlag(
       'watch',
       abbr: 'w',
@@ -160,8 +157,8 @@ class CheckCommand extends Command<void> {
 
 // `compile`
 
-class CompileCommand extends Command<void> {
-  CompileCommand() {
+class CompileCommand() extends Command<void> {
+  this {
     argParser.addFlag(
       'watch',
       abbr: 'w',
@@ -255,8 +252,8 @@ class CompileCommand extends Command<void> {
 
 // `lsp`
 
-class LspCommand extends Command<void> {
-  LspCommand() {
+class LspCommand() extends Command<void> {
+  this {
     argParser.addFlag(
       'stdio',
       negatable: false,
@@ -305,8 +302,8 @@ String _formatDuration(Duration duration) =>
 
 // `debug`
 
-class DebugCommand extends Command<void> {
-  DebugCommand() {
+class DebugCommand() extends Command<void> {
+  this {
     addSubcommand(DebugAstCommand());
     addSubcommand(DebugHirCommand());
     addSubcommand(DebugMonoCommand());
@@ -426,7 +423,7 @@ class DebugCCommand extends Command<void> {
 // `debug gold`
 
 class DebugGoldCommand extends Command<void> {
-  DebugGoldCommand() {
+  new() {
     addSubcommand(DebugGoldGenerateCommand());
     addSubcommand(DebugGoldCheckCommand());
   }
@@ -440,7 +437,7 @@ class DebugGoldCommand extends Command<void> {
 }
 
 abstract class DebugGoldSubcommand extends Command<void> {
-  DebugGoldSubcommand() {
+  new() {
     argParser.addOption(
       'output-directory',
       help:

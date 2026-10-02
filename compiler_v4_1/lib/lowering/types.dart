@@ -11,20 +11,14 @@ import 'declarations.dart';
 import 'modules.dart';
 
 /// The type parameters and `Self` type visible at some point in the program.
-class TypeScope {
-  const TypeScope({
-    this.typeParameters = const [],
-    this.selfBaseType,
-    this.selfTrait,
-  });
-
-  final List<HirTypeParameter> typeParameters;
-  final HirType? selfBaseType;
+class const TypeScope({
+  final List<HirTypeParameter> typeParameters = const [],
+  final HirType? selfBaseType,
 
   /// The trait `Self` gets its associated types from: the enclosing trait, or
   /// the trait an enclosing impl implements. `null` everywhere else.
-  final HirTrait? selfTrait;
-
+  final HirTrait? selfTrait,
+}) {
   TypeScope extend(List<HirTypeParameter> more) => TypeScope(
     typeParameters: [...typeParameters, ...more],
     selfBaseType: selfBaseType,
@@ -37,23 +31,17 @@ class TypeScope {
 
 /// Lowers syntax-level types to [HirType], resolving names through an
 /// [ImportScope].
-class TypeLowerer {
-  TypeLowerer({
-    required this.context,
-    required this.declarations,
-    required this.scope,
-    required this.checkTraitObject,
-  });
-
-  final Context context;
-  final CollectedDeclarations declarations;
-  final ImportScope scope;
+class TypeLowerer({
+  required final Context context,
+  required final CollectedDeclarations declarations,
+  required final ImportScope scope,
 
   /// Called for every trait used as a type. Whether it can be one depends on
   /// its functions, which may not be lowered yet, so the caller decides when
   /// to check.
-  final void Function(HirTrait trait, SourceSpan span) checkTraitObject;
-
+  required final void Function(HirTrait trait, SourceSpan span)
+  checkTraitObject,
+}) {
   void error(SourceSpan span, String message) =>
       context.addError(CompilerError(span: span, message: message));
 

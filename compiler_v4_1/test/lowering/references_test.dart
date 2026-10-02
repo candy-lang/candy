@@ -333,11 +333,9 @@ void main() {
         'withParameter',
         'argument',
       ]) {
-        expect(
-          harness.referencesAt(name, includeDeclaration: true),
-          [harness.location(name)],
-          reason: 'Expected to find the declaration of `$name`.',
-        );
+        expect(harness.referencesAt(name, includeDeclaration: true), [
+          harness.location(name),
+        ], reason: 'Expected to find the declaration of `$name`.');
       }
     });
 
@@ -355,11 +353,9 @@ void main() {
       harness.expectNoErrors();
 
       for (final name in ['binding', 'parameter', 'bound']) {
-        expect(
-          harness.referencesAt(name, includeDeclaration: true),
-          [harness.location(name)],
-          reason: 'Expected to find the declaration of `$name`.',
-        );
+        expect(harness.referencesAt(name, includeDeclaration: true), [
+          harness.location(name),
+        ], reason: 'Expected to find the declaration of `$name`.');
       }
     });
   });

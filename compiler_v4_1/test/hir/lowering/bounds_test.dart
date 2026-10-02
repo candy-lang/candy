@@ -14,6 +14,7 @@ void main() {
       expect(harness.signatureOf('f'), 'f[T: ToText + Compare](a: T) Text');
     });
 
+    // ignore: missing-test-assertion
     test('offers the functions of every bound', () {
       final harness = _lowerFull('''
         $_traitsSource
@@ -38,6 +39,7 @@ void main() {
       );
     });
 
+    // ignore: missing-test-assertion
     test('accepts a type that satisfies every bound', () {
       final harness = _lowerFull('''
         $_traitsSource
@@ -112,6 +114,7 @@ void main() {
       );
     });
 
+    // ignore: missing-test-assertion
     test('offers the functions of every bound on a projection', () {
       final harness = _lowerFull('''
         $_traitsSource

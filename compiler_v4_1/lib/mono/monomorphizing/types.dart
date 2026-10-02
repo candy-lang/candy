@@ -9,16 +9,10 @@ import '../mono/mono.dart';
 ///
 /// Every [MonoType] that appears anywhere in the result has an entry in
 /// [declarations], including ones only reachable as a type argument.
-class TypeMonomorphizer {
-  TypeMonomorphizer(this.hir, this.normalizer);
-
-  final Hir hir;
-  final TypeNormalizer normalizer;
+class TypeMonomorphizer(final Hir hir, final TypeNormalizer normalizer) {
   final _declarations = <MonoType, MonoTypeDeclaration?>{};
 
-  Map<MonoType, MonoTypeDeclaration> get declarations => {
-    for (final MapEntry(:key, :value) in _declarations.entries) key: value!,
-  };
+  Map<MonoType, MonoTypeDeclaration> get declarations => _declarations.cast();
 
   MonoTypeDeclaration declarationOf(MonoType type) =>
       _declarations[type] ??

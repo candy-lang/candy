@@ -4,12 +4,11 @@ import '../hir/hir.dart';
 import '../hir/ids.dart';
 
 /// Bindings for the type variables introduced while inferring one body.
-class TypeVariables {
-  TypeVariables();
-  TypeVariables._(this._bindings, this._next);
-
-  Map<TypeVariableId, HirType> _bindings = {};
-  var _next = 0;
+class TypeVariables._(
+  final Map<TypeVariableId, HirType> _bindings,
+  var int _next,
+) {
+  new() : this._({}, 0);
 
   HirType fresh() => HirType.variable(TypeVariableId(_next++));
 
@@ -155,21 +154,15 @@ extension on HirType {
 /// unification plus escapes for `Never`, error types, and `Self`. Coercing a
 /// value into a trait object needs the trait solver, so body lowering does that
 /// on top.
-class Unifier {
-  Unifier({
-    required this.variables,
-    required this.wellKnownTypes,
-    this.normalize,
-  });
-
-  final TypeVariables variables;
-  final WellKnownTypes wellKnownTypes;
+class Unifier({
+  required final TypeVariables variables,
+  required final WellKnownTypes wellKnownTypes,
 
   /// Resolves projections before they're compared, so `Self.Item` and the
   /// `Int` an impl binds it to are the same type. `null` inside the normalizer
   /// itself, which would otherwise call back into itself.
-  final HirType Function(HirType)? normalize;
-
+  final HirType Function(HirType)? normalize,
+}) {
   HirType _head(HirType type) {
     final resolved = variables.shallow(type);
     if (resolved is! HirType_Associated) return resolved;
@@ -289,34 +282,25 @@ class Unifier {
 }
 
 /// A constraint that can't be decided until more types are known.
-sealed class DeferredConstraint {
-  const DeferredConstraint();
-
+sealed class const DeferredConstraint() {
   SourceSpan get span;
 
   /// The type whose head has to be known before this can be decided.
   HirType get driver;
 }
 
-class HasFieldConstraint extends DeferredConstraint {
-  const HasFieldConstraint({
-    required this.receiver,
-    required this.field,
-    required this.result,
-    required this.span,
-  });
-
-  final HirType receiver;
-  final String field;
-  final HirType result;
-  @override
-  final SourceSpan span;
+class const HasFieldConstraint({
+  required final HirType receiver,
+  required final String field,
+  required final HirType result,
+  @override required final SourceSpan span,
+}) extends DeferredConstraint {
   @override
   HirType get driver => receiver;
 }
 
 class HasVariantConstraint extends DeferredConstraint {
-  const HasVariantConstraint({
+  const new({
     required this.enumType,
     required this.variant,
     required this.payload,
@@ -334,17 +318,11 @@ class HasVariantConstraint extends DeferredConstraint {
   HirType get driver => enumType;
 }
 
-class ImplementsConstraint extends DeferredConstraint {
-  const ImplementsConstraint({
-    required this.type,
-    required this.trait,
-    required this.span,
-  });
-
-  final HirType type;
-  final HirTrait trait;
-  @override
-  final SourceSpan span;
+class const ImplementsConstraint({
+  required final HirType type,
+  required final HirTrait trait,
+  @override required final SourceSpan span,
+}) extends DeferredConstraint {
   @override
   HirType get driver => type;
 }

@@ -10,23 +10,23 @@ part 'ids.freezed.dart';
 /// `Maybe[Int]` are the same key, so the type declarations hold one entry per
 /// monomorphized type.
 @freezed
-sealed class MonoType with _$MonoType implements Comparable<MonoType> {
-  const factory MonoType.named({
+sealed class const MonoType._()
+    with _$MonoType
+    implements Comparable<MonoType> {
+  const factory named({
     required DeclarationId declaration,
     @Default(<MonoType>[]) List<MonoType> typeArguments,
   }) = MonoType_Named;
-  const factory MonoType.function({
+  const factory function({
     required List<MonoType> parameterTypes,
     required MonoType returnType,
   }) = MonoType_Function;
 
   /// A trait object of [trait] instantiated with [typeArguments].
-  const factory MonoType.dyn({
+  const factory dyn({
     required DeclarationId trait,
     @Default(<MonoType>[]) List<MonoType> typeArguments,
   }) = MonoType_Dyn;
-
-  const MonoType._();
 
   @override
   int compareTo(MonoType other) => toString().compareTo(other.toString());
@@ -52,15 +52,13 @@ sealed class MonoType with _$MonoType implements Comparable<MonoType> {
 /// carry substitution maps of varying shape, so they're canonicalized to this
 /// list — otherwise one instantiation could end up under several keys.
 @freezed
-sealed class MonoFunctionId
+sealed class const MonoFunctionId._()
     with _$MonoFunctionId
     implements Comparable<MonoFunctionId> {
-  const factory MonoFunctionId({
+  const factory({
     required DeclarationId declaration,
     @Default(<MonoType>[]) List<MonoType> typeArguments,
   }) = _MonoFunctionId;
-
-  const MonoFunctionId._();
 
   @override
   int compareTo(MonoFunctionId other) => toString().compareTo(other.toString());
@@ -89,15 +87,13 @@ extension DeclarationIdMangling on DeclarationId {
 
 /// The vtable that lets [concreteType] be used as the trait object [dynType].
 @freezed
-sealed class MonoVtableId
+sealed class const MonoVtableId._()
     with _$MonoVtableId
     implements Comparable<MonoVtableId> {
-  const factory MonoVtableId({
+  const factory({
     required MonoType concreteType,
     required MonoType_Dyn dynType,
   }) = _MonoVtableId;
-  const MonoVtableId._();
-
   @override
   int compareTo(MonoVtableId other) => toString().compareTo(other.toString());
 

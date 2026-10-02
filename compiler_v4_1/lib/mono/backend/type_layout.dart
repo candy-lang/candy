@@ -10,10 +10,16 @@ import '../mono/mono.dart';
 /// `memory_layout.rs`. That pass also computed byte-level field offsets, but
 /// `mono_to_c` never used them — C's own compiler lays structs out — so this
 /// version only computes what the backend actually needs.
-class TypeLayouts {
-  TypeLayouts._(this.boxedVariants, this.declarationOrder);
+class TypeLayouts._(
+  /// For each enum type, the names of the variants that are stored as a
+  /// pointer instead of by value.
+  final Map<MonoType, Set<String>> boxedVariants,
 
-  factory TypeLayouts.compute(Map<MonoType, MonoTypeDeclaration> declarations) {
+  /// Every key of the input map, ordered so a struct/enum's by-value members
+  /// are declared before it.
+  final List<MonoType> declarationOrder,
+) {
+  factory compute(Map<MonoType, MonoTypeDeclaration> declarations) {
     final context = _Context(declarations);
     // ignore: prefer_foreach
     for (final type in declarations.keys) {
@@ -21,21 +27,9 @@ class TypeLayouts {
     }
     return TypeLayouts._(context.boxedVariants, context.declarationOrder);
   }
-
-  /// For each enum type, the names of the variants that are stored as a
-  /// pointer instead of by value.
-  final Map<MonoType, Set<String>> boxedVariants;
-
-  /// Every key of the input map, ordered so a struct/enum's by-value members
-  /// are declared before it.
-  final List<MonoType> declarationOrder;
 }
 
-class _Context {
-  _Context(this.declarations);
-
-  final Map<MonoType, MonoTypeDeclaration> declarations;
-
+class _Context(final Map<MonoType, MonoTypeDeclaration> declarations) {
   /// `null` while a type is being laid out (used to detect cycles), then
   /// replaced with `true` once it's fully processed.
   final Map<MonoType, bool> _visited = {};

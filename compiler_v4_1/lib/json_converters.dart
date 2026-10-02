@@ -3,12 +3,8 @@ import 'package:supernova/supernova.dart';
 
 import 'position.dart';
 
-class OptionConverter<T extends ToJson, J>
+class const OptionConverter<T extends ToJson, J>(final Mapper<J, T> fromJsonT)
     implements JsonConverter<Option<T>, Map<String, dynamic>> {
-  const OptionConverter(this.fromJsonT);
-
-  final Mapper<J, T> fromJsonT;
-
   @override
   Option<T> fromJson(Map<String, dynamic> json) => switch (json['type']) {
     'some' => Some(fromJsonT(json['value'] as J)),
@@ -23,14 +19,12 @@ class OptionConverter<T extends ToJson, J>
   };
 }
 
-class OffsetRangeInclusiveConverter
+class const OffsetRangeInclusiveConverter()
     implements JsonConverter<RangeInclusive<Offset>, Map<String, dynamic>> {
-  const OffsetRangeInclusiveConverter();
-
   @override
   RangeInclusive<Offset> fromJson(Map<String, dynamic> json) => RangeInclusive(
-    Offset.fromJson(json['start'] as Map<String, dynamic>),
-    Offset.fromJson(json['end'] as Map<String, dynamic>),
+    .fromJson(json['start'] as Map<String, dynamic>),
+    .fromJson(json['end'] as Map<String, dynamic>),
   );
 
   @override

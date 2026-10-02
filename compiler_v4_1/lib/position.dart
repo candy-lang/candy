@@ -10,11 +10,10 @@ part 'position.g.dart';
 /// The offset of a character in a string as the number of UTF-16 code units
 /// preceding it.
 @freezed
-sealed class Offset with _$Offset implements Comparable<Offset> {
-  const factory Offset(int value) = _Offset;
+sealed class const Offset._() with _$Offset implements Comparable<Offset> {
+  const factory(int value) = _Offset;
 
-  factory Offset.fromJson(Map<String, dynamic> json) => _$OffsetFromJson(json);
-  const Offset._();
+  factory fromJson(Map<String, dynamic> json) => _$OffsetFromJson(json);
 
   @override
   int compareTo(Offset other) => value.compareTo(other.value);
@@ -27,15 +26,13 @@ sealed class Offset with _$Offset implements Comparable<Offset> {
 }
 
 @freezed
-sealed class SourceSpan with _$SourceSpan {
-  const factory SourceSpan(
+sealed class const SourceSpan._() with _$SourceSpan {
+  const factory(
     SourceFile file,
     @OffsetRangeInclusiveConverter() RangeInclusive<Offset> span,
   ) = _SourceSpan;
 
-  factory SourceSpan.fromJson(Map<String, dynamic> json) =>
-      _$SourceSpanFromJson(json);
-  const SourceSpan._();
+  factory fromJson(Map<String, dynamic> json) => _$SourceSpanFromJson(json);
 
   /// `file:line:column`, e.g. for pointing at a single location.
   String get startLocation {

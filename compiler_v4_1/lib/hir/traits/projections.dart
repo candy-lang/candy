@@ -36,21 +36,14 @@ TypeNormalizer normalizerOf(Hir hir) {
 ///
 /// `LoweredImpl` and [HirImpl] both reduce to this, so signature lowering,
 /// body lowering and monomorphization can all share the resolution logic.
-class ProjectionImpl {
-  const ProjectionImpl({
-    required this.typeParameters,
-    required this.type,
-    required this.trait,
-    required this.associatedTypes,
-  });
-
-  final List<HirTypeParameter> typeParameters;
-  final HirType type;
+class const ProjectionImpl({
+  required final List<HirTypeParameter> typeParameters,
+  required final HirType type,
 
   /// `null` for an inherent impl, which binds no associated types.
-  final HirTrait? trait;
-  final Map<DeclarationId, HirType> associatedTypes;
-
+  required final HirTrait? trait,
+  required final Map<DeclarationId, HirType> associatedTypes,
+}) {
   bool get isBlanket => type is HirType_Parameter;
 }
 
@@ -60,10 +53,8 @@ class ProjectionImpl {
 /// A projection whose base type isn't known concretely stays as it is — a
 /// *rigid* projection, which only unifies with itself and only offers the
 /// methods of its declared bound.
-class TypeNormalizer {
-  TypeNormalizer(this.impls, {this.checkBounds});
-
-  final List<ProjectionImpl> impls;
+class TypeNormalizer(
+  final List<ProjectionImpl> impls, {
 
   /// Whether the impl's bounds hold for its concrete substitutions. Without
   /// it, two impls that only a bound tells apart (like the blanket impls of
@@ -73,7 +64,8 @@ class TypeNormalizer {
     ProjectionImpl impl,
     Map<TypeParameterId, HirType> substitutions,
   )?
-  checkBounds;
+  checkBounds,
+}) {
   final _cache = <HirType, HirType>{};
 
   /// `type Item = Self.Item` is legal to write and would otherwise never stop

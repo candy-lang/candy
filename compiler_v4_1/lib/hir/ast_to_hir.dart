@@ -13,12 +13,7 @@ import 'hir/ids.dart';
 Hir astToHir(Context context, List<Module> modules) =>
     _Lowerer(context, modules)._lower();
 
-class _Lowerer {
-  _Lowerer(this.context, this.modules);
-
-  final Context context;
-  final List<Module> modules;
-
+class _Lowerer(final Context context, final List<Module> modules) {
   final _ids = HirIdGenerator();
   final _globalTypes = <DeclarationId, HirType>{};
   final _assignments = <DeclarationId, HirAssignment>{};

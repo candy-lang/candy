@@ -4,12 +4,11 @@ part 'ids.freezed.dart';
 
 /// One source file. [path] is relative to the package root, without `.candy`.
 @freezed
-sealed class ModuleId with _$ModuleId implements Comparable<ModuleId> {
-  const factory ModuleId({
-    required String packageName,
-    required List<String> path,
-  }) = _ModuleId;
-  const ModuleId._();
+sealed class const ModuleId._()
+    with _$ModuleId
+    implements Comparable<ModuleId> {
+  const factory({required String packageName, required List<String> path}) =
+      _ModuleId;
 
   /// Synthetic and importable as `use Builtins`; it never exists on disk.
   static const builtin = ModuleId(packageName: builtinPackageName, path: []);
@@ -35,16 +34,15 @@ sealed class ModuleId with _$ModuleId implements Comparable<ModuleId> {
 }
 
 @freezed
-sealed class DeclarationId
+sealed class const DeclarationId._()
     with _$DeclarationId
     implements Comparable<DeclarationId> {
-  const factory DeclarationId({
+  const factory({
     required ModuleId module,
     required String name,
     DeclarationId? parent,
     @Default(0) int disambiguator,
   }) = _DeclarationId;
-  const DeclarationId._();
 
   static const implName = r'$impl';
 
@@ -82,16 +80,13 @@ sealed class DeclarationId
 }
 
 @freezed
-sealed class TypeParameterId with _$TypeParameterId {
-  const factory TypeParameterId.declared({
+sealed class const TypeParameterId._() with _$TypeParameterId {
+  const factory declared({
     required DeclarationId owner,
     required int index,
     required String name,
   }) = TypeParameterId_Declared;
-  const factory TypeParameterId.self(DeclarationId owner) =
-      TypeParameterId_Self;
-
-  const TypeParameterId._();
+  const factory self(DeclarationId owner) = TypeParameterId_Self;
 
   String get name => switch (this) {
     TypeParameterId_Declared(:final name) => name,
@@ -104,9 +99,8 @@ sealed class TypeParameterId with _$TypeParameterId {
 
 /// An unknown type during inference. Never survives into the final HIR.
 @freezed
-sealed class TypeVariableId with _$TypeVariableId {
-  const factory TypeVariableId(int value) = _TypeVariableId;
-  const TypeVariableId._();
+sealed class const TypeVariableId._() with _$TypeVariableId {
+  const factory(int value) = _TypeVariableId;
 
   @override
   String toString() => '?$value';
@@ -114,9 +108,8 @@ sealed class TypeVariableId with _$TypeVariableId {
 
 /// An expression or parameter within a single body.
 @freezed
-sealed class HirId with _$HirId implements Comparable<HirId> {
-  const factory HirId(int value) = _HirId;
-  const HirId._();
+sealed class const HirId._() with _$HirId implements Comparable<HirId> {
+  const factory(int value) = _HirId;
 
   @override
   int compareTo(HirId other) => value.compareTo(other.value);

@@ -39,6 +39,7 @@ void main() {
       );
     });
 
+    // ignore: missing-test-assertion
     test('matches an impl function that writes the bound type out', () {
       // The impl says `Int` where the trait says `Self.Item`; normalizing both
       // is what makes them the same signature.
@@ -269,6 +270,7 @@ void main() {
       expect(harness.bindingsOf('f').values, isNot(contains('Wrapper.Item')));
     });
 
+    // ignore: missing-test-assertion
     test("resolves `Self`'s projection in a blanket impl to its binding", () {
       final harness = _lowerFull('''
         trait Source {
@@ -293,6 +295,7 @@ void main() {
       harness.expectNoErrors();
     });
 
+    // ignore: missing-test-assertion
     test('reads a field through a projection the impl binds', () {
       final harness = _lowerFull('''
         trait Source {

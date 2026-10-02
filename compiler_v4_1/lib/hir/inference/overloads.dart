@@ -13,26 +13,19 @@ import 'inference.dart';
 
 /// The type parameters in scope where a call appears. Their bounds are what
 /// the solver may assume; they're opaque so nothing else can be proven of them.
-class SolverContext {
-  const SolverContext(
-    this.inScopeTypeParameters, {
-    this.extraConditions,
-    this.selfTrait,
-    this.selfType,
-  });
-
-  final List<HirTypeParameter> inScopeTypeParameters;
+class const SolverContext(
+  final List<HirTypeParameter> inScopeTypeParameters, {
 
   /// The bounds that in-scope associated types carry, which
   /// [OverloadResolver.solverContextFor] works out — `ToText($Assoc$Item(?T))`
   /// for `[T: Iterator]` and `trait Iterator { type Item: ToText }`.
-  final List<SolverGoal>? extraConditions;
+  final List<SolverGoal>? extraConditions,
 
   /// Inside a trait declaration, that trait and the `Self` it bounds. Both
   /// `null` anywhere else, including in an impl.
-  final HirTrait? selfTrait;
-  final HirType? selfType;
-
+  final HirTrait? selfTrait,
+  final HirType? selfType,
+}) {
   List<SolverGoal> get conditions => [
     ...solverGoalsOfBounds(inScopeTypeParameters),
     ?_selfGoal,
@@ -60,26 +53,19 @@ class SolverContext {
 
 /// A function that could be called, before its type parameters are given
 /// variables to stand in for them.
-class CandidateSource {
-  const CandidateSource({
-    required this.function,
-    required this.preset,
-    required this.group,
-    required this.goals,
-  });
-
-  final LoweredFunction function;
+class const CandidateSource({
+  required final LoweredFunction function,
 
   /// Already-known substitutions: `Self`, the trait's type arguments, and the
   /// enclosing impl's type parameters.
-  final Map<TypeParameterId, HirType> preset;
+  required final Map<TypeParameterId, HirType> preset,
 
   /// Lower binds tighter. Only the lowest non-empty group is considered.
-  final int group;
+  required final int group,
 
   /// Trait obligations this candidate brings, e.g. from a blanket impl.
-  final List<SolverGoal> goals;
-
+  required final List<SolverGoal> goals,
+}) {
   HirFunctionSignature get signature => function.signature;
 
   OverloadCandidate instantiate(TypeVariables variables) {
@@ -101,49 +87,31 @@ class CandidateSource {
   }
 }
 
-class OverloadCandidate {
-  const OverloadCandidate({
-    required this.source,
-    required this.signature,
-    required this.substitutions,
-  });
-
-  final CandidateSource source;
+class const OverloadCandidate({
+  required final CandidateSource source,
 
   /// [CandidateSource.signature] with variables in place of type parameters.
-  final HirFunctionSignature signature;
-  final Map<TypeParameterId, HirType> substitutions;
-
+  required final HirFunctionSignature signature,
+  required final Map<TypeParameterId, HirType> substitutions,
+}) {
   DeclarationId get id => source.signature.id;
   bool get isGeneric => source.signature.typeParameters.isNotEmpty;
 }
 
-sealed class OverloadResolution {
-  const OverloadResolution();
-}
+sealed class const OverloadResolution();
 
-class OverloadResolved extends OverloadResolution {
-  const OverloadResolved(this.candidate);
-  final OverloadCandidate candidate;
-}
+class const OverloadResolved(final OverloadCandidate candidate)
+    extends OverloadResolution;
 
-class OverloadNotFound extends OverloadResolution {
-  const OverloadNotFound(this.rejections);
-
+class const OverloadNotFound(
   /// Every candidate considered, with why it didn't apply.
-  final List<(HirFunctionSignature, String)> rejections;
-}
+  final List<(HirFunctionSignature, String)> rejections,
+) extends OverloadResolution;
 
-class OverloadAmbiguous extends OverloadResolution {
-  const OverloadAmbiguous(this.candidates);
-  final List<CandidateSource> candidates;
-}
+class const OverloadAmbiguous(final List<CandidateSource> candidates)
+    extends OverloadResolution;
 
-class OverloadResolver {
-  OverloadResolver(this.signatures);
-
-  final Signatures signatures;
-
+class OverloadResolver(final Signatures signatures) {
   Unifier _unifier(TypeVariables variables) => Unifier(
     variables: variables,
     wellKnownTypes: signatures.wellKnownTypes,

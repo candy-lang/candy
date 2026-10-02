@@ -5,13 +5,8 @@ import 'package:supernova/supernova.dart';
 import 'position.dart';
 
 @immutable
-class SourceFile {
-  const SourceFile(this.file, this.content);
-
-  factory SourceFile.fromJson(String json) => SourceFile(File(json), '');
-
-  final File file;
-  final String content;
+class const SourceFile(final File file, final String content) {
+  factory fromJson(String json) => SourceFile(File(json), '');
 
   String toJson() => file.path;
 

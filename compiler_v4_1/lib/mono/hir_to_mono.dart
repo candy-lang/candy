@@ -20,8 +20,12 @@ Mono? hirToMono(Hir hir) {
   return Monomorphizer(hir).run(mainFunction);
 }
 
-class Monomorphizer {
-  factory Monomorphizer(Hir hir) {
+class Monomorphizer._({
+  required final Hir hir,
+  required final TypeMonomorphizer types,
+  required final ImplResolver impls,
+}) {
+  factory(Hir hir) {
     final normalizer = normalizerOf(hir);
     return Monomorphizer._(
       hir: hir,
@@ -29,15 +33,6 @@ class Monomorphizer {
       impls: ImplResolver(hir, normalizer),
     );
   }
-  Monomorphizer._({
-    required this.hir,
-    required this.types,
-    required this.impls,
-  });
-
-  final Hir hir;
-  final TypeMonomorphizer types;
-  final ImplResolver impls;
 
   /// A `null` value marks an instantiation that is currently being lowered, so
   /// recursion doesn't lower it a second time.

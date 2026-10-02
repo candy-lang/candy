@@ -15,7 +15,7 @@ String monoToC(Mono mono) {
 }
 
 class _Context {
-  _Context(this.mono) : layouts = TypeLayouts.compute(mono.typeDeclarations);
+  new(this.mono) : layouts = TypeLayouts.compute(mono.typeDeclarations);
 
   final Mono mono;
   bool get usesOxygen => mono.functions.containsKey(

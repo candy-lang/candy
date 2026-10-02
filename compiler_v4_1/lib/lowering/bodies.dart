@@ -18,120 +18,81 @@ import 'signatures.dart';
 import 'types.dart';
 
 /// What lowering an expression produced.
-sealed class _Lowered {
-  const _Lowered();
-}
+sealed class const _Lowered();
 
-class _Value extends _Lowered {
-  const _Value(this.id, this.type);
-  final HirId id;
-  final HirType type;
-}
+class const _Value(final HirId id, final HirType type) extends _Lowered;
 
 /// A bare type name, e.g. the `Maybe` in `Maybe.none()`. Only meaningful as
 /// the receiver of a call or navigation.
-class _TypeReference extends _Lowered {
-  const _TypeReference(this.declaration);
-  final DeclarationId declaration;
-}
+class const _TypeReference(final DeclarationId declaration) extends _Lowered;
 
-class _LoweringError extends _Lowered {
-  const _LoweringError();
-}
+class const _LoweringError() extends _Lowered;
 
 /// A parameter or binding visible to the code being lowered.
-class _Local {
-  const _Local({
-    required this.name,
-    required this.id,
-    required this.type,
-    required this.span,
-  });
+class const _Local({
+  required final String name,
+  required final HirId id,
+  required final HirType type,
 
-  factory _Local.ofParameter(HirParameter parameter) => _Local(
+  /// Where the name is declared, or `null` for a builtin's parameter.
+  required final SourceSpan? span,
+}) {
+  factory ofParameter(HirParameter parameter) => _Local(
     name: parameter.name,
     id: parameter.id,
     type: parameter.type,
     span: parameter.span,
   );
-
-  final String name;
-  final HirId id;
-  final HirType type;
-
-  /// Where the name is declared, or `null` for a builtin's parameter.
-  final SourceSpan? span;
 }
 
 /// An expression whose callee isn't decided yet.
-class _PendingCall {
-  _PendingCall(this.candidate, this.arguments);
-  OverloadCandidate candidate;
-  final List<HirId> arguments;
-}
+class _PendingCall(
+  var OverloadCandidate candidate,
+  final List<HirId> arguments,
+);
 
-class _Entry {
-  _Entry({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.kind,
-  });
-
-  final HirId id;
-  final String? name;
-  HirType type;
-  HirExpressionKind kind;
+class _Entry({
+  required final HirId id,
+  required final String? name,
+  required var HirType type,
+  required var HirExpressionKind kind,
+}) {
   _PendingCall? pendingCall;
 }
 
-class BodyLowerer {
-  BodyLowerer({
-    required this.context,
-    required this.signatures,
-    required this.declarations,
-    required this.module,
-    required this.file,
-    required this.ids,
-    required this.globalTypes,
-  }) : variables = TypeVariables(),
-       resolver = OverloadResolver(signatures) {
-    unifier = Unifier(
-      variables: variables,
-      wellKnownTypes: signatures.wellKnownTypes,
-      normalize: signatures.normalizer.normalize,
-    );
-    typeLowerer = TypeLowerer(
-      context: context,
-      declarations: declarations,
-      scope: declarations.scopeOf(module),
-      // Signatures are complete by now, so this can be decided right away.
-      checkTraitObject: (trait, span) =>
-          checkTraitObject(context, signatures, trait, span),
-    );
-  }
+class BodyLowerer({
+  required final Context context,
+  required final Signatures signatures,
+  required final CollectedDeclarations declarations,
+  required final ModuleId module,
+  required final SourceFile file,
+  required final HirIdGenerator ids,
 
-  final Context context;
-  final Signatures signatures;
-  final CollectedDeclarations declarations;
-  final ModuleId module;
-  final SourceFile file;
-  final HirIdGenerator ids;
-
+  /// Types of top-level assignments, filled in as they're lowered.
+  required final Map<DeclarationId, HirType> globalTypes,
+}) {
   /// Used when an expression has no token at all, which means the parser
   /// already reported an error there.
-  late final fallbackSpan = SourceSpan(
+  final fallbackSpan = SourceSpan(
     file,
     const Offset(0).rangeTo(const Offset(0)),
   );
 
-  /// Types of top-level assignments, filled in as they're lowered.
-  final Map<DeclarationId, HirType> globalTypes;
-
-  final TypeVariables variables;
-  final OverloadResolver resolver;
-  late final Unifier unifier;
-  late final TypeLowerer typeLowerer;
+  final variables = TypeVariables();
+  final resolver = OverloadResolver(signatures);
+  late final unifier = Unifier(
+    variables: variables,
+    wellKnownTypes: signatures.wellKnownTypes,
+    normalize: signatures.normalizer.normalize,
+  );
+  late final typeLowerer = TypeLowerer(
+    context: context,
+    declarations: declarations,
+    scope: declarations.scopeOf(module),
+    // Signatures are complete by now, so this can be decided right away.
+    checkTraitObject: (trait, span) =>
+        checkTraitObject(context, signatures, trait, span),
+  );
 
   ImportScope get scope => declarations.scopeOf(module);
   WellKnownTypes get types => signatures.wellKnownTypes;
@@ -233,10 +194,7 @@ class BodyLowerer {
   }
 }
 
-class _Builder {
-  _Builder(this.lowerer);
-
-  final BodyLowerer lowerer;
+class _Builder(final BodyLowerer lowerer) {
   final _entries = <_Entry>[];
 
   TypeVariables get variables => lowerer.variables;

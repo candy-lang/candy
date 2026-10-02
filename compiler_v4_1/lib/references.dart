@@ -5,15 +5,13 @@ import 'package:supernova/supernova.dart' hide IterableSorted;
 import 'position.dart';
 
 /// Where a name in the source points, recorded while lowering resolves it.
-class Reference {
-  const Reference({required this.span, required this.targets});
-
-  final SourceSpan span;
+class const Reference({
+  required final SourceSpan span,
 
   /// More than one when a call couldn't be narrowed down to a single overload.
   /// Editors offer the user a choice between them.
-  final List<SourceSpan> targets;
-}
+  required final List<SourceSpan> targets,
+});
 
 /// Every resolved name in the program, so the language server can answer
 /// "what does this point at?" and "what points at this?" without redoing name
@@ -148,7 +146,7 @@ class ReferenceIndex {
 }
 
 class _Definition {
-  _Definition(this.span);
+  new(this.span);
 
   final SourceSpan span;
   final references = <SourceSpan>[];

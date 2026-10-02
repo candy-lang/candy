@@ -10,12 +10,10 @@ import 'types.dart';
 /// Expression IDs carry over unchanged: HIR lowering draws them from a single
 /// generator, so they're already unique within the function, nested lambdas
 /// and switch bindings included.
-class BodyMonomorphizer {
-  BodyMonomorphizer(this.monomorphizer, this.environment);
-
-  final Monomorphizer monomorphizer;
-  final Map<TypeParameterId, HirType> environment;
-
+class BodyMonomorphizer(
+  final Monomorphizer monomorphizer,
+  final Map<TypeParameterId, HirType> environment,
+) {
   TypeMonomorphizer get _types => monomorphizer.types;
 
   MonoBody lower(HirBody body) =>

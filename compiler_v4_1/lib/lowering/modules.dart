@@ -6,20 +6,16 @@ import '../file.dart';
 import '../hir/hir/builtins.dart';
 import '../hir/hir/ids.dart';
 
-class Module {
-  const Module({required this.id, required this.file, required this.ast});
+class const Module({
+  required final ModuleId id,
+  required final SourceFile file,
+  required final Ast ast,
+});
 
-  final ModuleId id;
-  final SourceFile file;
-  final Ast ast;
-}
-
-class Package {
-  const Package({required this.name, required this.rootDirectory});
-
-  final String name;
-  final Directory rootDirectory;
-
+class const Package({
+  required final String name,
+  required final Directory rootDirectory,
+}) {
   /// Files outside [rootDirectory] fall back to their basename, so
   /// single-file invocations like `hir_check foo.candy` work.
   ModuleId moduleIdFor(File file) {
@@ -71,10 +67,8 @@ class Package {
 
 /// Every package lives in one directory, and its name is its directory name.
 /// A package is marked by an empty `_package.candy` file.
-class Workspace {
-  const Workspace(this.packages);
-
-  factory Workspace.discover(Directory packagesDirectory) {
+class const Workspace(final Map<String, Package> packages) {
+  factory discover(Directory packagesDirectory) {
     final packages = <String, Package>{};
     // Sorted, so the order packages are loaded in — and with it the order
     // errors come out in — doesn't depend on the file system's listing order.
@@ -93,14 +87,12 @@ class Workspace {
 
   /// The fallback for a file with no `_package.candy` above it, so single-file
   /// invocations keep working.
-  factory Workspace.single(Package package) =>
-      Workspace({package.name: package});
+  factory single(Package package) => Workspace({package.name: package});
 
-  static String _directoryName(Directory directory) => Package._normalize(
-    directory.absolute.path,
-  ).split('/').lastWhere((it) => it.isNotEmpty);
-
-  final Map<String, Package> packages;
+  static String _directoryName(Directory directory) =>
+      Package._normalize(directory.absolute.path)
+          .split('/')
+          .lastWhere((it) => it.isNotEmpty);
 
   Package? operator [](String name) => packages[name];
 }
@@ -108,36 +100,17 @@ class Workspace {
 /// A name can refer to several functions at once, but to at most one type,
 /// trait, or assignment.
 @immutable
-sealed class NamedDeclarations {
-  const NamedDeclarations();
-}
-
-class NamedType extends NamedDeclarations {
-  const NamedType(this.id);
-  final DeclarationId id;
-}
-
-class NamedTrait extends NamedDeclarations {
-  const NamedTrait(this.id);
-  final DeclarationId id;
-}
-
-class NamedAssignment extends NamedDeclarations {
-  const NamedAssignment(this.id);
-  final DeclarationId id;
-}
-
-class NamedFunctions extends NamedDeclarations {
-  const NamedFunctions(this.ids);
-  final List<DeclarationId> ids;
-}
+sealed class const NamedDeclarations();
+class const NamedType(final DeclarationId id) extends NamedDeclarations;
+class const NamedTrait(final DeclarationId id) extends NamedDeclarations;
+class const NamedAssignment(final DeclarationId id) extends NamedDeclarations;
+class const NamedFunctions(final List<DeclarationId> ids)
+    extends NamedDeclarations;
 
 /// Two imported modules contributed the same name. Reported where the name is
 /// used, not at the `use` line, because there is no `hide` to resolve it with.
-class NamedAmbiguous extends NamedDeclarations {
-  const NamedAmbiguous(this.ids);
-  final List<DeclarationId> ids;
-
+class const NamedAmbiguous(final List<DeclarationId> ids)
+    extends NamedDeclarations {
   String get originsText {
     final modules = ids.map((it) => '${it.module}').toSet().sorted();
     return modules.map((it) => '`$it`').join(' and ');
@@ -146,23 +119,17 @@ class NamedAmbiguous extends NamedDeclarations {
 
 /// Every name lookup during lowering goes through [lookup], so adding `use`
 /// syntax later means filling [imports] rather than changing call sites.
-class ImportScope {
-  ImportScope({
-    required this.moduleDeclarations,
-    required this.imports,
-    required this.prelude,
-  });
-
-  final Map<String, NamedDeclarations> moduleDeclarations;
+class ImportScope({
+  required final Map<String, NamedDeclarations> moduleDeclarations,
 
   /// Explicit and glob imports share one layer for now.
-  final Map<String, NamedDeclarations> imports;
+  required final Map<String, NamedDeclarations> imports,
 
   /// The `Core` package's public declarations, ambient in every module outside
   /// `Core` itself. Filled in the same pass as [imports], because Core's
   /// exports are not known until every module has been collected.
-  final Map<String, NamedDeclarations> prelude;
-
+  required final Map<String, NamedDeclarations> prelude,
+}) {
   /// Innermost layer wins, except for functions: overloads from every layer
   /// are merged so a local `plus` doesn't hide an imported `plus` with a
   /// different signature. Overload resolution then ranks them by layer.

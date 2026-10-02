@@ -9,18 +9,16 @@ part 'solver.freezed.dart';
 
 /// The fact that a type implements a trait, e.g. `Compare(Ordering)`.
 @freezed
-sealed class SolverGoal with _$SolverGoal {
-  const factory SolverGoal({
+sealed class const SolverGoal._() with _$SolverGoal {
+  const factory({
     required DeclarationId trait,
     required List<SolverType> parameters,
   }) = _SolverGoal;
-  const SolverGoal._();
 
   Map<SolverVariable, SolverType>? unify(SolverGoal other) {
     if (trait != other.trait) return null;
-    return SolverValue.placeholder(
-      parameters,
-    ).type.unify(SolverValue.placeholder(other.parameters).type);
+    return SolverValue.placeholder(parameters).type
+        .unify(SolverValue.placeholder(other.parameters).type);
   }
 
   SolverGoal substituteAll(Map<SolverVariable, SolverType> substitutions) =>
@@ -37,9 +35,9 @@ sealed class SolverGoal with _$SolverGoal {
     Map<SolverVariable, SolverVariable> mapping,
   ) => SolverGoal(
     trait: trait,
-    parameters: SolverValue.placeholder(
-      parameters,
-    ).canonicalizeInternal(mapping).parameters,
+    parameters: SolverValue.placeholder(parameters)
+        .canonicalizeInternal(mapping)
+        .parameters,
   );
 
   @override
@@ -48,8 +46,8 @@ sealed class SolverGoal with _$SolverGoal {
 
 /// `impl[T: Compare] T: Equal` becomes `Equal(?T) <- Compare(?T)`.
 @freezed
-sealed class SolverRule with _$SolverRule {
-  const factory SolverRule({
+sealed class const SolverRule._() with _$SolverRule {
+  const factory({
     required SolverGoal goal,
     required List<SolverGoal> subgoals,
 
@@ -57,7 +55,6 @@ sealed class SolverRule with _$SolverRule {
     /// `null` for a rule standing for an in-scope bound.
     DeclarationId? origin,
   }) = _SolverRule;
-  const SolverRule._();
 
   /// How the rule reads in a diagnostic, e.g.
   /// ``impl `Equal(?T)` if `Compare(?T)` in Core.Operators.Compare``.
@@ -78,25 +75,22 @@ sealed class SolverRule with _$SolverRule {
 
 /// Why the solver couldn't pin a goal down to a single impl.
 @freezed
-sealed class SolverAmbiguity with _$SolverAmbiguity {
+sealed class const SolverAmbiguity._() with _$SolverAmbiguity {
   /// Every rule in [candidates] proves [goal], so which impl applies depends on
   /// a type that isn't known yet.
-  const factory SolverAmbiguity.multipleImpls({
+  const factory multipleImpls({
     required SolverGoal goal,
     required List<SolverRule> candidates,
   }) = SolverAmbiguity_MultipleImpls;
 
   /// [goal] can only be proven by way of itself.
-  const factory SolverAmbiguity.cycle({required SolverGoal goal}) =
-      SolverAmbiguity_Cycle;
+  const factory cycle({required SolverGoal goal}) = SolverAmbiguity_Cycle;
 
   /// One rule proves [goal], but it leaves the goal's own types open.
-  const factory SolverAmbiguity.underdetermined({
+  const factory underdetermined({
     required SolverGoal goal,
     required SolverRule rule,
   }) = SolverAmbiguity_Underdetermined;
-
-  const SolverAmbiguity._();
 
   /// A diagnostic explaining the ambiguity, as lines that read on from the
   /// goal they're about. Only the first line is unindented.
@@ -116,7 +110,7 @@ sealed class SolverAmbiguity with _$SolverAmbiguity {
 }
 
 class SolverEnvironment {
-  SolverEnvironment([List<SolverRule>? rules]) : rules = [...?rules];
+  new([List<SolverRule>? rules]) : rules = [...?rules];
 
   final List<SolverRule> rules;
 
@@ -161,10 +155,8 @@ class SolverEnvironment {
       (it) => SolverRule(goal: it.substituteAll(toVirtual), subgoals: const []),
     );
 
-    return _Solver([
-      ...rules,
-      ...virtualRules,
-    ]).solve(goal.substituteAll(toVirtual));
+    return _Solver([...rules, ...virtualRules])
+        .solve(goal.substituteAll(toVirtual));
   }
 
   @override
@@ -173,21 +165,18 @@ class SolverEnvironment {
 }
 
 @freezed
-sealed class SolverSolution with _$SolverSolution {
+sealed class const SolverSolution._() with _$SolverSolution {
   /// There is exactly one type that fulfills the goal.
-  const factory SolverSolution.unique({
+  const factory unique({
     required SolverGoal refinedGoal,
     required SolverRule usedRule,
   }) = SolverSolution_Unique;
 
   /// There may be multiple types that fulfill the goal.
-  const factory SolverSolution.ambiguous(SolverAmbiguity cause) =
-      SolverSolution_Ambiguous;
+  const factory ambiguous(SolverAmbiguity cause) = SolverSolution_Ambiguous;
 
   /// It's impossible to fulfill the goal.
-  const factory SolverSolution.impossible() = SolverSolution_Impossible;
-
-  const SolverSolution._();
+  const factory impossible() = SolverSolution_Impossible;
 
   bool get isUnique => this is SolverSolution_Unique;
 
@@ -201,7 +190,7 @@ sealed class SolverSolution with _$SolverSolution {
 }
 
 class _Solver {
-  _Solver(this.rules);
+  new(this.rules);
 
   final List<SolverRule> rules;
 
@@ -280,7 +269,7 @@ class _Solver {
 }
 
 class _SolverStrand {
-  _SolverStrand({
+  new({
     required this.usedRule,
     required this.goal,
     required this.solutionSpace,

@@ -8,10 +8,8 @@ import '../hir/lowering/harness.dart';
 
 /// Runs the whole pipeline, [preludeSource] included, up to monomorphization.
 // ignore: avoid-top-level-members-in-tests
-class MonoHarness {
-  MonoHarness._(this.mono);
-
-  factory MonoHarness.of(String source) {
+class MonoHarness._(final Mono mono) {
+  factory of(String source) {
     final harness = LoweringHarness.full('$preludeSource\n$source');
     harness.expectNoErrors();
 
@@ -19,8 +17,6 @@ class MonoHarness {
     expect(mono, isNotNull, reason: 'The program has no `main` function.');
     return MonoHarness._(mono!);
   }
-
-  final Mono mono;
 
   /// The instantiations of every function named [name], e.g. `identity[Int]`.
   List<String> instancesOf(String name) => mono.functions.keys

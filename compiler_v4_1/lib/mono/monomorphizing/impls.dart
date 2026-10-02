@@ -10,7 +10,7 @@ import '../../hir/traits/projections.dart';
 
 /// The function a call actually runs, and the substitutions to lower it with.
 class ResolvedCall {
-  const ResolvedCall({
+  const new({
     required this.signature,
     required HirBodyOrBuiltin this.body,
     required this.substitutions,
@@ -18,7 +18,7 @@ class ResolvedCall {
 
   /// A call through a trait object, which runs whatever its vtable holds in
   /// [dynSlot].
-  const ResolvedCall.dynDispatch({
+  const new dynDispatch({
     required this.signature,
     required int this.dynSlot,
     required this.substitutions,
@@ -31,13 +31,8 @@ class ResolvedCall {
 }
 
 /// Answers what a call to a trait function dispatches to once `Self` is known.
-class ImplResolver {
-  ImplResolver(this.hir, this.normalizer)
-    : _implsById = {for (final impl in hir.impls) impl.id: impl};
-
-  final Hir hir;
-  final TypeNormalizer normalizer;
-  final Map<DeclarationId, HirImpl> _implsById;
+class ImplResolver(final Hir hir, final TypeNormalizer normalizer) {
+  final _implsById = hir.impls.associateBy((it) => it.id);
 
   /// The type parameters the function's signature and body can mention, in the
   /// order that identifies one of its instantiations.
@@ -90,9 +85,9 @@ class ImplResolver {
       );
     }
 
-    if (normalizer.normalize(selfType) case HirType_Dyn(
-      trait: HirTrait(declaration: final objectTrait),
-    ) when objectTrait == trait.id) {
+    if (normalizer.normalize(selfType)
+        case HirType_Dyn(trait: HirTrait(declaration: final objectTrait))
+        when objectTrait == trait.id) {
       final slot = vtableSlotsOf(hir, trait.id).indexOf(id);
       if (slot < 0) throw StateError('`$id` is not in a vtable.');
       return ResolvedCall.dynDispatch(
@@ -153,9 +148,8 @@ class ImplResolver {
     final matches = <(HirImpl, Map<TypeParameterId, HirType>)>[];
     final blanketMatches = <(HirImpl, Map<TypeParameterId, HirType>)>[];
     for (final impl in hir.impls) {
-      if (impl.trait case Some(
-        some: final traitRef,
-      ) when traitRef.declaration == trait.id) {
+      if (impl.trait case Some(some: final traitRef)
+          when traitRef.declaration == trait.id) {
         final match = _match(impl, traitRef, selfType, traitArguments);
         if (match == null) continue;
         // A blanket impl only applies where no impl for the concrete type

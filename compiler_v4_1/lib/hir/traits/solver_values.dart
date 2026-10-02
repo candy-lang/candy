@@ -9,13 +9,9 @@ part 'solver_values.freezed.dart';
 /// The solver fabricates types while canonicalizing goals, hence
 /// [SolverTypeName.synthetic].
 @freezed
-sealed class SolverTypeName with _$SolverTypeName {
-  const factory SolverTypeName.declaration(DeclarationId id) =
-      SolverTypeName_Declaration;
-  const factory SolverTypeName.synthetic(String name) =
-      SolverTypeName_Synthetic;
-
-  const SolverTypeName._();
+sealed class const SolverTypeName._() with _$SolverTypeName {
+  const factory declaration(DeclarationId id) = SolverTypeName_Declaration;
+  const factory synthetic(String name) = SolverTypeName_Synthetic;
 
   @override
   String toString() => switch (this) {
@@ -27,15 +23,11 @@ sealed class SolverTypeName with _$SolverTypeName {
 /// [SolverVariableId.canonical] is used when goals get canonicalized so that
 /// structurally equal goals hash equally.
 @freezed
-sealed class SolverVariableId
+sealed class const SolverVariableId._()
     with _$SolverVariableId
     implements Comparable<SolverVariableId> {
-  const factory SolverVariableId.parameter(TypeParameterId id) =
-      SolverVariableId_Parameter;
-  const factory SolverVariableId.canonical(int index) =
-      SolverVariableId_Canonical;
-
-  const SolverVariableId._();
+  const factory parameter(TypeParameterId id) = SolverVariableId_Parameter;
+  const factory canonical(int index) = SolverVariableId_Canonical;
 
   /// Makes unification substitute the same variable whichever order the two
   /// are given in.
@@ -63,12 +55,9 @@ sealed class SolverVariableId
 
 /// Either a [SolverVariable] or a [SolverValue].
 @freezed
-sealed class SolverType with _$SolverType {
-  const factory SolverType.variable(SolverVariable variable) =
-      SolverType_Variable;
-  const factory SolverType.value(SolverValue value) = SolverType_Value;
-
-  const SolverType._();
+sealed class const SolverType._() with _$SolverType {
+  const factory variable(SolverVariable variable) = SolverType_Variable;
+  const factory value(SolverValue value) = SolverType_Value;
 
   bool containsVariable(SolverVariable variable) => switch (this) {
     SolverType_Variable(variable: final it) => it == variable,
@@ -169,11 +158,10 @@ sealed class SolverType with _$SolverType {
 
 /// Corresponds to a type parameter in Candy.
 @freezed
-sealed class SolverVariable with _$SolverVariable {
-  const factory SolverVariable(SolverVariableId id) = _SolverVariable;
-  const SolverVariable._();
+sealed class const SolverVariable._() with _$SolverVariable {
+  const factory(SolverVariableId id) = _SolverVariable;
 
-  factory SolverVariable.parameter(TypeParameterId id) =>
+  factory parameter(TypeParameterId id) =>
       SolverVariable(SolverVariableId.parameter(id));
 
   SolverType get type => SolverType.variable(this);
@@ -184,15 +172,14 @@ sealed class SolverVariable with _$SolverVariable {
 
 /// A concrete type, which may contain [SolverVariable]s in its [parameters].
 @freezed
-sealed class SolverValue with _$SolverValue {
-  const factory SolverValue({
+sealed class const SolverValue._() with _$SolverValue {
+  const factory({
     required SolverTypeName name,
     required List<SolverType> parameters,
   }) = _SolverValue;
-  const SolverValue._();
 
   /// Lets whole parameter lists be unified and canonicalized as one value.
-  factory SolverValue.placeholder(List<SolverType> types) => SolverValue(
+  factory placeholder(List<SolverType> types) => SolverValue(
     name: const SolverTypeName.synthetic(r'$Placeholder'),
     parameters: types,
   );

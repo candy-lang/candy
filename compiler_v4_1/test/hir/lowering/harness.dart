@@ -16,11 +16,9 @@ import 'package:compiler_v4_1/position.dart';
 import 'package:test/test.dart';
 
 // ignore: avoid-top-level-members-in-tests
-class LoweringHarness {
-  LoweringHarness._(this.source, this.context);
-
+class LoweringHarness._(final String source, final Context context) {
   /// Stops after signature lowering, leaving bodies alone.
-  factory LoweringHarness.of(String source) {
+  factory of(String source) {
     final harness = LoweringHarness._(source, Context());
     final module = harness._parse();
     harness
@@ -31,7 +29,7 @@ class LoweringHarness {
 
   /// Several modules in one package named `test`. Keys are slash-separated
   /// module paths.
-  factory LoweringHarness.modules(Map<String, String> sources) {
+  factory modules(Map<String, String> sources) {
     final harness = LoweringHarness._(sources.values.join('\n'), Context());
     final modules = [
       for (final MapEntry(key: path, value: source) in sources.entries)
@@ -46,7 +44,7 @@ class LoweringHarness {
   /// Like [LoweringHarness.modules], but runs bodies too, so name resolution
   /// inside function bodies is actually exercised. One module must define
   /// `main`.
-  factory LoweringHarness.fullModules(Map<String, String> sources) {
+  factory fullModules(Map<String, String> sources) {
     final harness = LoweringHarness._(sources.values.join('\n'), Context());
     harness.hir = astToHir(harness.context, [
       for (final MapEntry(key: path, value: source) in sources.entries)
@@ -57,7 +55,7 @@ class LoweringHarness {
 
   /// Several packages at once. Outer keys are package names, inner keys are
   /// module paths within that package.
-  factory LoweringHarness.packages(Map<String, Map<String, String>> sources) {
+  factory packages(Map<String, Map<String, String>> sources) {
     final harness = LoweringHarness._(
       [for (final package in sources.values) ...package.values].join('\n'),
       Context(),
@@ -75,9 +73,7 @@ class LoweringHarness {
 
   /// Like [LoweringHarness.packages], but runs bodies too. One module must
   /// define `main`.
-  factory LoweringHarness.fullPackages(
-    Map<String, Map<String, String>> sources,
-  ) {
+  factory fullPackages(Map<String, Map<String, String>> sources) {
     final harness = LoweringHarness._(
       [for (final package in sources.values) ...package.values].join('\n'),
       Context(),
@@ -91,7 +87,7 @@ class LoweringHarness {
   }
 
   /// Lexes and parses only, keeping whatever errors that produced.
-  factory LoweringHarness.parseOnly(String source) {
+  factory parseOnly(String source) {
     final harness = LoweringHarness._(source, Context());
     final file = SourceFile(File('test.candy'), source);
     Parser.parse(
@@ -103,14 +99,11 @@ class LoweringHarness {
   }
 
   /// Runs the whole pipeline, bodies included.
-  factory LoweringHarness.full(String source) {
+  factory full(String source) {
     final harness = LoweringHarness._(source, Context());
     harness.hir = astToHir(harness.context, [harness._parse()]);
     return harness;
   }
-
-  final String source;
-  final Context context;
 
   /// Every module's source, keyed by its path, so tests can look up offsets in
   /// the file a name actually lives in.

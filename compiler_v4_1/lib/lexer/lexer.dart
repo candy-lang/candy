@@ -7,18 +7,16 @@ import '../file.dart';
 import '../position.dart';
 import 'token.dart';
 
-class Lexer {
-  Lexer._(this.context, this.file, this.source);
-
+class Lexer._(
+  final Context context,
+  final SourceFile file,
+  final String source,
+) {
   static List<Token> lex(Context context, SourceFile file, String source) {
     final lexer = Lexer._(context, file, source);
     lexer._scanTokens();
     return lexer._result;
   }
-
-  final Context context;
-  final SourceFile file;
-  final String source;
 
   late final _characters = source.characters.iterator;
   var _start = const Offset(0);

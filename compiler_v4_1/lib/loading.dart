@@ -9,12 +9,7 @@ import 'lexer/token.dart';
 import 'lowering/modules.dart';
 import 'parser/parser.dart';
 
-class LoadedPackage {
-  const LoadedPackage(this.context, this.modules);
-
-  final Context context;
-  final List<Module> modules;
-}
+class const LoadedPackage(final Context context, final List<Module> modules);
 
 /// Loads the package rooted at [root] plus every package reachable through
 /// `use` lines. Loading only what is reachable keeps an unrelated broken

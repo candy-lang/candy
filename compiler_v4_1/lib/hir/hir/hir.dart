@@ -12,45 +12,34 @@ part 'hir.freezed.dart';
 /// error was already reported.
 typedef HirErrorOr<T extends Object> = Option<T>;
 
-class Hir {
-  Hir({
-    required this.solverEnvironment,
-    required this.typeDeclarations,
-    required this.traits,
-    required this.impls,
-    required this.assignments,
-    required this.functions,
-    required this.mainFunction,
-    this.anyTrait,
-  });
+class Hir({
+  required final SolverEnvironment solverEnvironment,
+  required final Map<DeclarationId, HirTypeDeclaration> typeDeclarations,
+  required final Map<DeclarationId, HirTraitDefinition> traits,
+  required final List<HirImpl> impls,
+  required final Map<DeclarationId, HirAssignment> assignments,
+  required final Map<DeclarationId, HirFunction> functions,
 
-  final SolverEnvironment solverEnvironment;
-  final Map<DeclarationId, HirTypeDeclaration> typeDeclarations;
-  final Map<DeclarationId, HirTraitDefinition> traits;
-  final List<HirImpl> impls;
-  final Map<DeclarationId, HirAssignment> assignments;
-  final Map<DeclarationId, HirFunction> functions;
-
-  final DeclarationId? mainFunction;
+  required final DeclarationId? mainFunction,
 
   /// The `Any` trait, which every type implements without an impl.
-  final DeclarationId? anyTrait;
-}
+  final DeclarationId? anyTrait,
+});
 
 // Types
 
 @freezed
-sealed class HirType with _$HirType {
-  const factory HirType.named({
+sealed class const HirType._() with _$HirType {
+  const factory named({
     required DeclarationId declaration,
     @Default([]) List<HirType> typeArguments,
   }) = HirType_Named;
-  const factory HirType.parameter(TypeParameterId id) = HirType_Parameter;
+  const factory parameter(TypeParameterId id) = HirType_Parameter;
 
   /// [baseType] is what `Self` stands for at the declaration site, used when
   /// no substitution applies.
-  const factory HirType.self({required HirType baseType}) = HirType_Self;
-  const factory HirType.function({
+  const factory self({required HirType baseType}) = HirType_Self;
+  const factory function({
     required List<HirType> parameterTypes,
     required HirType returnType,
   }) = HirType_Function;
@@ -61,7 +50,7 @@ sealed class HirType with _$HirType {
   /// unambiguous even for a generic trait. [declaration] is the associated
   /// type; its parent is the trait. Resolving one needs the impls in scope, so
   /// it happens in `TypeNormalizer` rather than in [substitute].
-  const factory HirType.associated({
+  const factory associated({
     required HirTrait trait,
     required HirType baseType,
     required DeclarationId declaration,
@@ -69,16 +58,14 @@ sealed class HirType with _$HirType {
 
   /// A trait object: some value whose type implements [trait], with the
   /// concrete type only known at runtime. Written as the bare trait name.
-  const factory HirType.dyn(HirTrait trait) = HirType_Dyn;
+  const factory dyn(HirTrait trait) = HirType_Dyn;
 
   /// An error was already reported, so anything involving this stays silent.
-  const factory HirType.error() = HirType_Error;
+  const factory error() = HirType_Error;
 
   /// Only exists while a body is being inferred. The substitution pass
   /// replaces any that are left with [HirType.error].
-  const factory HirType.variable(TypeVariableId id) = HirType_Variable;
-
-  const HirType._();
+  const factory variable(TypeVariableId id) = HirType_Variable;
 
   bool get containsError => switch (this) {
     HirType_Named(:final typeArguments) => typeArguments.any(
@@ -184,12 +171,11 @@ sealed class HirType with _$HirType {
 }
 
 @freezed
-sealed class HirTrait with _$HirTrait {
-  const factory HirTrait({
+sealed class const HirTrait._() with _$HirTrait {
+  const factory({
     required DeclarationId declaration,
     @Default(<HirType>[]) List<HirType> typeArguments,
   }) = _HirTrait;
-  const HirTrait._();
 
   HirTrait substitute(Map<TypeParameterId, HirType> environment) => HirTrait(
     declaration: declaration,
@@ -205,18 +191,17 @@ sealed class HirTrait with _$HirTrait {
 }
 
 @freezed
-sealed class HirTypeParameter with _$HirTypeParameter {
-  const factory HirTypeParameter({
+sealed class const HirTypeParameter._() with _$HirTypeParameter {
+  const factory({
     required TypeParameterId id,
 
     /// Bounds that couldn't be lowered are dropped, so this is empty for both
     /// `[T]` and `[T: Unknown]`.
     @Default(<HirTrait>[]) List<HirTrait> upperBounds,
   }) = _HirTypeParameter;
-  const HirTypeParameter._();
 
   String get name => id.name;
-  HirType get type => HirType.parameter(id);
+  HirType get type => .parameter(id);
 
   @override
   String toString() =>
@@ -226,8 +211,8 @@ sealed class HirTypeParameter with _$HirTypeParameter {
 // Type declarations
 
 @freezed
-sealed class HirTypeDeclaration with _$HirTypeDeclaration {
-  const factory HirTypeDeclaration({
+sealed class const HirTypeDeclaration._() with _$HirTypeDeclaration {
+  const factory({
     required DeclarationId id,
     required List<HirTypeParameter> typeParameters,
     required HirTypeDeclarationKind kind,
@@ -236,30 +221,26 @@ sealed class HirTypeDeclaration with _$HirTypeDeclaration {
     /// declarations without one (e.g. malformed code).
     SourceSpan? span,
   }) = _HirTypeDeclaration;
-  const HirTypeDeclaration._();
 
   /// `List[T]` for `struct List[T]`.
-  HirType get selfType => HirType.named(
+  HirType get selfType => .named(
     declaration: id,
     typeArguments: typeParameters.map((it) => it.type).toList(),
   );
 }
 
 @freezed
-sealed class HirTypeDeclarationKind with _$HirTypeDeclarationKind {
-  const factory HirTypeDeclarationKind.builtin(BuiltinType type) =
-      HirTypeDeclarationKind_Builtin;
-  const factory HirTypeDeclarationKind.struct({
-    required List<HirStructField> fields,
-  }) = HirTypeDeclarationKind_Struct;
-  const factory HirTypeDeclarationKind.enum_({
-    required List<HirEnumVariant> variants,
-  }) = HirTypeDeclarationKind_Enum;
+sealed class const HirTypeDeclarationKind._() with _$HirTypeDeclarationKind {
+  const factory builtin(BuiltinType type) = HirTypeDeclarationKind_Builtin;
+  const factory struct({required List<HirStructField> fields}) =
+      HirTypeDeclarationKind_Struct;
+  const factory enum_({required List<HirEnumVariant> variants}) =
+      HirTypeDeclarationKind_Enum;
 }
 
 @freezed
-sealed class HirStructField with _$HirStructField {
-  const factory HirStructField({
+sealed class const HirStructField._() with _$HirStructField {
+  const factory({
     required String name,
     required HirType type,
     @Default(AstVisibility.private) AstVisibility visibility,
@@ -267,16 +248,16 @@ sealed class HirStructField with _$HirStructField {
 }
 
 @freezed
-sealed class HirEnumVariant with _$HirEnumVariant {
-  const factory HirEnumVariant({required String name, required HirType? type}) =
+sealed class const HirEnumVariant._() with _$HirEnumVariant {
+  const factory({required String name, required HirType? type}) =
       _HirEnumVariant;
 }
 
 // Traits and impls
 
 @freezed
-sealed class HirTraitDefinition with _$HirTraitDefinition {
-  const factory HirTraitDefinition({
+sealed class const HirTraitDefinition._() with _$HirTraitDefinition {
+  const factory({
     required DeclarationId id,
     required List<HirTypeParameter> typeParameters,
     required SolverGoal solverGoal,
@@ -287,15 +268,14 @@ sealed class HirTraitDefinition with _$HirTraitDefinition {
 }
 
 @freezed
-sealed class HirAssociatedType with _$HirAssociatedType {
-  const factory HirAssociatedType({
+sealed class const HirAssociatedType._() with _$HirAssociatedType {
+  const factory({
     required DeclarationId id,
 
     /// Bounds that couldn't be lowered are dropped, so this is empty for both
     /// `type Item` and `type Item: Unknown`.
     @Default(<HirTrait>[]) List<HirTrait> upperBounds,
   }) = _HirAssociatedType;
-  const HirAssociatedType._();
 
   String get name => id.name;
 
@@ -305,8 +285,8 @@ sealed class HirAssociatedType with _$HirAssociatedType {
 }
 
 @freezed
-sealed class HirTraitFunction with _$HirTraitFunction {
-  const factory HirTraitFunction({
+sealed class const HirTraitFunction._() with _$HirTraitFunction {
+  const factory({
     required HirFunctionSignature signature,
 
     /// `null` without a default implementation.
@@ -315,8 +295,8 @@ sealed class HirTraitFunction with _$HirTraitFunction {
 }
 
 @freezed
-sealed class HirImpl with _$HirImpl {
-  const factory HirImpl({
+sealed class const HirImpl._() with _$HirImpl {
+  const factory({
     required DeclarationId id,
     required List<HirTypeParameter> typeParameters,
     required HirType type,
@@ -338,8 +318,8 @@ sealed class HirImpl with _$HirImpl {
 // Functions and assignments
 
 @freezed
-sealed class HirFunctionSignature with _$HirFunctionSignature {
-  const factory HirFunctionSignature({
+sealed class const HirFunctionSignature._() with _$HirFunctionSignature {
+  const factory({
     required DeclarationId id,
     required String name,
     required List<HirTypeParameter> typeParameters,
@@ -349,12 +329,11 @@ sealed class HirFunctionSignature with _$HirFunctionSignature {
     /// The declaration's span in the Candy source, or `null` for builtins.
     SourceSpan? span,
   }) = _HirFunctionSignature;
-  const HirFunctionSignature._();
 
   List<HirType> get parameterTypes => parameters.map((it) => it.type).toList();
 
   HirType get functionType =>
-      HirType.function(parameterTypes: parameterTypes, returnType: returnType);
+      .function(parameterTypes: parameterTypes, returnType: returnType);
 
   @override
   String toString() {
@@ -369,8 +348,8 @@ sealed class HirFunctionSignature with _$HirFunctionSignature {
 }
 
 @freezed
-sealed class HirParameter with _$HirParameter {
-  const factory HirParameter({
+sealed class const HirParameter._() with _$HirParameter {
+  const factory({
     required HirId id,
     required String name,
     required HirType type,
@@ -381,23 +360,22 @@ sealed class HirParameter with _$HirParameter {
 }
 
 @freezed
-sealed class HirFunction with _$HirFunction {
-  const factory HirFunction({
+sealed class const HirFunction._() with _$HirFunction {
+  const factory({
     required HirFunctionSignature signature,
     required HirBodyOrBuiltin body,
   }) = _HirFunction;
 }
 
 @freezed
-sealed class HirBodyOrBuiltin with _$HirBodyOrBuiltin {
-  const factory HirBodyOrBuiltin.body(HirBody body) = HirBodyOrBuiltin_Body;
-  const factory HirBodyOrBuiltin.builtin(BuiltinFunction function) =
-      HirBodyOrBuiltin_Builtin;
+sealed class const HirBodyOrBuiltin._() with _$HirBodyOrBuiltin {
+  const factory body(HirBody body) = HirBodyOrBuiltin_Body;
+  const factory builtin(BuiltinFunction function) = HirBodyOrBuiltin_Builtin;
 }
 
 @freezed
-sealed class HirAssignment with _$HirAssignment {
-  const factory HirAssignment({
+sealed class const HirAssignment._() with _$HirAssignment {
+  const factory({
     required DeclarationId id,
     required String name,
     required HirType type,
@@ -410,9 +388,8 @@ sealed class HirAssignment with _$HirAssignment {
 
 /// The last expression is the body's result.
 @freezed
-sealed class HirBody with _$HirBody {
-  const factory HirBody(List<HirBodyEntry> expressions) = _HirBody;
-  const HirBody._();
+sealed class const HirBody._() with _$HirBody {
+  const factory(List<HirBodyEntry> expressions) = _HirBody;
 
   static const empty = HirBody([]);
 
@@ -421,8 +398,8 @@ sealed class HirBody with _$HirBody {
 }
 
 @freezed
-sealed class HirBodyEntry with _$HirBodyEntry {
-  const factory HirBodyEntry({
+sealed class const HirBodyEntry._() with _$HirBodyEntry {
+  const factory({
     required HirId id,
 
     /// Only used for diagnostics and debug output.
@@ -432,41 +409,34 @@ sealed class HirBodyEntry with _$HirBodyEntry {
 }
 
 @freezed
-sealed class HirExpression with _$HirExpression {
-  const factory HirExpression({
-    required HirExpressionKind kind,
-    required HirType type,
-  }) = _HirExpression;
+sealed class const HirExpression._() with _$HirExpression {
+  const factory({required HirExpressionKind kind, required HirType type}) =
+      _HirExpression;
 }
 
 @freezed
-sealed class HirExpressionKind with _$HirExpressionKind {
-  const factory HirExpressionKind.int(int value) = HirExpressionKind_Int;
-  const factory HirExpressionKind.text(String value) = HirExpressionKind_Text;
+sealed class const HirExpressionKind._() with _$HirExpressionKind {
+  const factory int(int value) = HirExpressionKind_Int;
+  const factory text(String value) = HirExpressionKind_Text;
 
   /// The struct's type is the enclosing expression's type.
-  const factory HirExpressionKind.createStruct({required List<HirId> fields}) =
+  const factory createStruct({required List<HirId> fields}) =
       HirExpressionKind_CreateStruct;
-  const factory HirExpressionKind.structAccess({
-    required HirId struct,
-    required String field,
-  }) = HirExpressionKind_StructAccess;
+  const factory structAccess({required HirId struct, required String field}) =
+      HirExpressionKind_StructAccess;
 
   /// The enum's type is the enclosing expression's type.
-  const factory HirExpressionKind.createEnum({
-    required String variant,
-    required HirId? value,
-  }) = HirExpressionKind_CreateEnum;
+  const factory createEnum({required String variant, required HirId? value}) =
+      HirExpressionKind_CreateEnum;
 
   /// A parameter or earlier expression in the same body.
-  const factory HirExpressionKind.reference(HirId id) =
-      HirExpressionKind_Reference;
+  const factory reference(HirId id) = HirExpressionKind_Reference;
 
   /// A top-level assignment.
-  const factory HirExpressionKind.globalReference(DeclarationId id) =
+  const factory globalReference(DeclarationId id) =
       HirExpressionKind_GlobalReference;
 
-  const factory HirExpressionKind.call({
+  const factory call({
     required DeclarationId function,
     required Map<TypeParameterId, HirType> substitutions,
     required List<HirId> arguments,
@@ -474,18 +444,18 @@ sealed class HirExpressionKind with _$HirExpressionKind {
 
   /// The Rust compiler reuses [HirExpressionKind.call] for this by putting the
   /// local's ID in the function slot, leaving consumers to guess.
-  const factory HirExpressionKind.callLambda({
+  const factory callLambda({
     required HirId lambda,
     required List<HirId> arguments,
   }) = HirExpressionKind_CallLambda;
 
-  const factory HirExpressionKind.switch_({
+  const factory switch_({
     required HirId value,
     required HirType enumType,
     required List<HirSwitchCase> cases,
   }) = HirExpressionKind_Switch;
 
-  const factory HirExpressionKind.lambda({
+  const factory lambda({
     required List<HirParameter> parameters,
     required HirBody body,
   }) = HirExpressionKind_Lambda;
@@ -493,17 +463,15 @@ sealed class HirExpressionKind with _$HirExpressionKind {
   /// Boxes [value] into the trait object that is the enclosing expression's
   /// type. [sourceType] is [value]'s type, which monomorphization needs to
   /// pick the vtable.
-  const factory HirExpressionKind.toDyn({
-    required HirId value,
-    required HirType sourceType,
-  }) = HirExpressionKind_ToDyn;
+  const factory toDyn({required HirId value, required HirType sourceType}) =
+      HirExpressionKind_ToDyn;
 
-  const factory HirExpressionKind.error() = HirExpressionKind_Error;
+  const factory error() = HirExpressionKind_Error;
 }
 
 @freezed
-sealed class HirSwitchCase with _$HirSwitchCase {
-  const factory HirSwitchCase({
+sealed class const HirSwitchCase._() with _$HirSwitchCase {
+  const factory({
     required String variant,
     required HirId? valueId,
     required HirBody body,

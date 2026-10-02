@@ -169,9 +169,11 @@ extension on MonoHarness {
             .body
             .expressions)
       if (entry.expression.kind case MonoExpressionKind_ToDyn(:final vtable))
-        vtable == null
-            ? null
-            : '${describeType(vtable.concreteType)} as '
-                  '${describeType(vtable.dynType)}',
+        if (vtable == null)
+          null
+        else
+          // ignore: no_adjacent_strings_in_list
+          '${describeType(vtable.concreteType)} as '
+              '${describeType(vtable.dynType)}',
   ];
 }

@@ -5,14 +5,11 @@ import 'position.dart';
 part 'error.freezed.dart';
 
 @freezed
-sealed class CompilerError
+sealed class const CompilerError._()
     with _$CompilerError
     implements Comparable<CompilerError> {
-  const factory CompilerError({
-    required SourceSpan span,
-    required String message,
-  }) = _CompilerError;
-  const CompilerError._();
+  const factory({required SourceSpan span, required String message}) =
+      _CompilerError;
 
   /// Orders errors by where they are, so reporting doesn't depend on the order
   /// the phases happened to produce them in.
