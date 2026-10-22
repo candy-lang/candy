@@ -7,6 +7,7 @@ use Oxygen.Size
 use Oxygen.Widget
 use Oxygen.Widgets.Center
 use Oxygen.Widgets.ColoredBox
+use Oxygen.Widgets.Empty
 use Oxygen.Widgets.Padding
 use Oxygen.Widgets.SizedBox
 
@@ -47,19 +48,19 @@ fun main() Int {
   # day6Part1("1")
 
   let widget = Center(
-    Maybe.some(SizedBox(
+    SizedBox(
       Size(200, 100),
-      Maybe.some(ColoredBox(
+      ColoredBox(
         Color(0, 255, 0, 255),
-        Maybe.some(Padding(
+        Padding(
           EdgeInsets(10, 20, 30, 40),
-          Maybe.some(ColoredBox(
+          ColoredBox(
             Color(0, 0, 255, 255),
-            Maybe.none(),
-          )),
-        )),
-      )),
-    )),
+            Empty(),
+          ),
+        ),
+      ),
+    ),
   )
   run(widget, Size(800, 600))
 

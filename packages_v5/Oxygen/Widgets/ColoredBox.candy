@@ -8,28 +8,22 @@ use Oxygen.Widget
 
 public struct ColoredBox {
   public color: Color,
-  public child: Maybe[Widget],
+  public child: Widget,
 }
 impl ColoredBox: SingleChildWidget {
   type State = Nothing
   fun initialState(self: Self) Self.State {
     Nothing()
   }
-  fun child(self: Self) Maybe[Widget] {
+  fun child(self: Self) Widget {
     self.child
   }
   fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
-    let child = self.child.map((child) {
-      child.layout(child.initialState(), constraints, context).place(Offset(0, 0))
-    })
-    LaidOutSingleChildWidget(
-      child.map((it) { it.rect.size() }).unwrapOr(constraints.min),
-      state,
-      child,
-    )
+    let child = self.child.layout(self.child.initialState(), constraints, context).place(Offset(0, 0))
+    LaidOutSingleChildWidget(child.rect.size(), state, child)
   }
-  fun paint(self: Self, state: Self.State, child: Maybe[PositionedWidget[Any]], size: Size) List[DrawCommand] {
+  fun paint(self: Self, state: Self.State, child: PositionedWidget[Any], size: Size) List[DrawCommand] {
     List.of(DrawCommand.drawRect(DrawRect(Rect.fromOffsetAndSize(Offset(0, 0), size), Paint(self.color))))
-      .concat(child.map((child) { child.paint() }).unwrapOr(List.of()))
+      .concat(child.paint())
   }
 }

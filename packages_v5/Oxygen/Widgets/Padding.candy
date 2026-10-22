@@ -8,21 +8,19 @@ use Oxygen.Widget
 
 public struct Padding {
   public padding: EdgeInsets,
-  public child: Maybe[Widget],
+  public child: Widget,
 }
 impl Padding: SingleChildWidget {
   type State = Nothing
   fun initialState(self: Self) Self.State {
     Nothing()
   }
-  fun child(self: Self) Maybe[Widget] {
+  fun child(self: Self) Widget {
     self.child
   }
   fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
     let innerConstraints = constraints.subtract(self.padding)
-    let child = self.child.map((child) {
-      child.layout(child.initialState(), innerConstraints, context).place(self.padding.topLeft())
-    })
-    LaidOutSingleChildWidget(child.map((it) { it.rect.size().add(self.padding) }).unwrapOr(constraints.max), state, child)
+    let child = self.child.layout(self.child.initialState(), innerConstraints, context).place(self.padding.topLeft())
+    LaidOutSingleChildWidget(child.rect.size().add(self.padding), state, child)
   }
 }

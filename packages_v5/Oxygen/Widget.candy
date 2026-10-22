@@ -143,10 +143,10 @@ impl[W: LeafWidget] W: TypedWidget {
 public trait SingleChildWidget {
   type State
   fun initialState(self: Self) Self.State
-  fun child(self: Self) Maybe[Widget]
+  fun child(self: Self) Widget
   fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State]
-  fun paint(self: Self, state: Self.State, child: Maybe[PositionedWidget[Any]], size: Size) List[DrawCommand] {
-    child.map((child) { child.paint() }).unwrapOr(List.of())
+  fun paint(self: Self, state: Self.State, child: PositionedWidget[Any], size: Size) List[DrawCommand] {
+    child.paint()
   }
   fun handle(self: Self, state: Self.State, path: List[Int], message: Any) Self.State { state }
 }
@@ -157,7 +157,7 @@ struct SingleChildState[S] {
 public struct LaidOutSingleChildWidget[S] {
   public size: Size,
   public state: S,
-  public child: Maybe[PositionedWidget[Any]],
+  public child: PositionedWidget[Any],
 }
 impl[W: SingleChildWidget] W: TypedWidget {
   type State = SingleChildState[W.State]
@@ -166,14 +166,10 @@ impl[W: SingleChildWidget] W: TypedWidget {
   }
   fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutChild[Self.State] {
     let result = self.layout(state.own, constraints, context)
-    check(
-      self.child().isNone().equals(result.child.isNone()),
-      "SingleChildWidget must have a child iff the layout result has a child",
-    )
-    LaidOutChild(SingleChildState(result.state, result.child), result.size)
+    LaidOutChild(SingleChildState(result.state, Maybe.some(result.child)), result.size)
   }
   fun paint(self: Self, state: Self.State, size: Size) List[DrawCommand] {
-    self.paint(state.own, state.child, size)
+    self.paint(state.own, state.child.unwrap(), size)
   }
   fun handle(self: Self, state: Self.State, path: List[Int], message: Any) Self.State {
     # TODO(JonasWanke): handle child messages

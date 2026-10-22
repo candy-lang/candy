@@ -6,26 +6,24 @@ use Oxygen.Size
 use Oxygen.Widget
 
 public struct Center {
-  public child: Maybe[Widget],
+  public child: Widget,
 }
 impl Center: SingleChildWidget {
   type State = Nothing
   fun initialState(self: Self) Self.State {
     Nothing()
   }
-  fun child(self: Self) Maybe[Widget] {
+  fun child(self: Self) Widget {
     self.child
   }
   fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
     let size = constraints.max
-    let child = self.child.map((child) {
-      let child = child.layout(child.initialState(), Constraints.loose(size), context)
-      let offset = Offset(
-        (size.width.subtract(child.size.width)),
-        (size.height.subtract(child.size.height)),
-      ).divideTruncating(2)
-      child.place(offset)
-    })
+    let child = self.child.layout(self.child.initialState(), Constraints.loose(size), context)
+    let offset = Offset(
+      (size.width.subtract(child.size.width)),
+      (size.height.subtract(child.size.height)),
+    ).divideTruncating(2)
+    let child = child.place(offset)
     LaidOutSingleChildWidget(size, state, child)
   }
 }

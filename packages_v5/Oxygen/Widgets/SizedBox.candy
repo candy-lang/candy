@@ -7,21 +7,19 @@ use Oxygen.Widget
 
 public struct SizedBox {
   public size: Size,
-  public child: Maybe[Widget],
+  public child: Widget,
 }
 impl SizedBox: SingleChildWidget {
   type State = Nothing
   fun initialState(self: Self) Self.State {
     Nothing()
   }
-  fun child(self: Self) Maybe[Widget] {
+  fun child(self: Self) Widget {
     self.child
   }
   fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
     let size = constraints.constrain(self.size)
-    let child = self.child.map((child) {
-      child.layout(child.initialState(), Constraints.tight(size), context).place(Offset(0, 0))
-    })
+    let child = self.child.layout(self.child.initialState(), Constraints.tight(size), context).place(Offset(0, 0))
     LaidOutSingleChildWidget(size, state, child)
   }
 }
