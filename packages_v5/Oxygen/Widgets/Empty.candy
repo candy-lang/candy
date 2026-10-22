@@ -1,0 +1,21 @@
+use Oxygen.Color
+use Oxygen.Constraints
+use Oxygen.DrawCommand
+use Oxygen.Offset
+use Oxygen.Rect
+use Oxygen.Size
+use Oxygen.Widget
+
+public struct Empty {}
+impl Empty: LeafWidget {
+  type State = Nothing
+  fun initialState(self: Self) Self.State {
+    Nothing()
+  }
+  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutChild[Self.State] {
+    LaidOutChild(state, constraints.min)
+  }
+  fun paint(self: Self, state: Self.State, size: Size) List[DrawCommand] {
+    List.of()
+  }
+}

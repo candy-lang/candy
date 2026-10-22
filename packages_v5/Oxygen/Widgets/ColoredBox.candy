@@ -28,7 +28,7 @@ impl ColoredBox: SingleChildWidget {
       child,
     )
   }
-  fun paint(self: Self, state: Self.State, child: Maybe[PositionedChild[Any]], size: Size) List[DrawCommand] {
+  fun paint(self: Self, state: Self.State, child: Maybe[PositionedWidget[Any]], size: Size) List[DrawCommand] {
     List.of(DrawCommand.drawRect(DrawRect(Rect.fromOffsetAndSize(Offset(0, 0), size), Paint(self.color))))
       .concat(child.map((child) { child.paint() }).unwrapOr(List.of()))
   }
