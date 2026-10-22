@@ -18,8 +18,8 @@ impl ColoredBox: SingleChildWidget {
   fun child(self: Self) Widget {
     self.child
   }
-  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
-    let child = self.child.layout(self.child.initialState(), constraints, context).place(Offset(0, 0))
+  fun layout(self: Self, state: Self.State, child: Child, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
+    let child = child.layout(constraints, context).place(Offset(0, 0))
     LaidOutSingleChildWidget(child.rect.size(), state, child)
   }
   fun paint(self: Self, state: Self.State, child: PositionedWidget[Any], size: Size) List[DrawCommand] {

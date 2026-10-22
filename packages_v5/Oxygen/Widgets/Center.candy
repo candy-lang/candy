@@ -16,9 +16,9 @@ impl Center: SingleChildWidget {
   fun child(self: Self) Widget {
     self.child
   }
-  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
+  fun layout(self: Self, state: Self.State, child: Child, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
     let size = constraints.max
-    let child = self.child.layout(self.child.initialState(), Constraints.loose(size), context)
+    let child = child.layout(Constraints.loose(size), context)
     let offset = Offset(
       (size.width.subtract(child.size.width)),
       (size.height.subtract(child.size.height)),

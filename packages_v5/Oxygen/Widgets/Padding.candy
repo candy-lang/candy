@@ -18,9 +18,9 @@ impl Padding: SingleChildWidget {
   fun child(self: Self) Widget {
     self.child
   }
-  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
+  fun layout(self: Self, state: Self.State, child: Child, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
     let innerConstraints = constraints.subtract(self.padding)
-    let child = self.child.layout(self.child.initialState(), innerConstraints, context).place(self.padding.topLeft())
+    let child = child.layout(innerConstraints, context).place(self.padding.topLeft())
     LaidOutSingleChildWidget(child.rect.size().add(self.padding), state, child)
   }
 }

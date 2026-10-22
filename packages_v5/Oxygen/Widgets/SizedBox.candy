@@ -17,9 +17,9 @@ impl SizedBox: SingleChildWidget {
   fun child(self: Self) Widget {
     self.child
   }
-  fun layout(self: Self, state: Self.State, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
+  fun layout(self: Self, state: Self.State, child: Child, constraints: Constraints, context: Context) LaidOutSingleChildWidget[Self.State] {
     let size = constraints.constrain(self.size)
-    let child = self.child.layout(self.child.initialState(), Constraints.tight(size), context).place(Offset(0, 0))
+    let child = child.layout(Constraints.tight(size), context).place(Offset(0, 0))
     LaidOutSingleChildWidget(size, state, child)
   }
 }
